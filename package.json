@@ -1,0 +1,68 @@
+{
+  "name": "instabids",
+  "version": "1.0.0",
+  "description": "AI-powered marketplace connecting homeowners with contractors",
+  "private": true,
+  "workspaces": [
+    "web",
+    "mobile",
+    "shared"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=web",
+    "dev:mobile": "npm run start --workspace=mobile",
+    "dev:ai": "cd ai-agents && python -m uvicorn main:app --reload",
+    "build:web": "npm run build --workspace=web",
+    "build:mobile": "npm run build --workspace=mobile",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
+    "prepare": "husky install",
+    "setup": "npm install && npm run setup:supabase",
+    "setup:supabase": "supabase init && supabase start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/[your-username]/instabids.git"
+  },
+  "keywords": [
+    "marketplace",
+    "ai",
+    "contractors",
+    "homeowners",
+    "langraph",
+    "supabase",
+    "react",
+    "react-native"
+  ],
+  "author": "Instabids Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/[your-username]/instabids/issues"
+  },
+  "homepage": "https://github.com/[your-username]/instabids#readme",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "eslint": "^8.56.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.53.0"
+  }
+}

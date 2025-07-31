@@ -1,0 +1,217 @@
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Shield, Star, Clock, Users } from 'lucide-react'
+import UltraInteractiveCIAChat from '@/components/chat/UltraInteractiveCIAChat'
+import { apiService } from '@/services/api'
+import { motion } from 'framer-motion'
+import { useAuth } from '@/contexts/AuthContext'
+
+const HomePage: React.FC = () => {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false)
+  const [conversationComplete, setConversationComplete] = useState(false)
+  const [projectData, setProjectData] = useState<any>(null)
+  const [sessionId] = useState(`session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
+
+  const handleSendMessage = async (message: string, images: string[]) => {
+    try {
+      // Use authenticated user ID if available, otherwise undefined for anonymous
+      const userId = user?.id
+      const result = await apiService.sendChatMessage(message, images, userId, sessionId)
+      
+      if (result.success && result.data) {
+        // Check if conversation has reached a completion phase
+        if (result.data.phase === 'review' || result.data.phase === 'complete') {
+          setConversationComplete(true)
+          setProjectData(result.data.extractedData)
+          // Show signup prompt after a delay
+          setTimeout(() => setShowSignupPrompt(true), 2000)
+        }
+        
+        return {
+          response: result.data.response,
+          phase: result.data.phase,
+          extractedData: result.data.extractedData
+        }
+      } else {
+        throw new Error(result.error || 'Failed to send message')
+      }
+    } catch (error) {
+      console.error('[HomePage] Error sending message:', error)
+      throw error
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      {/* Header */}
+      <header className="bg-white/80 backdrop-blur-sm fixed top-0 w-full z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Instabids
+            </h1>
+            <nav className="flex gap-4">
+              <button
+                onClick={() => navigate('/login')}
+                className="text-gray-700 hover:text-primary-600 transition-colors"
+              >
+                Contractor Login
+              </button>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section with Chat */}
+      <section className="pt-24 pb-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Hero Text */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-8"
+          >
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Save 20% on Home Projects
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              No sales meetings. No hassle. Just chat with our AI to describe your project and get matched with pre-qualified contractors instantly.
+            </p>
+          </motion.div>
+
+          {/* Trust Indicators */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="flex flex-wrap justify-center gap-6 mb-8"
+          >
+            <div className="flex items-center gap-2 text-gray-600">
+              <Shield className="w-5 h-5 text-green-600" />
+              <span className="text-sm">Verified Contractors</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-600">
+              <Star className="w-5 h-5 text-yellow-500" />
+              <span className="text-sm">4.8/5 Average Rating</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-600">
+              <Clock className="w-5 h-5 text-blue-600" />
+              <span className="text-sm">24hr Response Time</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-600">
+              <Users className="w-5 h-5 text-purple-600" />
+              <span className="text-sm">10,000+ Projects</span>
+            </div>
+          </motion.div>
+
+          {/* Chat Interface */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+            className="max-w-4xl mx-auto"
+          >
+            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+              <UltraInteractiveCIAChat 
+                onSendMessage={handleSendMessage}
+                initialMessage="Welcome to Instabids! I'm Alex, your AI project assistant. Tell me about your home project and I'll help you get competitive bids from verified contractors. What are you looking to get done?"
+              />
+            </div>
+          </motion.div>
+
+          {/* Signup Prompt Modal */}
+          {showSignupPrompt && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowSignupPrompt(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-2xl font-bold mb-4">Great! Your Project is Ready</h3>
+                <p className="text-gray-600 mb-6">
+                  Sign up now to receive bids from verified contractors. It only takes 30 seconds!
+                </p>
+                <button
+                  onClick={() => navigate('/signup', { state: { sessionId, projectData } })}
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-200 mb-3"
+                >
+                  Sign Up with Google
+                </button>
+                <button
+                  onClick={() => setShowSignupPrompt(false)}
+                  className="w-full text-gray-500 py-2 hover:text-gray-700 transition-colors"
+                >
+                  Continue chatting
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </div>
+      </section>
+
+      {/* Social Proof */}
+      <section className="py-12 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="grid md:grid-cols-3 gap-8"
+          >
+            <div className="bg-white p-6 rounded-xl shadow-sm">
+              <div className="flex mb-2">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-5 h-5 fill-current text-yellow-400" />
+                ))}
+              </div>
+              <p className="text-gray-600 mb-2">
+                "Saved $3,000 on my kitchen remodel. The AI understood exactly what I wanted!"
+              </p>
+              <p className="text-sm font-semibold">- Sarah M., Los Angeles</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm">
+              <div className="flex mb-2">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-5 h-5 fill-current text-yellow-400" />
+                ))}
+              </div>
+              <p className="text-gray-600 mb-2">
+                "No pushy sales calls! Got 5 bids in 24 hours for my bathroom renovation."
+              </p>
+              <p className="text-sm font-semibold">- Mike T., Chicago</p>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm">
+              <div className="flex mb-2">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-5 h-5 fill-current text-yellow-400" />
+                ))}
+              </div>
+              <p className="text-gray-600 mb-2">
+                "The chat was so easy! Like texting a friend who knows everything about home projects."
+              </p>
+              <p className="text-sm font-semibold">- Emily R., New York</p>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 text-center text-gray-500 text-sm">
+        <p>© 2025 Instabids. All rights reserved. | Privacy | Terms</p>
+      </footer>
+    </div>
+  )
+}
+
+export default HomePage
