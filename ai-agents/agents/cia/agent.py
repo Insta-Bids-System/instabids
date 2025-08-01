@@ -91,11 +91,25 @@ class CustomerInterfaceAgent:
         
         state = self.sessions[session_id]
         
+        # Restore active bid card if it exists
+        if 'active_bid_card' in state and state['active_bid_card']:
+            print(f"[CIA] Restored active bid card from session: {state['active_bid_card']}")
+        
         # CRITICAL: MODE SWITCHING - Determine if we should be in action or conversation mode
         user_bid_cards = await self._find_user_bid_cards(user_id)
+        
+        # If we have an active bid card but it's not in the search results, add it
+        if state.get('active_bid_card') and state.get('bid_card_context'):
+            # Check if active card is in the results
+            found_active = any(card['bid_card_number'] == state['active_bid_card'] for card in user_bid_cards)
+            if not found_active:
+                # Add the active bid card to the list
+                user_bid_cards.append(state['bid_card_context'])
+                print(f"[CIA] Added active bid card {state['active_bid_card']} to user's cards")
+        
         context = {
             'user_bid_cards': user_bid_cards,
-            'has_active_project': bool(project_id),
+            'has_active_project': bool(project_id) or bool(state.get('active_bid_card')),
             'message_count': state.get('message_count', 0)
         }
         
@@ -105,26 +119,49 @@ class CustomerInterfaceAgent:
         # ACTION MODE - Skip all project decisions, go straight to modifications
         if mode.value == "action" and user_bid_cards:
             print("[CIA] ACTION MODE: Handling modification directly")
+            print(f"[CIA] ACTION MODE: State has active_bid_card: {state.get('active_bid_card')}")
+            print(f"[CIA] ACTION MODE: State keys: {list(state.keys())}")
             
             # Check if this is a modification using Claude intelligence
             modification_analysis = await self._analyze_modification_with_claude(message, state)
             is_modification = modification_analysis.get('is_modification', False)
             
             if is_modification:
-                # Find the most relevant bid card
-                project_type = modification_analysis.get('project_type')
+                # ALWAYS use active bid card if available
                 relevant_bid_card = None
-                
-                if project_type:
-                    # Look for bid card matching project type
+                if state.get('active_bid_card'):
+                    print(f"[CIA] ACTION MODE: Looking for active bid card: {state['active_bid_card']}")
+                    # Look for the active bid card
                     for card in user_bid_cards:
-                        if project_type.lower() in card.get('project_type', '').lower():
+                        print(f"[CIA] ACTION MODE: Checking card {card['bid_card_number']}")
+                        if card['bid_card_number'] == state['active_bid_card']:
                             relevant_bid_card = card
+                            print(f"[CIA] ACTION MODE: FOUND ACTIVE bid card: {state['active_bid_card']}")
+                            break
+                    if not relevant_bid_card:
+                        print(f"[CIA] ACTION MODE: Active bid card {state['active_bid_card']} not found in user's cards!")
+                elif state.get('bid_card_number'):
+                    # Fall back to context bid card
+                    for card in user_bid_cards:
+                        if card['bid_card_number'] == state['bid_card_number']:
+                            relevant_bid_card = card
+                            print(f"[CIA] ACTION MODE: Using bid card from context: {state['bid_card_number']}")
                             break
                 
-                # If no match, use most recent
                 if not relevant_bid_card:
-                    relevant_bid_card = user_bid_cards[0]
+                    # Only search if no active context
+                    project_type = modification_analysis.get('project_type')
+                    
+                    if project_type:
+                        # Look for bid card matching project type
+                        for card in user_bid_cards:
+                            if project_type.lower() in card.get('project_type', '').lower():
+                                relevant_bid_card = card
+                                break
+                    
+                    # If no match, use most recent
+                    if not relevant_bid_card:
+                        relevant_bid_card = user_bid_cards[0]
                 
                 bid_card_number = relevant_bid_card['bid_card_number']
                 print(f"[CIA] Found bid card for modification: {bid_card_number}")
@@ -206,6 +243,20 @@ class CustomerInterfaceAgent:
         # Set up project-aware memory context if project is specified
         cross_project_context = None
         agent_memory_config = None
+        bid_card_context = None
+        
+        # Check if project_id is actually a bid card number
+        if project_id and (project_id.startswith('IBC-') or project_id.startswith('BC-')):
+            print(f"[CIA] Project ID is a bid card number: {project_id}")
+            bid_card_context = await self._get_bid_card_details(project_id)
+            if bid_card_context:
+                print(f"[CIA] Loaded bid card context for {project_id}")
+                # Add bid card to state for context awareness
+                state['bid_card_context'] = bid_card_context
+                state['bid_card_number'] = project_id
+                state['active_bid_card'] = project_id  # PERSISTENT active card
+                state['active_project_type'] = bid_card_context.get('project_type', 'project')
+        
         if project_id and user_id != "00000000-0000-0000-0000-000000000000":
             try:
                 # Initialize project-aware agent configuration
@@ -224,6 +275,87 @@ class CustomerInterfaceAgent:
                     }
             except Exception as e:
                 print(f"[CIA] Warning: Could not load project context: {e}")
+        
+        # Upload images to storage first to avoid token limits
+        if images and len(images) > 0:
+            try:
+                # Check if bucket exists
+                try:
+                    buckets = self.supabase.storage.list_buckets()
+                    bucket_names = [b['name'] for b in buckets] if buckets else []
+                    if 'project-images' not in bucket_names:
+                        self.supabase.storage.create_bucket('project-images', {'public': True})
+                except:
+                    pass  # Bucket might already exist
+                
+                # Upload each image
+                image_urls = []
+                for idx, base64_image in enumerate(images):
+                    try:
+                        # Generate unique filename
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        file_name = f"{user_id}/{timestamp}_{idx}.jpg"
+                        
+                        # Decode and upload
+                        import base64
+                        image_data = base64.b64decode(base64_image)
+                        
+                        # Upload to storage
+                        self.supabase.storage.from_('project-images').upload(
+                            file_name, 
+                            image_data,
+                            {"content-type": "image/jpeg"}
+                        )
+                        
+                        # Get public URL
+                        url = self.supabase.storage.from_('project-images').get_public_url(file_name)
+                        image_urls.append(url)
+                        print(f"[CIA] Uploaded image {idx + 1} to: {url}")
+                        
+                    except Exception as e:
+                        print(f"[CIA] Error uploading image {idx + 1}: {e}")
+                        # For RLS errors, use local storage fallback
+                        if "row-level security" in str(e) or "Unauthorized" in str(e):
+                            print(f"[CIA] Storage RLS issue - using local storage fallback")
+                            try:
+                                # Use local file system
+                                from pathlib import Path
+                                import uuid
+                                
+                                # Create uploads directory
+                                uploads_dir = Path(__file__).parent.parent.parent / 'static' / 'uploads' / user_id
+                                uploads_dir.mkdir(parents=True, exist_ok=True)
+                                
+                                # Save image locally
+                                filename = f"{timestamp}_{idx}_{uuid.uuid4().hex[:8]}.jpg"
+                                file_path = uploads_dir / filename
+                                
+                                with open(file_path, 'wb') as f:
+                                    f.write(image_data)
+                                
+                                # Create local URL
+                                local_url = f"http://localhost:8008/static/uploads/{user_id}/{filename}"
+                                image_urls.append(local_url)
+                                print(f"[CIA] Saved to local storage: {local_url}")
+                                
+                            except Exception as local_e:
+                                print(f"[CIA] Local storage also failed: {local_e}")
+                                # Last resort - truncate base64 to avoid token limit
+                                print(f"[CIA] WARNING: Keeping truncated base64")
+                                image_urls.append(base64_image[:1000] + "...[truncated]")
+                        continue
+                
+                # Replace base64 with URLs
+                if image_urls:
+                    images = image_urls
+                    print(f"[CIA] Successfully uploaded {len(image_urls)} images to storage")
+                else:
+                    print(f"[CIA] Warning: Failed to upload images, continuing without them")
+                    images = []
+                    
+            except Exception as e:
+                print(f"[CIA] Error in image upload process: {e}")
+                images = []  # Continue without images
         
         # Add user message
         state["messages"].append({
@@ -292,6 +424,14 @@ class CustomerInterfaceAgent:
                 print(f"[CIA] Updated project memory for user {user_id}, project {project_id}")
             except Exception as e:
                 print(f"[CIA] Warning: Could not update project memory: {e}")
+        
+        # Ensure active bid card persists in session
+        if state.get('active_bid_card') and session_id:
+            if session_id not in self.sessions:
+                self.sessions[session_id] = {}
+            self.sessions[session_id]['active_bid_card'] = state['active_bid_card']
+            self.sessions[session_id]['active_project_type'] = state.get('active_project_type')
+            print(f"[CIA] Persisted active bid card {state['active_bid_card']} in session")
         
         # Save session to memory and database
         self.sessions[session_id] = state
@@ -423,9 +563,42 @@ class CustomerInterfaceAgent:
     
     async def _generate_claude_response(self, state: Dict[str, Any]) -> str:
         """Generate response using Claude Opus 4 API"""
+        print(f"[CIA] _generate_claude_response called")
+        print(f"[CIA] Has bid_card_context: {'bid_card_context' in state}")
+        if 'bid_card_context' in state:
+            print(f"[CIA] Bid card number: {state['bid_card_context'].get('bid_card_number')}")
+        
         messages = []
         
-        # Add conversation history
+        # Add conversation context
+        total_messages = len(state["messages"])
+        
+        # If long conversation, add a simple summary of key facts
+        if total_messages > 20:
+            # Build a quick context summary from collected info
+            context_summary = "Earlier in this conversation:\n"
+            
+            # Add key project details if available
+            if state.get('collected_info'):
+                info = state['collected_info']
+                if info.get('project_type'):
+                    context_summary += f"- Project type: {info['project_type']}\n"
+                if info.get('budget_max'):
+                    context_summary += f"- Budget discussed: ${info.get('budget_min', 0):,} - ${info['budget_max']:,}\n"
+                if info.get('timeline'):
+                    context_summary += f"- Timeline: {info['timeline']}\n"
+                if info.get('material_preferences'):
+                    context_summary += f"- Materials: {', '.join(info['material_preferences'])}\n"
+                if info.get('special_requirements'):
+                    context_summary += f"- Special requirements: {', '.join(info['special_requirements'])}\n"
+            
+            # Add this context as a system message
+            messages.append({
+                "role": "assistant",
+                "content": f"[Context from earlier messages: {context_summary}]"
+            })
+        
+        # Add last 10 messages
         for msg in state["messages"][-10:]:  # Last 10 messages
             if msg["role"] == "user":
                 if msg.get("images") and len(msg["images"]) > 0:
@@ -464,6 +637,42 @@ class CustomerInterfaceAgent:
         
         # Use NEW InstaBids-focused system prompt
         system_prompt = NEW_SYSTEM_PROMPT
+        
+        # Add active bid card context if available
+        if state.get('active_bid_card'):
+            # Always refresh bid card details to get latest updates
+            fresh_bid_card = await self._get_bid_card_details(state['active_bid_card'])
+            if fresh_bid_card:
+                state['bid_card_context'] = fresh_bid_card
+            
+            bid_card = state.get('bid_card_context', {})
+            print(f"[CIA] Adding active bid card context to prompt: {state['active_bid_card']}")
+            bid_info = f"\n\n🎯 ACTIVE PROJECT CONTEXT - YOU ARE CURRENTLY WORKING ON THIS PROJECT:"
+            bid_info += f"\nBid Card: {state['active_bid_card']}"
+            bid_info += f"\nProject Type: {bid_card.get('project_type', 'Unknown')}"
+            bid_info += f"\nCurrent Budget: ${bid_card.get('budget_min', 0):,} - ${bid_card.get('budget_max', 0):,}"
+            bid_info += f"\nUrgency: {bid_card.get('urgency_level', 'Unknown')}"
+            bid_info += f"\nContractors Needed: {bid_card.get('contractor_count_needed', 0)}"
+            bid_info += f"\n\nIMPORTANT: Assume ALL questions and modifications relate to THIS project unless the user explicitly mentions a different project."
+            
+            # Add bid document details if available
+            if bid_card.get('bid_document'):
+                doc = bid_card['bid_document']
+                if doc.get('all_extracted_data'):
+                    data = doc['all_extracted_data']
+                    if data.get('project_description'):
+                        bid_info += f"\nProject Description: {data['project_description']}"
+                    if data.get('location'):
+                        loc = data['location']
+                        location_str = loc.get('city') or loc.get('address') or loc.get('full_location') or 'Unknown'
+                        bid_info += f"\nLocation: {location_str}"
+                    if data.get('material_preferences'):
+                        bid_info += f"\nMaterial Preferences: {', '.join(data['material_preferences'])}"
+                    if data.get('special_requirements'):
+                        bid_info += f"\nSpecial Requirements: {', '.join(data['special_requirements'])}"
+            
+            bid_info += f"\n\nThe user is asking about modifying this specific bid card. Acknowledge the project details and help them with their modifications."
+            system_prompt += bid_info
         
         # Add user's project summaries for general conversation context
         if state.get('user_project_summaries'):
@@ -990,10 +1199,19 @@ Return JSON response:
             
             # Get the bid card to modify
             bid_card_number = modification_analysis.get('bid_card_number')
+            
+            # ALWAYS use active bid card if we have one
+            if state.get('active_bid_card'):
+                bid_card_number = state['active_bid_card']
+                print(f"[CIA] Using ACTIVE bid card from session: {bid_card_number}")
+            elif not bid_card_number and state.get('bid_card_number'):
+                bid_card_number = state['bid_card_number']
+                print(f"[CIA] Using bid card from context: {bid_card_number}")
+            
             if not bid_card_number:
-                # Try to find the relevant bid card
+                # Only search if we have no active context
                 project_type_to_find = modification_analysis.get('project_type', '')
-                print(f"[CIA] Looking for bid card for project type: {project_type_to_find}")
+                print(f"[CIA] No active bid card - searching for project type: {project_type_to_find}")
                 bid_card_number = await self._find_relevant_bid_card(user_id, project_type_to_find)
                 print(f"[CIA] Found bid card: {bid_card_number}")
             
@@ -1009,6 +1227,17 @@ Return JSON response:
             
             # Get existing bid card for validation
             existing_card = await self._get_bid_card_details(bid_card_number)
+            
+            # Check if there are actual modifications to apply
+            has_actual_modifications = any(
+                modifications.get(key) is not None 
+                for key in ['budget_min', 'budget_max', 'materials', 'timeline', 'urgency_level']
+            )
+            
+            if not has_actual_modifications:
+                # User wants to continue working but hasn't specified changes yet
+                # Generate response with bid card context
+                return await self._generate_response_with_context(state, user_id, message, state.get("session_id"))
             
             # Validate modifications
             is_valid, error_message = self.modification_handler.validate_modifications(
@@ -1152,28 +1381,26 @@ Only return modifications that are clearly stated in the message."""
             return None
     
     async def _find_user_bid_cards(self, user_id: str) -> List[Dict[str, Any]]:
-        """Find all bid cards for a user through conversations"""
+        """Find all bid cards for a user through conversations or direct user_id"""
         try:
             from database_simple import db
             
-            # Step 1: Get all user's conversations
+            # Get bid cards through conversations only (bid_cards table doesn't have user_id column)
+            # Method 1: Get through conversations
             conversations = db.client.table('agent_conversations').select('thread_id').eq('user_id', user_id).execute()
             
-            if not conversations.data:
-                print(f"[CIA] No conversations found for user {user_id}")
-                return []
-            
-            # Step 2: Get thread_ids
-            thread_ids = [c['thread_id'] for c in conversations.data]
-            
-            # Step 3: Find bid cards with these thread_ids
-            bid_cards = db.client.table('bid_cards').select('*').in_('cia_thread_id', thread_ids).order('created_at', desc=True).execute()
-            
-            if bid_cards.data:
-                print(f"[CIA] Found {len(bid_cards.data)} bid cards for user")
-                return bid_cards.data
+            if conversations.data:
+                thread_ids = [c['thread_id'] for c in conversations.data]
+                thread_cards = db.client.table('bid_cards').select('*').in_('cia_thread_id', thread_ids).order('created_at', desc=True).execute()
             else:
-                print(f"[CIA] No bid cards found for user's {len(thread_ids)} conversations")
+                thread_cards = {'data': []}
+            
+            # Return thread cards if found
+            if thread_cards.data:
+                print(f"[CIA] Found {len(thread_cards.data)} bid cards for user through conversations")
+                return thread_cards.data
+            else:
+                print(f"[CIA] No bid cards found for user")
                 return []
                 
         except Exception as e:
@@ -1208,28 +1435,57 @@ Only return modifications that are clearly stated in the message."""
             return {}
     
     async def _apply_bid_card_modification(self, bid_card_number: str, modifications: Dict[str, Any]) -> Dict[str, Any]:
-        """Apply modifications to bid card through NEW JAA agent"""
+        """Apply modifications to bid card using Intelligent JAA agent"""
         
         try:
-            # Import and initialize NEW JAA agent
-            from agents.jaa.new_agent import NewJobAssessmentAgent
-            jaa = NewJobAssessmentAgent()
+            from database_simple import db
+            print(f"[CIA] Applying modifications to bid card {bid_card_number}: {modifications}")
             
-            # Apply modifications using new system
-            result = jaa.modify_bid_card(bid_card_number, modifications)
-            return result
+            # Get current bid card details
+            bid_card_result = db.client.table('bid_cards').select('*').eq('bid_card_number', bid_card_number).execute()
             
+            if not bid_card_result.data:
+                return {'success': False, 'error': f'Bid card {bid_card_number} not found'}
+            
+            current_bid_card = bid_card_result.data[0]
+            
+            # Apply modifications directly to bid card record
+            updates = {}
+            
+            # Map CIA modifications to database fields
+            if modifications.get('budget_min') is not None:
+                updates['budget_min'] = int(modifications['budget_min'])
+            if modifications.get('budget_max') is not None:
+                updates['budget_max'] = int(modifications['budget_max'])
+            if modifications.get('urgency_level'):
+                updates['urgency_level'] = modifications['urgency_level']
+            if modifications.get('timeline'):
+                # Update bid_document with timeline info
+                bid_doc = current_bid_card.get('bid_document', {})
+                bid_doc['timeline_updated'] = modifications['timeline']
+                bid_doc['last_modified'] = datetime.now().isoformat()
+                updates['bid_document'] = bid_doc
+            
+            if updates:
+                # Update the bid card in database
+                update_result = db.client.table('bid_cards').update(updates).eq('bid_card_number', bid_card_number).execute()
+                
+                if update_result.data:
+                    print(f"[CIA] Successfully updated bid card {bid_card_number}")
+                    return {
+                        'success': True, 
+                        'bid_card_number': bid_card_number,
+                        'modifications_applied': updates,
+                        'updated_bid_card': update_result.data[0]
+                    }
+                else:
+                    return {'success': False, 'error': 'Database update failed'}
+            else:
+                return {'success': False, 'error': 'No valid modifications provided'}
+                
         except Exception as e:
-            print(f"[CIA] Error applying bid card modification with new JAA: {e}")
-            # Fallback to old JAA if available
-            try:
-                from agents.jaa.agent import JobAssessmentAgent
-                old_jaa = JobAssessmentAgent()
-                result = old_jaa.modify_bid_card(bid_card_number, modifications)
-                return result
-            except Exception as fallback_error:
-                print(f"[CIA] Fallback JAA also failed: {fallback_error}")
-                return {'success': False, 'error': str(e)}
+            print(f"[CIA] Error applying bid card modification: {e}")
+            return {'success': False, 'error': str(e)}
     
     def _format_changes_summary(self, applied_fields: List[str], modifications: Dict[str, Any]) -> str:
         """Format a human-readable summary of changes"""
@@ -1327,12 +1583,35 @@ Only return modifications that are clearly stated in the message."""
             
             # Parse Claude's JSON response
             import json
+            response_text = response.content[0].text
+            
+            # Strip markdown code blocks if present
+            if '```json' in response_text:
+                json_start = response_text.find('```json') + 7
+                json_end = response_text.find('```', json_start)
+                if json_end > json_start:
+                    response_text = response_text[json_start:json_end].strip()
+            
+            # Try to extract JSON from response
             try:
-                analysis = json.loads(response.content[0].text)
+                # First try direct parsing
+                analysis = json.loads(response_text)
                 print(f"[CIA] Claude modification analysis: {analysis}")
                 return analysis
             except json.JSONDecodeError:
-                print(f"[CIA] Could not parse Claude response: {response.content[0].text}")
+                # Try to find JSON in the response
+                json_start = response_text.find('{')
+                json_end = response_text.rfind('}') + 1
+                if json_start >= 0 and json_end > json_start:
+                    try:
+                        json_str = response_text[json_start:json_end]
+                        analysis = json.loads(json_str)
+                        print(f"[CIA] Claude modification analysis: {analysis}")
+                        return analysis
+                    except:
+                        pass
+                
+                print(f"[CIA] Could not parse Claude response: {response_text[:200]}...")
                 return {"is_modification": False, "confidence": 0.0}
                 
         except Exception as e:
@@ -1539,6 +1818,39 @@ Only return modifications that are clearly stated in the message."""
             return 'dream_project'
         else:
             return 'not_discussed'
+    
+    async def _generate_response_with_context(self, state: Dict[str, Any], user_id: str, message: str, session_id: str) -> Dict[str, Any]:
+        """Generate a response using Claude API with full bid card context"""
+        # Add the user message to state
+        state["messages"].append({
+            "role": "user",
+            "content": message,
+            "metadata": {"timestamp": datetime.now().isoformat()}
+        })
+        
+        # Generate response using Claude
+        response_text = await self._generate_claude_response(state)
+        
+        # Add assistant response to state
+        state["messages"].append({
+            "role": "assistant",
+            "content": response_text,
+            "metadata": {"timestamp": datetime.now().isoformat()}
+        })
+        
+        # Save conversation
+        await self._save_conversation_to_database(state, user_id, session_id)
+        
+        return {
+            "response": response_text,
+            "session_id": session_id,
+            "current_phase": "conversation",
+            "ready_for_jaa": False,
+            "missing_fields": [],
+            "state": state,
+            "has_bid_card_context": True,
+            "bid_card_number": state.get('bid_card_number')
+        }
     
     async def _save_conversation_to_database(self, state: Dict[str, Any], user_id: str, session_id: str):
         """Save conversation state to database for JAA processing"""

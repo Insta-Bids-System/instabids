@@ -14,6 +14,7 @@ import { OpenAIRealtimeWebRTC, AudioProcessor } from '@/services/openai-realtime
 interface UltraInteractiveCIAChatProps {
   onSendMessage?: (message: string, images?: string[]) => Promise<any>;
   initialMessage?: string;
+  projectContext?: any;
 }
 
 interface Message {
@@ -28,7 +29,8 @@ interface Message {
 
 const UltraInteractiveCIAChat: React.FC<UltraInteractiveCIAChatProps> = ({
   onSendMessage,
-  initialMessage = "Welcome to Instabids! I'm Alex, your AI project assistant. Tell me about your home project and I'll help you get competitive bids from verified contractors. What are you looking to get done?"
+  initialMessage = "Welcome to Instabids! I'm Alex, your AI project assistant. Tell me about your home project and I'll help you get competitive bids from verified contractors. What are you looking to get done?",
+  projectContext
 }) => {
   // State management
   const [messages, setMessages] = useState<Message[]>([
@@ -63,6 +65,7 @@ const UltraInteractiveCIAChat: React.FC<UltraInteractiveCIAChatProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const realtimeClient = useRef<OpenAIRealtimeWebRTC | null>(null);
   const audioProcessor = useRef<AudioProcessor | null>(null);
+  const hasInitialMessageSent = useRef(false);
 
   // Alex expressions for personality
   const alexExpressions = {
@@ -269,6 +272,54 @@ Start by asking what kind of home project they're planning and work through the 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Auto-send initial message when projectContext is present
+  useEffect(() => {
+    if (projectContext && initialMessage && !hasInitialMessageSent.current && onSendMessage) {
+      hasInitialMessageSent.current = true;
+      // Small delay to ensure component is fully mounted
+      setTimeout(async () => {
+        setInputMessage(initialMessage);
+        
+        // Directly call the send logic instead of the function
+        if (!initialMessage.trim()) return;
+
+        const newMessage: Message = {
+          id: Date.now().toString(),
+          role: 'user',
+          content: initialMessage,
+          timestamp: new Date(),
+        };
+
+        setMessages(prev => [...prev, newMessage]);
+        setInputMessage('');
+        setIsLoading(true);
+        setCurrentExpression(alexExpressions.analyzing);
+
+        try {
+          const result = await onSendMessage(initialMessage, []);
+          
+          if (result) {
+            const assistantMessage: Message = {
+              id: (Date.now() + 1).toString(),
+              role: 'assistant',
+              content: result.response,
+              timestamp: new Date(),
+              phase: result.phase
+            };
+            setMessages(prev => [...prev, assistantMessage]);
+          }
+          
+          setIsLoading(false);
+          setCurrentExpression(alexExpressions.happy);
+        } catch (error) {
+          console.error('Error sending auto message:', error);
+          setIsLoading(false);
+          setCurrentExpression(alexExpressions.working);
+        }
+      }, 500);
+    }
+  }, [projectContext, initialMessage, onSendMessage]);
 
   // Connect to OpenAI Realtime API
   const connectToRealtime = async () => {

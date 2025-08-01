@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import UltraInteractiveCIAChat from '@/components/chat/UltraInteractiveCIAChat';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,8 +7,13 @@ import { apiService } from '@/services/api';
 
 export default function ChatPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [apiConnected, setApiConnected] = useState(false);
+  
+  // Extract project context from navigation state
+  const projectContext = location.state?.projectContext;
+  const initialMessage = location.state?.initialMessage;
 
   // Test API connection on component mount
   useEffect(() => {
@@ -36,7 +41,13 @@ export default function ChatPage() {
       }
 
       const userId = user?.id || 'anonymous_user';
-      const result = await apiService.sendChatMessage(message, images, userId, sessionId);
+      
+      // Include project context if available
+      const messageWithContext = projectContext ? 
+        `[Project Context: ${projectContext.project_type} - ${projectContext.bid_card_number}]\n${message}` : 
+        message;
+      
+      const result = await apiService.sendChatMessage(messageWithContext, images, userId, sessionId, projectContext?.id);
       
       if (result.success && result.data) {
         return {
@@ -85,7 +96,11 @@ export default function ChatPage() {
       </div>
 
       <div className="py-8">
-        <UltraInteractiveCIAChat onSendMessage={apiConnected ? handleSendMessage : undefined} />
+        <UltraInteractiveCIAChat 
+          onSendMessage={apiConnected ? handleSendMessage : undefined}
+          projectContext={projectContext}
+          initialMessage={initialMessage}
+        />
       </div>
     </div>
   );

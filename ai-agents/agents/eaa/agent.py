@@ -9,6 +9,8 @@ from typing import Dict, List, Any, Optional
 import json
 
 from .outreach_channels.email_channel import EmailChannel
+from .outreach_channels.mcp_email_channel import MCPEmailChannel
+from .outreach_channels.mcp_email_channel_claude import MCPEmailChannelWithClaude
 from .outreach_channels.sms_channel import SMSChannel
 from .message_templates.template_engine import TemplateEngine
 from .response_tracking.response_parser import ResponseParser
@@ -23,6 +25,7 @@ class ExternalAcquisitionAgent:
         try:
             # Initialize communication channels
             self.email_channel = EmailChannel()
+            self.mcp_email_channel = MCPEmailChannelWithClaude()  # Claude-powered email channel
             self.sms_channel = SMSChannel()
             
             # Initialize template engine
@@ -137,28 +140,34 @@ class ExternalAcquisitionAgent:
         messages_sent = []
         
         try:
-            # Generate personalized messages
-            messages = self.template_engine.generate_messages(
-                contractor, bid_card_data, channels, urgency
-            )
+            # Send personalized email via MCP if email channel requested
+            if 'email' in channels:
+                result = self.mcp_email_channel.send_personalized_outreach(
+                    contractor, bid_card_data, campaign_id
+                )
+                if result['success']:
+                    messages_sent.append({
+                        'message_id': result['message_id'],
+                        'channel': 'mcp_email',
+                        'contractor_email': contractor.get('email'),
+                        'contractor_company': contractor.get('company_name'),
+                        'personalization_applied': result.get('personalization_applied', False),
+                        'unique_elements': result.get('unique_elements', {}),
+                        'sent_at': datetime.now().isoformat()
+                    })
+                else:
+                    print(f"[EAA ERROR] MCP email failed for {contractor.get('company_name')}: {result.get('error')}")
             
-            # Send via each channel
-            for channel, message_data in messages.items():
-                if channel == 'email' and 'email' in channels:
-                    result = self.email_channel.send_message(
-                        contractor, message_data, campaign_id
-                    )
-                    if result['success']:
-                        messages_sent.append({
-                            'message_id': result['message_id'],
-                            'channel': 'email',
-                            'contractor_email': contractor.get('email'),
-                            'sent_at': datetime.now().isoformat()
-                        })
+            # Generate traditional messages for other channels
+            if any(channel in channels for channel in ['sms', 'website_form']):
+                messages = self.template_engine.generate_messages(
+                    contractor, bid_card_data, channels, urgency
+                )
                 
-                elif channel == 'sms' and 'sms' in channels:
+                # Send via SMS channel
+                if 'sms' in channels and 'sms' in messages:
                     result = self.sms_channel.send_message(
-                        contractor, message_data, campaign_id
+                        contractor, messages['sms'], campaign_id
                     )
                     if result['success']:
                         messages_sent.append({
@@ -167,6 +176,16 @@ class ExternalAcquisitionAgent:
                             'contractor_phone': contractor.get('phone'),
                             'sent_at': datetime.now().isoformat()
                         })
+                
+                # Handle website_form channel (would integrate with WFA agent)
+                if 'website_form' in channels:
+                    messages_sent.append({
+                        'message_id': str(uuid.uuid4()),
+                        'channel': 'website_form',
+                        'contractor_website': contractor.get('website'),
+                        'status': 'queued_for_wfa',
+                        'sent_at': datetime.now().isoformat()
+                    })
             
             return messages_sent
             
@@ -293,6 +312,122 @@ class ExternalAcquisitionAgent:
             print(f"[EAA ERROR] Failed to start onboarding: {e}")
             return {'success': False, 'error': str(e)}
     
+    def test_mcp_email_integration(self, test_contractors: List[Dict[str, Any]], bid_card_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Test MCP email integration with sample contractors"""
+        try:
+            print(f"[EAA] Testing MCP email integration with {len(test_contractors)} contractors")
+            
+            test_results = {
+                'success': True,
+                'emails_sent': 0,
+                'emails_failed': 0,
+                'unique_elements_verified': [],
+                'sent_emails': []
+            }
+            
+            for contractor in test_contractors:
+                result = self.mcp_email_channel.send_personalized_outreach(
+                    contractor, bid_card_data, 'test-campaign-123'
+                )
+                
+                if result['success']:
+                    test_results['emails_sent'] += 1
+                    test_results['unique_elements_verified'].append({
+                        'contractor': contractor.get('company_name', 'Unknown'),
+                        'email': contractor.get('email', 'No email'),
+                        'unique_elements': result.get('unique_elements', {}),
+                        'message_id': result.get('message_id')
+                    })
+                    test_results['sent_emails'].append(result)
+                else:
+                    test_results['emails_failed'] += 1
+                    print(f"[EAA ERROR] Failed to send test email to {contractor.get('company_name')}: {result.get('error')}")
+            
+            # Get all sent emails for verification
+            sent_emails = self.mcp_email_channel.get_sent_emails_for_testing()
+            test_results['stored_emails_count'] = len(sent_emails)
+            
+            print(f"[EAA] MCP Test Results:")
+            print(f"  Emails Sent: {test_results['emails_sent']}")
+            print(f"  Emails Failed: {test_results['emails_failed']}")
+            print(f"  Stored Emails: {test_results['stored_emails_count']}")
+            
+            return test_results
+            
+        except Exception as e:
+            print(f"[EAA ERROR] MCP test failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'emails_sent': 0,
+                'emails_failed': 0
+            }
+    
+    def verify_unique_emails(self) -> Dict[str, Any]:
+        """Verify that each contractor received unique, personalized emails"""
+        try:
+            sent_emails = self.mcp_email_channel.get_sent_emails_for_testing()
+            
+            verification = {
+                'total_emails': len(sent_emails),
+                'unique_subjects': set(),
+                'unique_companies': set(),
+                'unique_urls': set(),
+                'unique_message_ids': set(),
+                'personalization_verified': True,
+                'details': []
+            }
+            
+            for email in sent_emails:
+                verification['unique_subjects'].add(email.get('subject', ''))
+                verification['unique_companies'].add(email.get('company_name', ''))
+                verification['unique_urls'].add(email.get('external_url', ''))
+                verification['unique_message_ids'].add(email.get('message_id', ''))
+                
+                verification['details'].append({
+                    'company': email.get('company_name'),
+                    'subject': email.get('subject'),
+                    'external_url': email.get('external_url'),
+                    'message_id': email.get('message_id'),
+                    'sent_at': email.get('sent_at')
+                })
+            
+            # Convert sets to counts for JSON serialization
+            verification['unique_subjects_count'] = len(verification['unique_subjects'])
+            verification['unique_companies_count'] = len(verification['unique_companies'])
+            verification['unique_urls_count'] = len(verification['unique_urls'])
+            verification['unique_message_ids_count'] = len(verification['unique_message_ids'])
+            
+            # Clean up sets for return
+            verification['unique_subjects'] = list(verification['unique_subjects'])
+            verification['unique_companies'] = list(verification['unique_companies'])
+            verification['unique_urls'] = list(verification['unique_urls'])
+            verification['unique_message_ids'] = list(verification['unique_message_ids'])
+            
+            print(f"[EAA] Email Uniqueness Verification:")
+            print(f"  Total Emails: {verification['total_emails']}")
+            print(f"  Unique Companies: {verification['unique_companies_count']}")
+            print(f"  Unique URLs: {verification['unique_urls_count']}")
+            print(f"  Unique Message IDs: {verification['unique_message_ids_count']}")
+            
+            return verification
+            
+        except Exception as e:
+            print(f"[EAA ERROR] Email verification failed: {e}")
+            return {
+                'total_emails': 0,
+                'error': str(e),
+                'personalization_verified': False
+            }
+    
+    def clear_test_data(self):
+        """Clear test email data"""
+        try:
+            self.mcp_email_channel.clear_test_emails()
+            print("[EAA] Test email data cleared")
+        except Exception as e:
+            print(f"[EAA ERROR] Failed to clear test data: {e}")
+
     def get_analytics(self, date_range: int = 30) -> Dict[str, Any]:
         """Get EAA performance analytics"""
         try:

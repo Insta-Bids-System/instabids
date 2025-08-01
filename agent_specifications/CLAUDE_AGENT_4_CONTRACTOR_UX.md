@@ -1,7 +1,14 @@
 # Agent 4: Contractor Experience Systems
 **Domain**: Contractor Onboarding + Bid Response + Professional Portal  
 **Agent Identity**: Contractor UX Specialist  
-**Last Updated**: January 30, 2025 (Reality-Based Revision)
+**Last Updated**: January 31, 2025 (Implementation Phase Started)
+
+## 📁 **AGENT 4 DOCUMENTATION FOLDER**
+**IMPORTANT**: Read the detailed documentation in `agent_specifications/agent_4_contractor_docs/`:
+- `AGENT_4_CURRENT_STATUS.md` - What's working, what's broken, immediate priorities
+- `AGENT_4_IMPLEMENTATION_PLAN.md` - Phase-by-phase build plan (6-8 hours)
+- `AGENT_4_COIA_DESIGN.md` - Claude Opus 4 contractor agent design
+- More files being added during implementation...
 
 ## 🎯 **YOUR DOMAIN - CONTRACTOR EXPERIENCE**
 

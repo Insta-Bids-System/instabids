@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -8,8 +8,23 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signIn, profile } = useAuth()
+  const { signIn, profile, user } = useAuth()
   const navigate = useNavigate()
+
+  // Redirect based on profile role after successful login
+  useEffect(() => {
+    console.log('LoginPage useEffect:', { user: !!user, profile, loading })
+    if (user && profile && !loading) {
+      console.log('Profile role:', profile.role)
+      if (profile.role === 'contractor') {
+        console.log('Redirecting to contractor dashboard')
+        navigate('/contractor/dashboard')
+      } else if (profile.role === 'homeowner') {
+        console.log('Redirecting to homeowner dashboard')
+        navigate('/dashboard')
+      }
+    }
+  }, [user, profile, loading, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -18,15 +33,10 @@ const LoginPage: React.FC = () => {
     try {
       await signIn(email, password)
       toast.success('Welcome back!')
-      
-      // Wait a moment for profile to load, then redirect based on role
-      setTimeout(() => {
-        // The ProtectedRoute will handle the actual role-based redirect
-        navigate('/dashboard')
-      }, 100)
+      // The useEffect above will handle the redirect once profile loads
+      setLoading(false)
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign in')
-    } finally {
       setLoading(false)
     }
   }

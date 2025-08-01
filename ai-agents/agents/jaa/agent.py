@@ -1,56 +1,112 @@
 """
-JAA (Job Assessment Agent) - Clean Implementation
-Converts CIA conversations to bid cards using BetterJAAExtractor
+Intelligent Job Assessment Agent - LangGraph + Claude Opus 4 Implementation
+Replaces regex-based extraction with real AI intelligence
 """
 import os
 import json
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional, Annotated
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
 from supabase import create_client
 from dotenv import load_dotenv
 import sys
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from create_better_extractor import BetterJAAExtractor
+from database_simple import SupabaseDB
 
+from typing_extensions import TypedDict
+
+class IntelligentJAAState(TypedDict):
+    """State for the Intelligent JAA Agent"""
+    messages: Annotated[List[BaseMessage], add_messages]
+    conversation_data: Dict[str, Any]
+    extracted_data: Dict[str, Any]
+    bid_card_data: Dict[str, Any]
+    thread_id: str
+    stage: str  # 'analysis', 'extraction', 'validation', 'generation'
+    errors: List[str]
 
 class JobAssessmentAgent:
-    """JAA - Converts CIA conversations to professional bid cards"""
+    """
+    Intelligent Job Assessment Agent using Claude Opus 4 + LangGraph
+    Replaces simple regex patterns with real AI understanding
+    """
     
     def __init__(self):
-        """Initialize JAA with Supabase connection"""
+        """Initialize Intelligent JAA with Claude Opus 4 and LangGraph"""
         load_dotenv(override=True)
+        
+        # Initialize Anthropic client
+        self.anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+        if not self.anthropic_key:
+            raise ValueError("ANTHROPIC_API_KEY not found in environment")
+        
+        self.llm = ChatAnthropic(
+            model="claude-opus-4-20250514",  # Claude Opus 4 - most powerful model for complex reasoning
+            api_key=self.anthropic_key,
+            temperature=0.1,
+            max_tokens=4000
+        )
+        
+        # Initialize Supabase
         self.supabase_url = os.getenv('SUPABASE_URL')
         self.supabase_key = os.getenv('SUPABASE_ANON_KEY')
         self.supabase = create_client(self.supabase_url, self.supabase_key)
-        self.extractor = BetterJAAExtractor()
-        print("[JAA] Initialized Job Assessment Agent")
+        self.db = SupabaseDB()
+        
+        # Build the LangGraph workflow
+        self.workflow = self._build_workflow()
+        
+        print("[INTELLIGENT JAA] Initialized with Claude Opus 4 + LangGraph")
     
-    def process_conversation(self, cia_thread_id: str) -> Dict[str, Any]:
+    def _build_workflow(self) -> StateGraph:
+        """Build the LangGraph workflow for intelligent bid card generation"""
+        
+        workflow = StateGraph(IntelligentJAAState)
+        
+        # Add nodes
+        workflow.add_node("analyze_conversation", self._analyze_conversation)
+        workflow.add_node("extract_project_data", self._extract_project_data)
+        workflow.add_node("validate_extraction", self._validate_extraction)
+        workflow.add_node("generate_bid_card", self._generate_bid_card)
+        
+        # Add edges
+        workflow.add_edge(START, "analyze_conversation")
+        workflow.add_edge("analyze_conversation", "extract_project_data")
+        workflow.add_edge("extract_project_data", "validate_extraction")
+        workflow.add_edge("validate_extraction", "generate_bid_card")
+        workflow.add_edge("generate_bid_card", END)
+        
+        return workflow.compile()
+    
+    def process_conversation(self, thread_id: str) -> Dict[str, Any]:
         """
-        Main JAA function: Convert CIA conversation to bid card
+        Main entry point: Process CIA conversation with full AI intelligence
         
         Args:
-            cia_thread_id: Thread ID from CIA conversation
-            
+            thread_id: The conversation thread ID from CIA
+        
         Returns:
             Dict with success status and bid card data
         """
-        print(f"\n[JAA] Processing conversation: {cia_thread_id}")
+        print(f"\n[INTELLIGENT JAA] Processing conversation: {thread_id}")
         
         try:
-            # Step 1: Load conversation from Supabase
-            print("[JAA] Loading conversation from database...")
-            result = self.supabase.table('agent_conversations').select("*").eq('thread_id', cia_thread_id).execute()
+            # Step 1: Load conversation from database
+            print("[INTELLIGENT JAA] Loading conversation from database...")
+            result = self.supabase.table('agent_conversations').select("*").eq('thread_id', thread_id).execute()
             
             if not result.data or len(result.data) == 0:
                 return {
                     'success': False,
-                    'error': f'No conversation found for thread_id: {cia_thread_id}'
+                    'error': f'No conversation found for thread_id: {thread_id}'
                 }
             
-            conversation_data = result.data[0]  # Get first (and only) result
+            conversation_data = result.data[0]
             
             # Parse state if it's JSON string
             state = conversation_data.get('state', {})
@@ -58,42 +114,48 @@ class JobAssessmentAgent:
                 state = json.loads(state)
                 conversation_data['state'] = state
             
-            print(f"[JAA] Loaded conversation with {len(state.get('messages', []))} messages")
+            print(f"[INTELLIGENT JAA] Loaded conversation with {len(state.get('messages', []))} messages")
             
-            # Step 2: Extract all 12 data points
-            print("[JAA] Extracting bid card data...")
-            bid_card_data = self.extractor.extract_bid_card_data(conversation_data)
+            # Step 2: Initialize state and run LangGraph workflow
+            initial_state = {
+                "messages": [],
+                "conversation_data": conversation_data,
+                "extracted_data": {},
+                "bid_card_data": {},
+                "thread_id": thread_id,
+                "stage": "analysis",
+                "errors": []
+            }
             
-            # Step 3: Generate bid card
+            # Run the intelligent workflow
+            final_state = self.workflow.invoke(initial_state)
+            
+            if final_state["errors"]:
+                return {
+                    'success': False,
+                    'error': f'Processing errors: {"; ".join(final_state["errors"])}'
+                }
+            
+            # Step 3: Save to database
             bid_card_number = self._generate_bid_card_number()
-            complexity_score = self._calculate_complexity_score(bid_card_data)
             
-            # Step 4: Save to bid_cards table
-            print("[JAA] Saving bid card to database...")
             bid_card_record = {
-                'cia_thread_id': cia_thread_id[-20:],  # Truncate to fit VARCHAR(20)
+                'cia_thread_id': thread_id[-20:],  # Truncate to fit VARCHAR(20)
                 'bid_card_number': bid_card_number,
-                'project_type': bid_card_data['project_type'],
-                'urgency_level': bid_card_data['urgency_level'],
-                'complexity_score': complexity_score,
-                'contractor_count_needed': bid_card_data['contractor_requirements']['contractor_count'],
-                'budget_min': bid_card_data['budget_min'],
-                'budget_max': bid_card_data['budget_max'],
-                # Store all extracted data in bid_document INCLUDING INSTABIDS DATA
+                'project_type': final_state["bid_card_data"].get('project_type', 'general'),
+                'urgency_level': final_state["bid_card_data"].get('urgency_level', 'flexible'),
+                'complexity_score': final_state["bid_card_data"].get('complexity_score', 5),
+                'contractor_count_needed': final_state["bid_card_data"].get('contractor_count_needed', 4),
+                'budget_min': final_state["bid_card_data"].get('budget_min', 5000),
+                'budget_max': final_state["bid_card_data"].get('budget_max', 15000),
                 'bid_document': {
                     'bid_card_number': bid_card_number,
-                    'full_cia_thread_id': cia_thread_id,  # Store full thread ID
-                    'all_extracted_data': bid_card_data,
-                    'complexity_score': complexity_score,
+                    'full_cia_thread_id': thread_id,
+                    'all_extracted_data': final_state["extracted_data"],
+                    'ai_analysis': final_state["bid_card_data"],
                     'generated_at': datetime.now().isoformat(),
-                    'extraction_method': 'BetterJAAExtractor',
-                    # INSTABIDS SPECIFIC DATA
-                    'service_type': bid_card_data.get('service_type'),
-                    'group_bidding_potential': bid_card_data.get('group_bidding_potential'),
-                    'intention_score': bid_card_data.get('intention_score'),
-                    'budget_context': bid_card_data.get('budget_context'),
-                    'timeline_urgency': bid_card_data.get('timeline_urgency'),
-                    'instabids_version': '2.0'
+                    'extraction_method': 'IntelligentJAA_ClaudeOpus4',
+                    'instabids_version': '3.0'
                 },
                 'status': 'generated'
             }
@@ -101,16 +163,15 @@ class JobAssessmentAgent:
             save_result = self.supabase.table('bid_cards').insert(bid_card_record).execute()
             
             if save_result.data:
-                print(f"[JAA] SUCCESS: Created bid card {bid_card_number}")
-                print(f"[JAA] Budget: ${bid_card_data['budget_min']}-${bid_card_data['budget_max']}")
-                print(f"[JAA] Project: {bid_card_data['project_type']}")
-                print(f"[JAA] Contractors needed: {bid_card_data['contractor_requirements']['contractor_count']}")
+                print(f"[INTELLIGENT JAA] SUCCESS: Created bid card {bid_card_number}")
+                print(f"[INTELLIGENT JAA] Project: {final_state['bid_card_data'].get('project_type')}")
+                print(f"[INTELLIGENT JAA] Budget: ${final_state['bid_card_data'].get('budget_min')}-${final_state['bid_card_data'].get('budget_max')}")
                 
                 return {
                     'success': True,
                     'bid_card_number': bid_card_number,
-                    'bid_card_data': bid_card_data,
-                    'cia_thread_id': cia_thread_id,
+                    'bid_card_data': final_state["bid_card_data"],
+                    'cia_thread_id': thread_id,
                     'database_id': save_result.data[0]['id']
                 }
             else:
@@ -120,7 +181,7 @@ class JobAssessmentAgent:
                 }
                 
         except Exception as e:
-            print(f"[JAA ERROR] Failed to process conversation: {e}")
+            print(f"[INTELLIGENT JAA ERROR] {e}")
             import traceback
             traceback.print_exc()
             return {
@@ -128,18 +189,287 @@ class JobAssessmentAgent:
                 'error': str(e)
             }
     
-    def _generate_bid_card_number(self) -> str:
-        """Generate unique bid card number"""
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        return f"BC-{timestamp}"
+    def _analyze_conversation(self, state: IntelligentJAAState) -> IntelligentJAAState:
+        """Step 1: Analyze conversation with AI to understand project scope"""
+        print("[INTELLIGENT JAA] Stage 1: Analyzing conversation with Claude Opus 4...")
+        
+        # Extract conversation messages
+        conversation_state = state["conversation_data"].get('state', {})
+        messages = conversation_state.get('messages', [])
+        collected_info = conversation_state.get('collected_info', {})
+        
+        # Combine all user messages
+        user_messages = []
+        for msg in messages:
+            if msg.get('role') == 'user':
+                user_messages.append(msg.get('content', ''))
+        
+        full_conversation = '\n'.join(user_messages)
+        
+        # Create analysis prompt
+        analysis_prompt = f"""
+You are an expert project analyst for InstaBids, a contractor marketplace. 
+
+Analyze this homeowner conversation and provide a detailed understanding of their project:
+
+CONVERSATION:
+{full_conversation}
+
+COLLECTED INFO FROM CIA:
+{json.dumps(collected_info, indent=2)}
+
+Please analyze and provide:
+
+1. PROJECT UNDERSTANDING:
+   - What type of project is this?
+   - What is the homeowner's primary goal?
+   - What specific work needs to be done?
+
+2. URGENCY & TIMELINE:
+   - How urgent is this project?
+   - When do they want to start?
+   - Any time constraints or deadlines?
+
+3. BUDGET ANALYSIS:
+   - What budget range did they mention?
+   - Do they seem price-sensitive or quality-focused?
+   - Are there any budget constraints?
+
+4. COMPLEXITY ASSESSMENT:
+   - Is this a simple or complex project?
+   - What challenges might contractors face?
+   - Any special requirements or permits needed?
+
+5. HOMEOWNER PROFILE:
+   - How serious are they about proceeding?
+   - Do they seem well-informed about the project?
+   - Any specific preferences or concerns?
+
+Provide your analysis in clear, structured format.
+"""
+        
+        try:
+            response = self.llm.invoke([
+                SystemMessage(content="You are an expert project analyst for InstaBids contractor marketplace."),
+                HumanMessage(content=analysis_prompt)
+            ])
+            
+            # Store analysis
+            state["extracted_data"]['ai_analysis'] = response.content
+            state["stage"] = 'extraction'
+            
+            print("[INTELLIGENT JAA] Conversation analysis complete")
+            return state
+            
+        except Exception as e:
+            state["errors"].append(f"Analysis failed: {str(e)}")
+            return state
     
-    def _calculate_complexity_score(self, bid_card_data: Dict[str, Any]) -> int:
-        """Calculate project complexity score (1-10)"""
+    def _extract_project_data(self, state: IntelligentJAAState) -> IntelligentJAAState:
+        """Step 2: Extract structured data points using AI intelligence"""
+        print("[INTELLIGENT JAA] Stage 2: Extracting structured data with AI...")
+        
+        # Get conversation data
+        conversation_state = state["conversation_data"].get('state', {})
+        messages = conversation_state.get('messages', [])
+        collected_info = conversation_state.get('collected_info', {})
+        
+        user_messages = []
+        for msg in messages:
+            if msg.get('role') == 'user':
+                user_messages.append(msg.get('content', ''))
+        
+        full_conversation = '\n'.join(user_messages)
+        
+        # Create extraction prompt
+        extraction_prompt = f"""
+You are a data extraction specialist for InstaBids contractor marketplace.
+
+Extract structured data from this homeowner conversation:
+
+CONVERSATION:
+{full_conversation}
+
+COLLECTED INFO:
+{json.dumps(collected_info, indent=2)}
+
+PREVIOUS ANALYSIS:
+{state["extracted_data"].get('ai_analysis', 'No previous analysis')}
+
+Extract the following data points in JSON format:
+
+{{
+  "project_type": "kitchen|bathroom|roofing|flooring|plumbing|electrical|hvac|painting|landscaping|general",
+  "service_type": "installation|repair|maintenance|renovation|new_construction",
+  "project_description": "Detailed description of work needed",
+  "budget_min": integer (minimum budget in dollars),
+  "budget_max": integer (maximum budget in dollars),
+  "budget_confidence": "high|medium|low",
+  "urgency_level": "emergency|urgent|flexible",
+  "timeline_start": "when they want to start",
+  "timeline_duration": "expected project duration",
+  "location": {{
+    "address": "full address if provided",
+    "city": "city name",
+    "state": "state name", 
+    "zip_code": "zip code",
+    "property_type": "house|condo|apartment|commercial"
+  }},
+  "materials_specified": ["list of materials mentioned"],
+  "special_requirements": ["list of special needs"],
+  "homeowner_info": {{
+    "name": "homeowner name if provided",
+    "email": "email if provided",
+    "phone": "phone if provided",
+    "communication_preference": "email|phone|text"
+  }},
+  "contractor_requirements": {{
+    "count_needed": integer (3-6 contractors),
+    "specialties_required": ["list of required specialties"],
+    "license_requirements": ["list of required licenses"]
+  }},
+  "complexity_factors": ["list of complexity factors"],
+  "quality_expectations": "basic|standard|premium",
+  "intention_score": integer (1-10, how serious are they)
+}}
+
+IMPORTANT: 
+- Only extract data that is clearly mentioned or strongly implied
+- Use null for unknown values
+- Be conservative with budget estimates
+- Consider urgency carefully based on language used
+- Assess intention score based on specificity and commitment level
+
+Return ONLY the JSON, no additional text.
+"""
+        
+        try:
+            response = self.llm.invoke([
+                SystemMessage(content="You are a data extraction specialist. Return only valid JSON."),
+                HumanMessage(content=extraction_prompt)
+            ])
+            
+            # Clean the response - remove markdown code blocks if present
+            response_content = response.content.strip()
+            if response_content.startswith('```json'):
+                response_content = response_content[7:]  # Remove ```json
+            if response_content.endswith('```'):
+                response_content = response_content[:-3]  # Remove ```
+            response_content = response_content.strip()
+            
+            # Parse the JSON response
+            extracted_data = json.loads(response_content)
+            state["extracted_data"].update(extracted_data)
+            state["stage"] = 'validation'
+            
+            print("[INTELLIGENT JAA] Data extraction complete")
+            return state
+            
+        except json.JSONDecodeError as e:
+            state["errors"].append(f"JSON parsing failed: {str(e)}")
+            return state
+        except Exception as e:
+            state["errors"].append(f"Extraction failed: {str(e)}")
+            return state
+    
+    def _validate_extraction(self, state: IntelligentJAAState) -> IntelligentJAAState:
+        """Step 3: Validate extracted data and fill in missing pieces"""
+        print("[INTELLIGENT JAA] Stage 3: Validating and enriching data...")
+        
+        # Basic validation and defaults
+        extracted = state["extracted_data"]
+        
+        # Ensure required fields have sensible defaults
+        if not extracted.get('project_type'):
+            extracted['project_type'] = 'general'
+        
+        if not extracted.get('budget_min') or extracted['budget_min'] < 100:
+            extracted['budget_min'] = 5000
+        
+        if not extracted.get('budget_max') or extracted['budget_max'] < extracted['budget_min']:
+            extracted['budget_max'] = max(extracted['budget_min'] * 2, 15000)
+        
+        if not extracted.get('urgency_level'):
+            extracted['urgency_level'] = 'flexible'
+        
+        if not extracted.get('contractor_requirements'):
+            extracted['contractor_requirements'] = {
+                'count_needed': 4,
+                'specialties_required': [],
+                'license_requirements': []
+            }
+        
+        # Calculate complexity score
+        complexity_score = self._calculate_complexity_score(extracted)
+        extracted['complexity_score'] = complexity_score
+        
+        state["stage"] = 'generation'
+        print("[INTELLIGENT JAA] Data validation complete")
+        return state
+    
+    def _generate_bid_card(self, state: IntelligentJAAState) -> IntelligentJAAState:
+        """Step 4: Generate final bid card with all InstaBids-specific data"""
+        print("[INTELLIGENT JAA] Stage 4: Generating professional bid card...")
+        
+        extracted = state["extracted_data"]
+        
+        # Generate final bid card data
+        bid_card_data = {
+            # Core project info
+            'project_type': extracted.get('project_type', 'general'),
+            'service_type': extracted.get('service_type', 'installation'),
+            'project_description': extracted.get('project_description', 'Project details to be discussed'),
+            
+            # Budget and timeline
+            'budget_min': extracted.get('budget_min', 5000),
+            'budget_max': extracted.get('budget_max', 15000),
+            'budget_confidence': extracted.get('budget_confidence', 'medium'),
+            'urgency_level': extracted.get('urgency_level', 'flexible'),
+            'timeline_start': extracted.get('timeline_start'),
+            'timeline_duration': extracted.get('timeline_duration'),
+            
+            # Location
+            'location': extracted.get('location', {}),
+            
+            # Requirements
+            'materials_specified': extracted.get('materials_specified', []),
+            'special_requirements': extracted.get('special_requirements', []),
+            
+            # Contractor needs
+            'contractor_count_needed': extracted.get('contractor_requirements', {}).get('count_needed', 4),
+            'specialties_required': extracted.get('contractor_requirements', {}).get('specialties_required', []),
+            'license_requirements': extracted.get('contractor_requirements', {}).get('license_requirements', []),
+            
+            # InstaBids metrics
+            'complexity_score': extracted.get('complexity_score', 5),
+            'intention_score': extracted.get('intention_score', 7),
+            'quality_expectations': extracted.get('quality_expectations', 'standard'),
+            
+            # Homeowner info
+            'homeowner_info': extracted.get('homeowner_info', {}),
+            
+            # AI generated insights
+            'ai_insights': {
+                'project_analysis': state["extracted_data"].get('ai_analysis'),
+                'complexity_factors': extracted.get('complexity_factors', []),
+                'generated_by': 'IntelligentJAA_ClaudeOpus4',
+                'generated_at': datetime.now().isoformat()
+            }
+        }
+        
+        state["bid_card_data"] = bid_card_data
+        print("[INTELLIGENT JAA] Bid card generation complete")
+        return state
+    
+    def _calculate_complexity_score(self, extracted_data: Dict[str, Any]) -> int:
+        """Calculate project complexity score (1-10) using AI-extracted data"""
         score = 5  # Base score
         
         # Budget impact
-        budget_max = bid_card_data.get('budget_max', 0)
-        if budget_max > 50000:
+        budget_max = extracted_data.get('budget_max', 0)
+        if budget_max > 100000:
+            score += 4
+        elif budget_max > 50000:
             score += 3
         elif budget_max > 25000:
             score += 2
@@ -149,177 +479,51 @@ class JobAssessmentAgent:
             score -= 2
         
         # Urgency impact
-        if bid_card_data.get('urgency_level') == 'emergency':
+        urgency = extracted_data.get('urgency_level', 'flexible')
+        if urgency == 'emergency':
+            score += 3
+        elif urgency == 'urgent':
             score += 2
-        elif bid_card_data.get('urgency_level') == 'week':
-            score += 1
-        
-        # Specialties required
-        specialties = bid_card_data.get('contractor_requirements', {}).get('specialties_required', [])
-        score += len(specialties)
-        
-        # Concerns mentioned
-        concerns = bid_card_data.get('concerns_issues', [])
-        score += len(concerns) * 0.5
         
         # Special requirements
-        special_reqs = bid_card_data.get('special_requirements', [])
+        special_reqs = extracted_data.get('special_requirements', [])
         score += len(special_reqs)
         
-        return max(1, min(10, int(score)))  # Clamp between 1-10
+        # Complexity factors
+        complexity_factors = extracted_data.get('complexity_factors', [])
+        score += len(complexity_factors) * 0.5
+        
+        # License requirements indicate complexity
+        license_reqs = extracted_data.get('contractor_requirements', {}).get('license_requirements', [])
+        score += len(license_reqs)
+        
+        return max(1, min(10, int(score)))
     
-    def modify_bid_card(self, bid_card_number: str, modifications: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Modify an existing bid card with new specifications
-        
-        Args:
-            bid_card_number: The bid card number to modify (e.g., "BC-20250729165023")
-            modifications: Dict of changes to make
-            
-        Returns:
-            Dict with success status and updated bid card data
-        """
-        print(f"\n[JAA] Modifying bid card: {bid_card_number}")
-        print(f"[JAA] Modifications: {modifications}")
-        
-        try:
-            # Step 1: Load existing bid card
-            result = self.supabase.table('bid_cards').select("*").eq('bid_card_number', bid_card_number).execute()
-            
-            if not result.data or len(result.data) == 0:
-                return {
-                    'success': False,
-                    'error': f'No bid card found with number: {bid_card_number}'
-                }
-            
-            existing_card = result.data[0]
-            bid_card_id = existing_card['id']
-            
-            print(f"[JAA] Found existing bid card: {existing_card['project_type']}")
-            
-            # Step 2: Apply modifications
-            updates = {}
-            
-            # Handle project type changes
-            if 'project_type' in modifications:
-                updates['project_type'] = modifications['project_type']
-            
-            # Handle budget changes
-            if 'budget_min' in modifications and modifications['budget_min'] is not None:
-                updates['budget_min'] = int(modifications['budget_min'])
-            if 'budget_max' in modifications and modifications['budget_max'] is not None:
-                updates['budget_max'] = int(modifications['budget_max'])
-            
-            # Handle urgency changes
-            if 'urgency_level' in modifications:
-                updates['urgency_level'] = modifications['urgency_level']
-            
-            # Handle contractor count changes
-            if 'contractor_count_needed' in modifications and modifications['contractor_count_needed'] is not None:
-                updates['contractor_count_needed'] = int(modifications['contractor_count_needed'])
-            
-            # Handle bid document modifications (materials, timeline, frequency, etc.)
-            if any(key in modifications for key in ['materials', 'timeline', 'frequency', 'special_notes', 'project_description']):
-                bid_document = existing_card.get('bid_document', {})
-                
-                if 'materials' in modifications:
-                    if 'all_extracted_data' not in bid_document:
-                        bid_document['all_extracted_data'] = {}
-                    bid_document['all_extracted_data']['materials_preferences'] = modifications['materials']
-                
-                if 'timeline' in modifications:
-                    if 'all_extracted_data' not in bid_document:
-                        bid_document['all_extracted_data'] = {}
-                    bid_document['all_extracted_data']['timeline_start'] = modifications['timeline']
-                
-                if 'frequency' in modifications:
-                    if 'all_extracted_data' not in bid_document:
-                        bid_document['all_extracted_data'] = {}
-                    # Store frequency in appropriate field for lawn care/service projects
-                    bid_document['all_extracted_data']['service_frequency'] = modifications['frequency']
-                    # Also update project description to include frequency
-                    current_desc = bid_document.get('all_extracted_data', {}).get('project_description', '')
-                    if 'weekly' in current_desc and modifications['frequency'] == 'bi-weekly':
-                        updated_desc = current_desc.replace('weekly', 'bi-weekly')
-                        bid_document['all_extracted_data']['project_description'] = updated_desc
-                
-                if 'special_notes' in modifications:
-                    if 'all_extracted_data' not in bid_document:
-                        bid_document['all_extracted_data'] = {}
-                    bid_document['all_extracted_data']['special_requirements'] = modifications['special_notes']
-                
-                if 'project_description' in modifications:
-                    if 'all_extracted_data' not in bid_document:
-                        bid_document['all_extracted_data'] = {}
-                    bid_document['all_extracted_data']['project_description'] = modifications['project_description']
-                
-                # Add modification history
-                if 'modification_history' not in bid_document:
-                    bid_document['modification_history'] = []
-                
-                bid_document['modification_history'].append({
-                    'modified_at': datetime.now().isoformat(),
-                    'modifications': modifications,
-                    'modified_by': 'CIA_agent'
-                })
-                
-                updates['bid_document'] = bid_document
-            
-            # Recalculate complexity if needed
-            if any(key in updates for key in ['budget_max', 'urgency_level']):
-                # Create mock bid_card_data for complexity calculation
-                mock_data = {
-                    'budget_max': updates.get('budget_max', existing_card.get('budget_max', 0)),
-                    'urgency_level': updates.get('urgency_level', existing_card.get('urgency_level', 'flexible')),
-                    'contractor_requirements': {'specialties_required': []},
-                    'concerns_issues': [],
-                    'special_requirements': []
-                }
-                updates['complexity_score'] = self._calculate_complexity_score(mock_data)
-            
-            # Step 3: Update in database
-            print(f"[JAA] Applying updates: {list(updates.keys())}")
-            update_result = self.supabase.table('bid_cards').update(updates).eq('id', bid_card_id).execute()
-            
-            if update_result.data:
-                updated_card = update_result.data[0]
-                print(f"[JAA] SUCCESS: Modified bid card {bid_card_number}")
-                print(f"[JAA] Updated fields: {', '.join(updates.keys())}")
-                
-                return {
-                    'success': True,
-                    'bid_card_number': bid_card_number,
-                    'modifications_applied': list(updates.keys()),
-                    'updated_card': updated_card,
-                    'original_card': existing_card
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': 'Failed to update bid card in database'
-                }
-                
-        except Exception as e:
-            print(f"[JAA ERROR] Failed to modify bid card: {e}")
-            import traceback
-            traceback.print_exc()
-            return {
-                'success': False,
-                'error': str(e)
-            }
+    def _generate_bid_card_number(self) -> str:
+        """Generate unique bid card number"""
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        return f"IBC-{timestamp}"  # Intelligent Bid Card prefix
 
 
-# Test the clean JAA agent
+# Test the intelligent agent
 if __name__ == "__main__":
-    jaa = JobAssessmentAgent()
+    import asyncio
     
-    # Test with a real conversation ID (you'd replace this)
-    test_thread_id = "session_0912f528-924c-4a7c-8b70-2708b3f5f227_1753744456.540726"
+    def test_intelligent_jaa():
+        """Test the intelligent JAA with a real conversation"""
+        jaa = JobAssessmentAgent()
+        
+        # Use a real thread ID from your testing
+        test_thread_id = "session_1727644456_test_bathroom_renovation"
+        
+        result = jaa.process_conversation(test_thread_id)
+        
+        if result.get('success'):
+            print(f"\nINTELLIGENT JAA Test Passed!")
+            print(f"Created bid card: {result['bid_card_number']}")
+            print(f"Project type: {result['bid_card_data']['project_type']}")
+            print(f"Budget: ${result['bid_card_data']['budget_min']}-${result['bid_card_data']['budget_max']}")
+        else:
+            print(f"\nINTELLIGENT JAA Test Failed: {result.get('error')}")
     
-    result = jaa.process_conversation(test_thread_id)
-    
-    if result['success']:
-        print(f"\n✅ JAA Test Passed!")
-        print(f"Created bid card: {result['bid_card_number']}")
-    else:
-        print(f"\n❌ JAA Test Failed: {result['error']}")
+    test_intelligent_jaa()

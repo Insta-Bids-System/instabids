@@ -16,12 +16,12 @@ load_dotenv()
 
 
 class UrgencyLevel(Enum):
-    """Project urgency levels"""
-    EMERGENCY = "emergency"      # < 6 hours
-    URGENT = "urgent"           # 6-24 hours  
-    STANDARD = "standard"       # 1-3 days
-    FLEXIBLE = "flexible"       # 3-7 days
-    PLANNING = "planning"       # > 7 days
+    """Project urgency levels - AGGRESSIVE BUSINESS TIMELINES"""
+    EMERGENCY = "emergency"      # < 1 hour (NOTE: Future enhancement - needs pre-loaded contractors for lockouts/emergency plumbing)
+    URGENT = "urgent"           # 1-12 hours (same day response)  
+    STANDARD = "standard"       # 12-72 hours (3 day max)
+    GROUP_BIDDING = "group_bidding"  # 72-120 hours (5 day max, multiple projects)
+    FLEXIBLE = "flexible"       # 120+ hours (5+ days, absolute maximum)
 
 
 @dataclass
@@ -51,7 +51,7 @@ class OutreachStrategy:
     total_to_contact: int
     expected_total_responses: float
     
-    # Check-in schedule
+    # Check-in schedule (AGGRESSIVE TIMING)
     check_in_times: List[datetime]
     escalation_thresholds: Dict[datetime, int]  # Expected bids at each check-in
     
@@ -59,6 +59,10 @@ class OutreachStrategy:
     confidence_score: float  # 0-100, likelihood of success
     risk_factors: List[str]
     recommendations: List[str]
+    
+    # Group bidding support (with defaults)
+    is_group_bidding: bool = False
+    group_bidding_projects: Optional[List[str]] = None  # Other project IDs in group
 
 
 class ContractorOutreachCalculator:
@@ -83,13 +87,13 @@ class ContractorOutreachCalculator:
             3: 15   # Max 15 new/cold
         }
         
-        # Urgency multipliers (urgent projects may have lower response rates)
+        # Urgency multipliers for AGGRESSIVE TIMELINES
         self.urgency_multipliers = {
-            UrgencyLevel.EMERGENCY: 0.7,   # 30% lower response rate
-            UrgencyLevel.URGENT: 0.85,     # 15% lower response rate
-            UrgencyLevel.STANDARD: 1.0,    # Normal response rate
-            UrgencyLevel.FLEXIBLE: 1.1,    # 10% higher response rate
-            UrgencyLevel.PLANNING: 1.2     # 20% higher response rate
+            UrgencyLevel.EMERGENCY: 0.6,      # 40% lower response rate (< 1 hour)
+            UrgencyLevel.URGENT: 0.75,        # 25% lower response rate (same day)
+            UrgencyLevel.STANDARD: 1.0,       # Normal response rate (3 days)
+            UrgencyLevel.GROUP_BIDDING: 1.15, # 15% higher (contractors like multiple projects)
+            UrgencyLevel.FLEXIBLE: 1.1        # 10% higher response rate (5+ days)
         }
         
     def calculate_outreach_strategy(self,
@@ -99,27 +103,32 @@ class ContractorOutreachCalculator:
                                   tier2_available: int = 30,
                                   tier3_available: int = 100,
                                   project_type: Optional[str] = None,
-                                  location: Optional[Dict[str, Any]] = None) -> OutreachStrategy:
+                                  location: Optional[Dict[str, Any]] = None,
+                                  group_bidding_projects: Optional[List[str]] = None) -> OutreachStrategy:
         """
-        Calculate optimal outreach strategy
+        Calculate optimal outreach strategy with AGGRESSIVE BUSINESS TIMELINES
         
         Args:
             bids_needed: Target number of bids (default 4)
-            timeline_hours: Hours available to get bids
+            timeline_hours: Hours available to get bids (AGGRESSIVE TIMELINES)
             tier1_available: Number of Tier 1 contractors available
             tier2_available: Number of Tier 2 contractors available
             tier3_available: Number of Tier 3 contractors available
             project_type: Type of project (affects response rates)
             location: Project location (affects availability)
+            group_bidding_projects: List of project IDs for group bidding (increases response rates)
             
         Returns:
-            Complete outreach strategy with tier breakdowns and check-in schedule
+            Complete outreach strategy with aggressive check-in schedule and group bidding support
         """
         # Determine urgency level
         urgency = self._determine_urgency(timeline_hours)
         
-        # Adjust response rates based on urgency
-        adjusted_rates = self._adjust_response_rates(urgency, project_type)
+        # Check if this is group bidding scenario
+        is_group_bidding = bool(group_bidding_projects) or urgency == UrgencyLevel.GROUP_BIDDING
+        
+        # Adjust response rates based on urgency and group bidding
+        adjusted_rates = self._adjust_response_rates(urgency, project_type, is_group_bidding)
         
         # Calculate contractors needed per tier
         tier_strategies = self._calculate_tier_strategies(
@@ -175,29 +184,36 @@ class ContractorOutreachCalculator:
             expected_total_responses=expected_responses,
             check_in_times=check_in_times,
             escalation_thresholds=escalation_thresholds,
+            is_group_bidding=is_group_bidding,
+            group_bidding_projects=group_bidding_projects or [],
             confidence_score=confidence_score,
             risk_factors=risk_factors,
             recommendations=recommendations
         )
     
     def _determine_urgency(self, timeline_hours: int) -> UrgencyLevel:
-        """Determine urgency level based on timeline"""
-        if timeline_hours < 6:
-            return UrgencyLevel.EMERGENCY
-        elif timeline_hours <= 24:
-            return UrgencyLevel.URGENT
-        elif timeline_hours <= 72:
+        """Determine urgency level based on AGGRESSIVE BUSINESS TIMELINES"""
+        if timeline_hours < 1:
+            return UrgencyLevel.EMERGENCY      # < 1 hour: Emergency
+        elif timeline_hours <= 12:
+            return UrgencyLevel.URGENT         # 1-12 hours: Same day
+        elif timeline_hours <= 72:            # 12-72 hours: 3 days max
             return UrgencyLevel.STANDARD
-        elif timeline_hours <= 168:  # 7 days
-            return UrgencyLevel.FLEXIBLE
+        elif timeline_hours <= 120:           # 72-120 hours: 5 days max (group bidding)
+            return UrgencyLevel.GROUP_BIDDING  
         else:
-            return UrgencyLevel.PLANNING
+            return UrgencyLevel.FLEXIBLE       # 120+ hours: 5+ days absolute maximum
     
     def _adjust_response_rates(self, 
                              urgency: UrgencyLevel,
-                             project_type: Optional[str] = None) -> Dict[int, float]:
-        """Adjust response rates based on urgency and project type"""
+                             project_type: Optional[str] = None,
+                             is_group_bidding: bool = False) -> Dict[int, float]:
+        """Adjust response rates based on urgency, project type, and group bidding"""
         multiplier = self.urgency_multipliers[urgency]
+        
+        # GROUP BIDDING BOOST: Contractors love multiple project opportunities
+        if is_group_bidding:
+            multiplier *= 1.2  # 20% higher response rate for group bidding
         
         # Additional adjustments for project type
         if project_type:
@@ -277,9 +293,25 @@ class ContractorOutreachCalculator:
         return strategies
     
     def _calculate_check_in_schedule(self, timeline_hours: int) -> List[datetime]:
-        """Calculate check-in times at 25%, 50%, 75% of timeline"""
+        """Calculate AGGRESSIVE check-in times based on business timeline requirements"""
         now = datetime.now()
-        check_points = [0.25, 0.50, 0.75]
+        
+        # AGGRESSIVE CHECK-IN SCHEDULES based on timeline
+        if timeline_hours < 1:  # EMERGENCY: < 1 hour
+            # Check every 15 minutes for first hour
+            check_points = [0.25, 0.5, 0.75]  # 15min, 30min, 45min
+        elif timeline_hours <= 12:  # URGENT: 1-12 hours (same day)
+            # Check every 2-4 hours
+            check_points = [0.17, 0.5, 0.83]  # 2hrs, 6hrs, 10hrs for 12hr timeline
+        elif timeline_hours <= 72:  # STANDARD: 3 days max
+            # Check every 12 hours  
+            check_points = [0.17, 0.5, 0.83]  # 12hrs, 36hrs, 60hrs for 72hr timeline
+        elif timeline_hours <= 120:  # GROUP_BIDDING: 5 days max
+            # Check daily
+            check_points = [0.2, 0.5, 0.8]    # 24hrs, 60hrs, 96hrs for 120hr timeline
+        else:  # FLEXIBLE: 5+ days
+            # Standard check-ins
+            check_points = [0.25, 0.50, 0.75]
         
         return [
             now + timedelta(hours=timeline_hours * point)

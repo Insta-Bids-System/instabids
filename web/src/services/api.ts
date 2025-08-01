@@ -72,13 +72,15 @@ class ApiService {
     message: string,
     images: string[] = [],
     userId?: string,
-    sessionId?: string
+    sessionId?: string,
+    projectId?: string
   ): Promise<ApiResponse<ChatResponse>> {
-    const payload: ChatMessage = {
+    const payload: ChatMessage & { project_id?: string } = {
       message,
       images,
       user_id: userId,
       session_id: sessionId,
+      project_id: projectId,
     };
 
     return this.request<ChatResponse>('/api/cia/chat', {

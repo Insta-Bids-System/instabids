@@ -13,9 +13,11 @@ import sys
 from datetime import datetime
 import base64
 import io
+import asyncio
 from PIL import Image
 import asyncio
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 # Load environment variables from .env file
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -26,26 +28,80 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from agents.cia.agent import CustomerInterfaceAgent
 from agents.cia.state import ConversationState
 from agents.jaa.agent import JobAssessmentAgent
-from agents.jaa.new_agent import NewJobAssessmentAgent
 from agents.cda.agent_v2 import IntelligentContractorDiscoveryAgent  # Opus 4 powered CDA
 from agents.eaa.agent import ExternalAcquisitionAgent
 from agents.iris.agent import iris_agent, IrisRequest, IrisResponse
+from agents.coia.intelligent_research_agent import initialize_intelligent_coia, get_intelligent_coia
 from agents.orchestration.timing_probability_engine import ContractorOutreachCalculator, UrgencyLevel
 from agents.orchestration.enhanced_campaign_orchestrator import EnhancedCampaignOrchestrator, CampaignRequest
 from agents.orchestration.check_in_manager import CampaignCheckInManager
 from database_simple import db
 from api.bid_cards_simple import router as bid_cards_router
 from api.projects import router as projects_router
-from api.iris_chat import router as iris_chat_router
+# from api.iris_chat import router as iris_chat_router  # Removed - causing internal errors
 from api.tracking import router as tracking_router
 
-# Initialize FastAPI app
-app = FastAPI(title="Instabids AI Agents API", version="1.0.0")
+# Global agent instances
+cia_agent = None
+jaa_agent = None
+cda_agent = None
+eaa_agent = None
+coia_agent = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize agents on startup and cleanup on shutdown"""
+    global cia_agent, jaa_agent, cda_agent, eaa_agent, coia_agent
+    
+    print("\n[STARTUP] Beginning agent initialization...")
+    print(f"[STARTUP] Working directory: {os.getcwd()}")
+    print(f"[STARTUP] Looking for .env in: {os.path.join(os.path.dirname(__file__), '..', '.env')}")
+    
+    # Get API key from environment
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    print(f"[STARTUP] ANTHROPIC_API_KEY from env: {anthropic_key[:20] if anthropic_key else 'NOT FOUND'}...")
+    
+    if not anthropic_key:
+        print("[WARNING] ANTHROPIC_API_KEY not set. Using demo mode.")
+        print("[WARNING] This means AI will give generic responses and not use Claude Opus 4!")
+        anthropic_key = "demo_key"
+    else:
+        print(f"[OK] Anthropic API key loaded successfully: {anthropic_key[:10]}...")
+    
+    try:
+        cia_agent = CustomerInterfaceAgent(anthropic_key)
+        print("[OK] CIA Agent initialized successfully with Claude Opus 4 + NEW InstaBids structure")
+        
+        jaa_agent = JobAssessmentAgent()
+        print("[OK] Intelligent JAA Agent initialized successfully with Claude Opus 4 + LangGraph")
+        
+        cda_agent = IntelligentContractorDiscoveryAgent()
+        print("[OK] CDA Agent (Opus 4) initialized successfully with intelligent matching")
+        
+        eaa_agent = ExternalAcquisitionAgent()
+        print("[OK] EAA Agent initialized successfully")
+        
+        coia_agent = initialize_intelligent_coia(anthropic_key)
+        print("[OK] Intelligent Research-Based CoIA Agent initialized successfully with Claude Opus 4")
+        
+        print("\n[READY] INSTABIDS NEW SYSTEM READY!")
+        print("[OK] All agents powered by Claude Opus 4")
+        print("[OK] Ready for production testing!\n")
+    except Exception as e:
+        print(f"[ERROR] Failed to initialize agents: {e}")
+    
+    yield
+    
+    # Cleanup on shutdown
+    print("[SHUTDOWN] Cleaning up agents...")
+
+# Initialize FastAPI app with lifespan
+app = FastAPI(title="Instabids AI Agents API", version="1.0.0", lifespan=lifespan)
 
 # Configure CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003", "http://localhost:3004", "http://localhost:3005", "http://localhost:3006", "http://localhost:3007", "http://localhost:3008", "http://localhost:3009", "http://localhost:3010", "http://localhost:3011", "http://localhost:3012", "http://localhost:3013", "http://localhost:3014", "http://localhost:3015", "http://localhost:3016", "http://localhost:3017", "http://localhost:3018", "http://localhost:3019", "http://localhost:3020", "http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176", "http://localhost:5177", "http://localhost:5178", "http://localhost:5179", "http://localhost:5180", "http://localhost:5181"],  # React dev servers + Vite dev servers
+    allow_origins=["*"],  # Allow all origins for development - agents can use any port
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -54,7 +110,7 @@ app.add_middleware(
 # Include routers
 app.include_router(bid_cards_router)
 app.include_router(projects_router, prefix="/api")
-app.include_router(iris_chat_router)
+# app.include_router(iris_chat_router)  # Removed - causing internal errors
 app.include_router(tracking_router, prefix="/api")
 
 # Add inspiration boards router
@@ -73,8 +129,26 @@ app.include_router(demo_iris_router)
 from api.image_generation import router as image_generation_router
 app.include_router(image_generation_router)
 
+# Add vision analysis router
+from api.vision import router as vision_router
+app.include_router(vision_router)
+
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Mount test images for demo purposes
+test_images_path = os.path.join(os.path.dirname(__file__), '..', 'test-images')
+if os.path.exists(test_images_path):
+    app.mount("/test-images", StaticFiles(directory=test_images_path), name="test-images")
+    print(f"[OK] Test images mounted from: {test_images_path}")
+
+# Mount static uploads directory for local image storage fallback
+static_path = os.path.join(os.path.dirname(__file__), 'static')
+if not os.path.exists(static_path):
+    os.makedirs(static_path, exist_ok=True)
+    os.makedirs(os.path.join(static_path, 'uploads'), exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_path), name="static")
+print(f"[OK] Static uploads mounted from: {static_path}")
 
 @app.get("/demo/wfa-rich-preview", response_class=HTMLResponse)
 async def get_wfa_demo():
@@ -90,23 +164,40 @@ async def get_wfa_demo():
 async def get_homeowner_bid_cards_direct(homeowner_id: str):
     """Get all bid cards for a specific homeowner - Direct implementation"""
     try:
-        # Get conversations for this user
-        conversations_result = db.supabase.table('agent_conversations').select('thread_id').eq('user_id', homeowner_id).execute()
+        from asyncio import timeout as async_timeout
         
-        if not conversations_result.data:
-            return []
-        
-        # Get thread IDs
-        thread_ids = [conv['thread_id'] for conv in conversations_result.data]
-        
-        # Get bid cards linked to these conversations
-        result = db.supabase.table('bid_cards').select("*").in_('cia_thread_id', thread_ids).order('created_at', desc=True).execute()
+        # Add timeout to prevent hanging
+        async with async_timeout(10):  # 10 second timeout
+            # Get conversations for this user
+            conversations_result = db.client.table('agent_conversations').select('thread_id').eq('user_id', homeowner_id).execute()
+            
+            if not conversations_result.data:
+                return []
+            
+            # Get thread IDs
+            thread_ids = [conv['thread_id'] for conv in conversations_result.data]
+            
+            # Get bid cards linked to these conversations
+            result = db.client.table('bid_cards').select("*").in_('cia_thread_id', thread_ids).order('created_at', desc=True).execute()
         
         if not result.data:
             return []
             
-        return result.data
+        # Process bid cards to ensure photo_urls field exists
+        bid_cards = []
+        for card in result.data:
+            # Map images to photo_urls for frontend compatibility
+            if card.get('bid_document') and card['bid_document'].get('all_extracted_data'):
+                extracted = card['bid_document']['all_extracted_data']
+                if 'images' in extracted and 'photo_urls' not in extracted:
+                    extracted['photo_urls'] = extracted['images']
+            bid_cards.append(card)
+            
+        return bid_cards
         
+    except asyncio.TimeoutError:
+        print(f"[API ERROR] Timeout getting bid cards for {homeowner_id}")
+        raise HTTPException(status_code=504, detail="Database query timeout")
     except Exception as e:
         print(f"[API ERROR] Failed to get homeowner bid cards: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -121,12 +212,7 @@ async def get_real_preview_test():
     except FileNotFoundError:
         return HTMLResponse(content="<h1>Test page not found</h1>", status_code=404)
 
-# Initialize AI agents
-cia_agent = None
-jaa_agent = None
-new_jaa_agent = None  # NEW InstaBids JAA
-cda_agent = None
-eaa_agent = None
+# Pydantic models
 
 class ChatMessage(BaseModel):
     message: str
@@ -142,45 +228,20 @@ class ChatResponse(BaseModel):
     ready_for_jaa: bool
     missing_fields: List[str]
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize agents on startup"""
-    global cia_agent, jaa_agent, cda_agent, eaa_agent
-    
-    # Get API key from environment
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-    if not anthropic_key:
-        print("Warning: ANTHROPIC_API_KEY not set. Using demo mode.")
-        # For now, we'll create a mock agent
-        anthropic_key = "demo_key"
-    else:
-        print(f"[OK] Anthropic API key loaded: {anthropic_key[:10]}...")
-    
-    try:
-        cia_agent = CustomerInterfaceAgent(anthropic_key)
-        print("[OK] CIA Agent initialized successfully with Claude Opus 4 + NEW InstaBids structure")
-        
-        # Initialize both old and new JAA agents
-        jaa_agent = JobAssessmentAgent()
-        print("[OK] JAA Agent (legacy) initialized successfully")
-        
-        new_jaa_agent = NewJobAssessmentAgent()
-        print("[OK] NEW JAA Agent initialized successfully with InstaBids 12 data points")
-        
-        cda_agent = IntelligentContractorDiscoveryAgent()
-        print("[OK] CDA Agent (Opus 4) initialized successfully with intelligent matching")
-        
-        eaa_agent = ExternalAcquisitionAgent()
-        print("[OK] EAA Agent initialized successfully")
-        
-        print("\n🎉 INSTABIDS NEW SYSTEM READY!")
-        print("✅ CIA: 12 data points + service classification + group bidding")
-        print("✅ JAA: InstaBids value propositions + intention scoring")
-        print("✅ All agents: Claude Opus 4 powered intelligence")
-        print("🚀 Ready for production testing!\n")
-    except Exception as e:
-        print(f"[ERROR] Failed to initialize agents: {e}")
-        # We'll handle this gracefully
+class ContractorChatMessage(BaseModel):
+    session_id: str
+    message: str
+    current_stage: Optional[str] = None
+    profile_data: Optional[Dict[str, Any]] = None
+
+class ContractorChatResponse(BaseModel):
+    response: str
+    stage: str
+    profile_progress: Dict[str, Any]
+    contractor_id: Optional[str] = None
+    session_data: Dict[str, Any]
+
+# Health check endpoint
 
 @app.get("/")
 async def root():
@@ -190,10 +251,10 @@ async def root():
         "service": "Instabids AI Agents API",
         "agents": {
             "cia": "active" if cia_agent else "inactive",
-            "jaa_legacy": "active" if jaa_agent else "inactive",
-            "jaa_new": "active" if new_jaa_agent else "inactive",
+            "jaa": "active" if jaa_agent else "inactive",
             "cda": "active" if cda_agent else "inactive",
-            "eaa": "active" if eaa_agent else "inactive"
+            "eaa": "active" if eaa_agent else "inactive",
+            "coia": "active" if coia_agent else "inactive"
         },
         "instabids_features": {
             "service_type_classification": True,
@@ -231,21 +292,32 @@ async def cia_chat(chat_data: ChatMessage):
         
         # Handle project awareness
         project_id = chat_data.project_id
+        bid_card_context = None
         if project_id:
             print(f"[CIA] Using project ID: {project_id}")
-            # Verify project exists and user has access
+            # Load bid card data
             try:
-                if user_id != "00000000-0000-0000-0000-000000000000":
+                # Try to load bid card data
+                bid_card_result = db.client.table('bid_cards').select('*').eq('id', project_id).execute()
+                if bid_card_result.data:
+                    bid_card_context = bid_card_result.data[0]
+                    print(f"[CIA] Loaded bid card: {bid_card_context.get('bid_card_number')}")
+                else:
+                    print(f"[CIA] No bid card found for project ID: {project_id}")
+                
+                # Verify user access if authenticated
+                if user_id != "00000000-0000-0000-0000-000000000000" and bid_card_context:
                     # For authenticated users, check homeowner relationship
                     homeowner_result = db.client.table('homeowners').select('id').eq('user_id', user_id).execute()
                     if homeowner_result.data:
                         homeowner_id = homeowner_result.data[0]['id']
-                        project_check = db.client.table('projects').select('id').eq('id', project_id).eq('homeowner_id', homeowner_id).execute()
-                        if not project_check.data:
-                            raise HTTPException(status_code=403, detail="Project not found or access denied")
-                        print(f"[CIA] Verified project access for homeowner {homeowner_id}")
+                        if bid_card_context.get('homeowner_id') != homeowner_id:
+                            raise HTTPException(status_code=403, detail="Bid card access denied")
+                        print(f"[CIA] Verified bid card access for homeowner {homeowner_id}")
+            except HTTPException:
+                raise
             except Exception as e:
-                print(f"[CIA] Project verification warning: {e}")
+                print(f"[CIA] Bid card loading warning: {e}")
         
         # Generate session ID - include project if specified
         if not chat_data.session_id:
@@ -275,13 +347,24 @@ async def cia_chat(chat_data: ChatMessage):
                 # For now, we'll just pass the base64 data
                 image_urls.append(img_data)
         
+        # Enhance existing state with bid card context if available
+        if existing_state and bid_card_context:
+            existing_state['bid_card_context'] = bid_card_context
+            existing_state['project_id'] = project_id
+        elif bid_card_context:
+            existing_state = {
+                'bid_card_context': bid_card_context,
+                'project_id': project_id
+            }
+        
         # Call the actual CIA agent with existing state
         result = await cia_agent.handle_conversation(
             user_id=user_id,
             message=chat_data.message,
             images=image_urls,
             session_id=session_id,
-            existing_state=existing_state
+            existing_state=existing_state,
+            project_id=project_id
         )
         
         # Save conversation state to Supabase
@@ -379,6 +462,56 @@ def generate_intelligent_response(message: str, images: Optional[List[str]] = No
     else:
         return "I'd be happy to help with your home improvement project! Could you tell me what type of work you're considering? Common projects include kitchen remodels, bathroom updates, roofing, flooring, painting, or outdoor improvements. Feel free to share photos if you have them - they really help me understand your vision."
 
+@app.post("/api/contractor-chat/message", response_model=ContractorChatResponse)
+async def contractor_chat(chat_data: ContractorChatMessage):
+    """Handle contractor onboarding chat messages with CoIA agent"""
+    if not coia_agent:
+        # Fallback response if CoIA not initialized
+        return ContractorChatResponse(
+            response="I'm having trouble connecting right now. Please try again in a moment.",
+            stage=chat_data.current_stage or "welcome",
+            profile_progress={
+                "completeness": 0,
+                "stage": chat_data.current_stage or "welcome",
+                "collectedData": {},
+                "matchingProjects": 0
+            },
+            contractor_id=None,
+            session_data={}
+        )
+    
+    try:
+        # Process message with CoIA agent
+        result = await coia_agent.process_message(
+            session_id=chat_data.session_id,
+            user_message=chat_data.message,
+            context={
+                "current_stage": chat_data.current_stage,
+                "profile_data": chat_data.profile_data or {}
+            }
+        )
+        
+        return ContractorChatResponse(**result)
+        
+    except Exception as e:
+        import traceback
+        print(f"Error in contractor chat: {e}")
+        print(traceback.format_exc())
+        
+        # Fallback response
+        return ContractorChatResponse(
+            response="I apologize, but I'm having trouble processing that right now. Could you please try rephrasing your response?",
+            stage=chat_data.current_stage or "welcome",
+            profile_progress={
+                "completeness": 0,
+                "stage": chat_data.current_stage or "welcome", 
+                "collectedData": chat_data.profile_data or {},
+                "matchingProjects": 0
+            },
+            contractor_id=None,
+            session_data={}
+        )
+
 @app.post("/api/jaa/process/{thread_id}")
 async def process_with_jaa(thread_id: str):
     """Process CIA conversation with JAA to generate bid card"""
@@ -403,58 +536,6 @@ async def process_with_jaa(thread_id: str):
         print(f"[JAA API ERROR] {e}")
         raise HTTPException(500, f"JAA processing failed: {str(e)}")
 
-@app.post("/api/jaa/process-new/{thread_id}")
-async def process_with_new_jaa(thread_id: str):
-    """Process CIA conversation with NEW JAA to generate InstaBids bid card"""
-    if not new_jaa_agent:
-        raise HTTPException(500, "NEW JAA agent not initialized")
-    
-    try:
-        result = new_jaa_agent.process_conversation(thread_id)
-        
-        if result['success']:
-            return {
-                "success": True,
-                "bid_card_number": result['bid_card_number'],
-                "bid_card_data": result['bid_card_data'],
-                "complexity_score": result['complexity_score'],
-                "database_record": result['database_record'],
-                "instabids_features": {
-                    "service_type": result['bid_card_data'].get('service_type'),
-                    "group_bidding_potential": result['bid_card_data'].get('group_bidding_potential'),
-                    "intention_score": result['bid_card_data'].get('intention_score'),
-                    "budget_context": result['bid_card_data'].get('budget_context')
-                }
-            }
-        else:
-            raise HTTPException(500, result.get('error', 'Unknown error processing conversation'))
-    
-    except Exception as e:
-        print(f"[NEW JAA API ERROR] {e}")
-        raise HTTPException(500, f"NEW JAA processing failed: {str(e)}")
-
-@app.post("/api/jaa/modify/{bid_card_number}")
-async def modify_bid_card_new(bid_card_number: str, modifications: Dict[str, Any]):
-    """Modify existing bid card using NEW JAA system"""
-    if not new_jaa_agent:
-        raise HTTPException(500, "NEW JAA agent not initialized")
-    
-    try:
-        result = new_jaa_agent.modify_bid_card(bid_card_number, modifications)
-        
-        if result['success']:
-            return {
-                "success": True,
-                "bid_card_number": result['bid_card_number'],
-                "modifications_applied": result['modifications_applied'],
-                "updated_card": result['updated_card']
-            }
-        else:
-            raise HTTPException(400, result.get('error', 'Unknown error modifying bid card'))
-    
-    except Exception as e:
-        print(f"[NEW JAA MODIFY ERROR] {e}")
-        raise HTTPException(500, f"NEW JAA modification failed: {str(e)}")
 
 @app.post("/api/cda/discover/{bid_card_id}")
 async def discover_contractors(bid_card_id: str, contractors_needed: int = 5):
@@ -785,6 +866,116 @@ async def check_campaign_status(campaign_id: str):
         print(f"[CAMPAIGN CHECK-IN ERROR] {e}")
         raise HTTPException(500, f"Failed to check campaign status: {str(e)}")
 
+@app.get("/api/campaigns/{campaign_id}/metrics")
+async def get_campaign_metrics(campaign_id: str):
+    """Get detailed campaign performance metrics"""
+    try:
+        orchestrator = EnhancedCampaignOrchestrator()
+        
+        # Get campaign from database
+        campaign = db.client.table('outreach_campaigns').select('*').eq('id', campaign_id).execute()
+        
+        if not campaign.data:
+            raise HTTPException(404, "Campaign not found")
+        
+        # Get outreach attempts
+        attempts = db.client.table('contractor_outreach_attempts').select('*').eq('campaign_id', campaign_id).execute()
+        
+        # Calculate metrics
+        total_sent = len([a for a in attempts.data if a['status'] in ['sent', 'delivered', 'opened', 'clicked', 'responded']])
+        total_opened = len([a for a in attempts.data if a['status'] in ['opened', 'clicked', 'responded']])
+        total_responded = len([a for a in attempts.data if a['status'] == 'responded'])
+        
+        # Get check-ins
+        check_ins = db.client.table('campaign_check_ins').select('*').eq('campaign_id', campaign_id).order('check_in_time', desc=False).execute()
+        
+        return {
+            "success": True,
+            "campaign_id": campaign_id,
+            "status": campaign.data[0]['status'],
+            "created_at": campaign.data[0]['created_at'],
+            "metrics": {
+                "total_contractors": len(attempts.data),
+                "messages_sent": total_sent,
+                "open_rate": (total_opened / total_sent * 100) if total_sent > 0 else 0,
+                "response_rate": (total_responded / total_sent * 100) if total_sent > 0 else 0,
+                "bids_received": total_responded
+            },
+            "check_ins": [
+                {
+                    "time": ci['check_in_time'],
+                    "bids_at_time": ci['bids_received'],
+                    "on_track": ci['on_track'],
+                    "action_taken": ci['action_taken']
+                }
+                for ci in check_ins.data
+            ]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[CAMPAIGN METRICS ERROR] {e}")
+        raise HTTPException(500, f"Failed to get campaign metrics: {str(e)}")
+
+@app.post("/api/campaigns/{campaign_id}/escalate")
+async def escalate_campaign(campaign_id: str, escalation_data: dict):
+    """Manually escalate a campaign by adding more contractors"""
+    try:
+        orchestrator = EnhancedCampaignOrchestrator()
+        
+        # Get campaign
+        campaign = db.client.table('outreach_campaigns').select('*').eq('id', campaign_id).execute()
+        
+        if not campaign.data:
+            raise HTTPException(404, "Campaign not found")
+        
+        # Add more contractors based on escalation level
+        additional_contractors = escalation_data.get('additional_contractors', 5)
+        tier_preference = escalation_data.get('tier_preference', 'tier2')
+        
+        # Get available contractors
+        existing_attempts = db.client.table('contractor_outreach_attempts').select('contractor_lead_id').eq('campaign_id', campaign_id).execute()
+        existing_ids = [a['contractor_lead_id'] for a in existing_attempts.data]
+        
+        # Find new contractors
+        new_contractors = db.client.table('potential_contractors').select('*').not_.in_('id', existing_ids).limit(additional_contractors).execute()
+        
+        if new_contractors.data:
+            # Create new outreach attempts
+            new_attempts = []
+            for contractor in new_contractors.data:
+                for channel in ['email', 'website_form']:
+                    new_attempts.append({
+                        'contractor_lead_id': contractor['id'],
+                        'bid_card_id': campaign.data[0]['bid_card_id'],
+                        'campaign_id': campaign_id,
+                        'channel': channel,
+                        'status': 'queued',
+                        'message_content': f"Escalation outreach to {contractor.get('business_name', 'Contractor')}",
+                        'created_at': datetime.now().isoformat()
+                    })
+            
+            db.client.table('contractor_outreach_attempts').insert(new_attempts).execute()
+            
+            return {
+                "success": True,
+                "campaign_id": campaign_id,
+                "contractors_added": len(new_contractors.data),
+                "new_total": len(existing_ids) + len(new_contractors.data)
+            }
+        else:
+            return {
+                "success": False,
+                "error": "No additional contractors available"
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[CAMPAIGN ESCALATE ERROR] {e}")
+        raise HTTPException(500, f"Failed to escalate campaign: {str(e)}")
+
 # Inspiration Board Endpoints
 @app.get("/api/debug/env")
 async def debug_env():
@@ -875,16 +1066,7 @@ async def create_inspiration_board(board_data: dict):
             "image_count": 0
         }
 
-# Iris Design Assistant Endpoints
-@app.post("/api/iris/chat", response_model=IrisResponse)
-async def chat_with_iris(request: IrisRequest):
-    """Chat with Iris - Your design inspiration assistant powered by Claude Opus 4"""
-    try:
-        response = await iris_agent.process_message(request)
-        return response
-    except Exception as e:
-        print(f"[IRIS ERROR] {e}")
-        raise HTTPException(500, f"Iris encountered an error: {str(e)}")
+# OLD Iris endpoint removed - using new iris_chat_router instead
 
 @app.get("/api/iris/status")
 async def get_iris_status():
@@ -931,14 +1113,14 @@ async def get_agents_status():
             "model": "Claude Opus 4 (claude-opus-4-20250514)"
         },
         "coia": {
-            "status": "not_implemented",
+            "status": "active" if coia_agent else "offline",
             "description": "Contractor Interface Agent",
             "model": "Claude Opus 4 (claude-opus-4-20250514)"
         },
         "jaa": {
             "status": "active" if jaa_agent else "offline",
-            "description": "Job Assessment Agent",
-            "model": "BetterJAAExtractor"
+            "description": "Intelligent Job Assessment Agent with LangGraph + Claude Opus 4",
+            "model": "Claude Opus 4 + LangGraph Workflow"
         },
         "cda": {
             "status": "active" if cda_agent else "offline",

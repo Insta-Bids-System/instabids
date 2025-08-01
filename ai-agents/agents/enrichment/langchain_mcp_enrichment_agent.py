@@ -426,14 +426,8 @@ Always return structured data that can be used for database storage and contract
             
             # Prepare update data based on enrichment results
             update_data = {
-                'lead_status': 'enriched',
-                'last_enriched_at': datetime.now().isoformat()
+                # Skip non-existent columns - lead_status, last_enriched_at, enrichment_data
             }
-            
-            # Add enrichment data as JSONB for full context
-            if enrichment_data:
-                enrichment_dict = asdict(enrichment_data)
-                update_data['enrichment_data'] = enrichment_dict
             
             # Update specific fields if found during enrichment
             if enrichment_data.email:
@@ -448,59 +442,42 @@ Always return structured data that can be used for database storage and contract
             if enrichment_data.website:
                 update_data['website'] = enrichment_data.website
                 
-            # NEW AI WRITEUP FIELDS - CRITICAL FOR BID CARD MATCHING
+            # STORE AI DATA IN PROPER COLUMNS (NOW AVAILABLE!)
             if enrichment_data.business_size:
                 update_data['business_size_category'] = enrichment_data.business_size
             
-            # Generate AI business summary using contractor data (skip if column doesn't exist)
-            try:
-                ai_summary = self._generate_ai_business_summary(contractor_id, enrichment_data)
-                if ai_summary:
-                    update_data['ai_business_summary'] = ai_summary
-            except Exception as e:
-                print(f"[INFO] Skipping AI business summary - column may not exist: {e}")
+            # Generate AI writeups and store in proper fields
+            ai_summary = self._generate_ai_business_summary(contractor_id, enrichment_data)
+            ai_capabilities = self._generate_ai_capability_description(enrichment_data)
+            
+            if ai_summary:
+                update_data['ai_business_summary'] = ai_summary
+            
+            if ai_capabilities:
+                update_data['ai_capability_description'] = ai_capabilities
                 
-            # Generate AI capability description (skip if column doesn't exist)
-            try:
-                ai_capabilities = self._generate_ai_capability_description(enrichment_data)
-                if ai_capabilities:
-                    update_data['ai_capability_description'] = ai_capabilities
-            except Exception as e:
-                print(f"[INFO] Skipping AI capability description - column may not exist: {e}")
-                
-            if enrichment_data.business_hours:
-                update_data['business_hours'] = enrichment_data.business_hours
-                
+            # Only update columns that exist in potential_contractors
             if enrichment_data.service_types:
                 update_data['specialties'] = enrichment_data.service_types
-                
-            if enrichment_data.service_description:
-                update_data['service_description'] = enrichment_data.service_description
-                
-            if enrichment_data.service_areas:
-                update_data['service_areas'] = enrichment_data.service_areas
                 
             if enrichment_data.years_in_business:
                 update_data['years_in_business'] = enrichment_data.years_in_business
                 
-            if enrichment_data.team_size:
-                update_data['team_size'] = enrichment_data.team_size
+            # Skip non-existent columns:
+            # - business_hours
+            # - service_description  
+            # - service_areas
+            # - team_size
+            # - contractor_size
                 
-            if enrichment_data.business_size:
-                update_data['contractor_size'] = enrichment_data.business_size
-                
-            # Verification flags - critical for qualification
-            if hasattr(enrichment_data, 'license_verified') and enrichment_data.license_verified is not None:
-                update_data['license_verified'] = enrichment_data.license_verified
-                
+            # Verification flags - only update existing columns
             if hasattr(enrichment_data, 'insurance_verified') and enrichment_data.insurance_verified is not None:
                 update_data['insurance_verified'] = enrichment_data.insurance_verified
                 
-            if hasattr(enrichment_data, 'rating') and enrichment_data.rating:
-                update_data['rating'] = enrichment_data.rating
-                
-            if hasattr(enrichment_data, 'review_count') and enrichment_data.review_count:
-                update_data['review_count'] = enrichment_data.review_count
+            # Skip non-existent columns:
+            # - license_verified
+            # - rating (use google_rating instead)
+            # - review_count (use google_review_count instead)
             
             # Execute the update
             result = db.client.table('potential_contractors')\

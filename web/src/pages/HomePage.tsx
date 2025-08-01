@@ -54,10 +54,16 @@ const HomePage: React.FC = () => {
             </h1>
             <nav className="flex gap-4">
               <button
+                onClick={() => navigate('/contractor')}
+                className="text-gray-700 hover:text-primary-600 transition-colors"
+              >
+                Contractor Portal
+              </button>
+              <button
                 onClick={() => navigate('/login')}
                 className="text-gray-700 hover:text-primary-600 transition-colors"
               >
-                Contractor Login
+                Login
               </button>
             </nav>
           </div>

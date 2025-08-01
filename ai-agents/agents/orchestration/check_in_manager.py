@@ -94,15 +94,18 @@ class CampaignCheckInManager:
             expected_bids = int(strategy.bids_needed * percentage)
             expected_responses = int(strategy.expected_total_responses * percentage)
             
-            # Create check-in record
+            # Create check-in record (mapped to actual database column names)
             check_in = {
                 'campaign_id': campaign_id,
                 'check_in_number': i + 1,
-                'check_in_percentage': percentage * 100,
-                'scheduled_at': check_in_time.isoformat(),
+                'check_in_percentage': int(percentage * 100),  # INTEGER field
+                'scheduled_time': check_in_time.isoformat(),
                 'expected_bids': expected_bids,
-                'expected_responses': expected_responses,
-                'escalation_needed': False
+                'responses_expected': expected_responses,  # mapped from expected_responses
+                'escalation_needed': False,
+                'check_in_time': check_in_time.isoformat(),  # Required field
+                'progress_percentage': 0,  # Required field, start at 0
+                'status': 'pending'  # Set default status
             }
             
             # Insert into database
@@ -137,7 +140,7 @@ class CampaignCheckInManager:
                 .select('*')\
                 .eq('campaign_id', campaign_id)\
                 .is_('completed_at', 'null')\
-                .order('scheduled_at')\
+                .order('scheduled_time')\
                 .limit(1)\
                 .execute().data
             
@@ -195,10 +198,10 @@ class CampaignCheckInManager:
             campaign_id=campaign_id,
             check_in_number=check_in['check_in_number'],
             check_in_percentage=check_in['check_in_percentage'],
-            scheduled_time=datetime.fromisoformat(check_in['scheduled_at']),
+            scheduled_time=datetime.fromisoformat(check_in['scheduled_time']),
             bids_expected=check_in['expected_bids'],
             bids_received=bids_received,
-            responses_expected=check_in['expected_responses'],
+            responses_expected=check_in['responses_expected'],
             responses_received=responses_received,
             on_track=on_track,
             performance_ratio=performance_ratio,
@@ -472,7 +475,7 @@ class CampaignCheckInManager:
                 # Find due check-ins
                 due_check_ins = self.supabase.table('campaign_check_ins')\
                     .select('*, outreach_campaigns!inner(*)')\
-                    .lte('scheduled_at', datetime.now().isoformat())\
+                    .lte('scheduled_time', datetime.now().isoformat())\
                     .is_('completed_at', 'null')\
                     .execute()
                 

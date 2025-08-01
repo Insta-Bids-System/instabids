@@ -5,7 +5,7 @@ import { supabase, Project } from '@/lib/supabase'
 import { Plus, Home, Clock, CheckCircle, XCircle, MessageSquare } from 'lucide-react'
 import toast from 'react-hot-toast'
 import InspirationDashboard from '@/components/inspiration/InspirationDashboard'
-import InternalBidCard from '@/components/InternalBidCard'
+import EnhancedBidCard from '@/components/EnhancedBidCard'
 import { apiService } from '@/services/api'
 
 const DashboardPage: React.FC = () => {
@@ -207,14 +207,28 @@ const DashboardPage: React.FC = () => {
                 </div>
                 <div className="grid gap-6 lg:grid-cols-2">
                   {bidCards.map((bidCard) => (
-                    <InternalBidCard
+                    <div 
                       key={bidCard.id}
-                      bidCard={bidCard}
-                      onContinueChat={() => navigate('/chat')}
-                      onViewAnalytics={() => {
-                        toast.success('Analytics coming soon!')
-                      }}
-                    />
+                      className="cursor-pointer"
+                      onClick={() => navigate(`/bid-cards/${bidCard.id}`)}
+                    >
+                      <EnhancedBidCard
+                        bidCard={bidCard}
+                        onContinueChat={(e) => {
+                          e?.stopPropagation();
+                          navigate('/chat', {
+                            state: {
+                              projectContext: bidCard,
+                              initialMessage: `I want to continue working on my ${bidCard.project_type} project (${bidCard.bid_card_number})`
+                            }
+                          });
+                        }}
+                        onViewAnalytics={(e) => {
+                          e?.stopPropagation();
+                          toast.success('Analytics coming soon!');
+                        }}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>

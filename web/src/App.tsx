@@ -12,9 +12,11 @@ import TestPage from '@/pages/TestPage'
 import WebRTCTestPage from '@/pages/WebRTCTestPage'
 import AuthCallbackPage from '@/pages/AuthCallbackPage'
 import ProjectDetailPage from '@/pages/ProjectDetailPage'
+import HomeownerProjectWorkspace from '@/components/HomeownerProjectWorkspace'
 import ExternalBidCardDemo from '@/pages/ExternalBidCardDemo'
 import ExternalBidCardLanding from '@/pages/ExternalBidCardLanding'
 import ContractorHeroLanding from '@/pages/ContractorHeroLanding'
+import ContractorLandingPage from '@/pages/contractor/ContractorLandingPage'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 
 function App() {
@@ -31,7 +33,7 @@ function App() {
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/external-bid-card-demo" element={<ExternalBidCardDemo />} />
             <Route path="/join" element={<ExternalBidCardLanding />} />
-            <Route path="/contractor" element={<ContractorHeroLanding />} />
+            <Route path="/contractor" element={<ContractorLandingPage />} />
             <Route
               path="/dashboard"
               element={
@@ -61,6 +63,14 @@ function App() {
               element={
                 <ProtectedRoute requiredRole="homeowner">
                   <ProjectDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bid-cards/:id"
+              element={
+                <ProtectedRoute requiredRole="homeowner">
+                  <HomeownerProjectWorkspace />
                 </ProtectedRoute>
               }
             />

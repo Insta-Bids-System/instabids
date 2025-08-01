@@ -23,19 +23,23 @@ interface BidCardData {
   urgency_level: string;
   budget_min: number;
   budget_max: number;
-  location: {
-    city: string;
-    state: string;
-  };
   contractor_count_needed: number;
   created_at: string;
   status: string;
   bid_document?: {
     all_extracted_data?: {
+      location?: {
+        city?: string | null;
+        state?: string | null;
+        address?: string | null;
+        zip_code?: string | null;
+        full_location?: string | null;
+      };
       project_details?: {
         scope_of_work?: string[];
       };
       photo_urls?: string[];
+      project_description?: string;
     };
   };
   // Tracking data
@@ -125,7 +129,12 @@ const InternalBidCard: React.FC<InternalBidCardProps> = ({
             </h3>
             <div className="flex items-center gap-2 text-blue-100">
               <MapPin className="w-4 h-4" />
-              <span className="text-sm">{bidCard.location.city}, {bidCard.location.state}</span>
+              <span className="text-sm">
+                {bidCard.bid_document?.all_extracted_data?.location?.city || 
+                 bidCard.bid_document?.all_extracted_data?.location?.address || 
+                 bidCard.bid_document?.all_extracted_data?.location?.zip_code || 
+                 'Location TBD'}
+              </span>
             </div>
           </div>
           <div className="text-right">

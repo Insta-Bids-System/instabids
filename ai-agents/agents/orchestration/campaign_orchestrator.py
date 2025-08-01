@@ -15,6 +15,12 @@ import uuid
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
+# Import service role database client and error handler
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+from database_service import db_service
+from .error_handler import error_handler, ErrorCategory, ErrorSeverity
+
 
 class OutreachChannel(Enum):
     """Available outreach channels"""
@@ -41,9 +47,13 @@ class OutreachCampaignOrchestrator:
     def __init__(self):
         """Initialize orchestrator with connections to all systems"""
         load_dotenv(override=True)
+        # Initialize service role client for backend operations that need to bypass RLS
+        from database_service import SupabaseService
+        self.db_service = SupabaseService(use_service_role=True)
+        self.supabase = self.db_service.client
+        
+        # Keep regular client reference if needed
         self.supabase_url = os.getenv('SUPABASE_URL')
-        self.supabase_key = os.getenv('SUPABASE_ANON_KEY')
-        self.supabase = create_client(self.supabase_url, self.supabase_key)
         
         # Import other agents dynamically to avoid circular imports
         self._email_agent = None
@@ -147,7 +157,24 @@ class OutreachCampaignOrchestrator:
                 
         except Exception as e:
             print(f"[Orchestrator ERROR] Failed to create campaign: {e}")
-            return {'success': False, 'error': str(e)}
+            
+            # Categorize and handle the error
+            category = error_handler.categorize_error(e)
+            severity = ErrorSeverity.HIGH if "row-level security" in str(e) else ErrorSeverity.MEDIUM
+            
+            error_response = error_handler.handle_error(
+                error=e,
+                context={
+                    'operation': 'create_campaign',
+                    'campaign_name': name,
+                    'bid_card_id': bid_card_id,
+                    'contractor_count': len(contractor_ids)
+                },
+                severity=severity,
+                category=category
+            )
+            
+            return error_response
     
     def execute_campaign(self, campaign_id: str) -> Dict[str, Any]:
         """

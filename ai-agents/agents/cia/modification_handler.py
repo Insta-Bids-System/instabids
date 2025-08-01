@@ -130,34 +130,42 @@ class ModificationHandler:
                             min_str = match.group(1).replace(',', '')
                             max_str = match.group(2).replace(',', '')
                             
-                            # Handle 'k' notation
-                            if min_str.endswith('k'):
-                                min_val = int(min_str[:-1]) * 1000
-                            else:
-                                min_val = int(min_str)
-                                
-                            if max_str.endswith('k'):
-                                max_val = int(max_str[:-1]) * 1000
-                            else:
-                                max_val = int(max_str)
-                                
-                            modifications['budget_min'] = min_val
-                            modifications['budget_max'] = max_val
+                            try:
+                                # Handle 'k' notation
+                                if min_str.endswith('k'):
+                                    min_val = int(min_str[:-1]) * 1000
+                                else:
+                                    min_val = int(min_str)
+                                    
+                                if max_str.endswith('k'):
+                                    max_val = int(max_str[:-1]) * 1000
+                                else:
+                                    max_val = int(max_str)
+                                    
+                                modifications['budget_min'] = min_val
+                                modifications['budget_max'] = max_val
+                            except (ValueError, TypeError):
+                                # Skip invalid budget values
+                                pass
                         else:
                             # Single value
                             budget_str = match.group(1).replace(',', '')
                             
-                            # Handle 'k' notation
-                            if budget_str.endswith('k'):
-                                budget_value = int(budget_str[:-1]) * 1000
-                            else:
-                                budget_value = int(budget_str)
+                            try:
+                                # Handle 'k' notation
+                                if budget_str.endswith('k'):
+                                    budget_value = int(budget_str[:-1]) * 1000
+                                else:
+                                    budget_value = int(budget_str)
+                                    
+                                modifications['budget_max'] = budget_value
                                 
-                            modifications['budget_max'] = budget_value
-                            
-                            # Always infer budget_min for single value patterns
-                            # For "increase" commands or any single budget value, set min to 80%
-                            modifications['budget_min'] = int(budget_value * 0.8)
+                                # Always infer budget_min for single value patterns
+                                # For "increase" commands or any single budget value, set min to 80%
+                                modifications['budget_min'] = int(budget_value * 0.8)
+                            except (ValueError, TypeError):
+                                # Skip invalid budget values
+                                pass
                     
                     elif mod_type == 'materials':
                         # Skip if this looks like a timeline match
@@ -257,6 +265,8 @@ class ModificationHandler:
         # Budget validation
         if 'budget_max' in modifications:
             new_max = modifications['budget_max']
+            if new_max is None:
+                return False, "Budget value cannot be empty"
             if new_max < 1000:
                 return False, "Budget must be at least $1,000"
             if new_max > 1000000:
@@ -290,7 +300,10 @@ class ModificationHandler:
         
         if 'budget_max' in modifications:
             budget = modifications['budget_max']
-            changes.append(f"budget updated to ${budget:,}")
+            if budget is not None:
+                changes.append(f"budget updated to ${budget:,}")
+            else:
+                changes.append("budget updated")
         
         if 'materials' in modifications:
             materials = modifications['materials']

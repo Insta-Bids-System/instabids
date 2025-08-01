@@ -52,7 +52,7 @@ const InspirationDashboard: React.FC = () => {
       if (demoUser) {
         const demoData = JSON.parse(demoUser)
         console.log('🔍 Demo data parsed:', demoData)
-        console.log('🔍 Making API call to:', `http://localhost:8007/api/demo/inspiration/boards?homeowner_id=${encodeURIComponent(demoData.id)}`)
+        console.log('🔍 Making API call to:', `http://localhost:8008/api/demo/inspiration/boards?homeowner_id=${encodeURIComponent(demoData.id)}`)
         // Load demo boards from backend API
         try {
           const response = await fetch(`http://localhost:8008/api/demo/inspiration/boards?homeowner_id=${encodeURIComponent(demoData.id)}`, {

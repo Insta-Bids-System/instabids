@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { ArrowLeft, Plus, MoreVertical, Eye, Download, Trash2, Grid3X3, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Plus, MoreVertical, Eye, Download, Trash2, Grid3X3, Image as ImageIcon, MessageCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { InspirationBoard } from './InspirationDashboard'
 import { ImageUploader } from './ImageUploader'
 import ImageCategorizer from './ImageCategorizer'
 import AIAnalysisDisplay from './AIAnalysisDisplay'
+import IrisChat from './IrisChat'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -34,7 +35,9 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
   const [loading, setLoading] = useState(true)
   const [showUploader, setShowUploader] = useState(false)
   const [selectedImage, setSelectedImage] = useState<BoardImage | null>(null)
-  const [viewMode, setViewMode] = useState<'grid' | 'columns'>('grid')
+  const [viewMode, setViewMode] = useState<'grid' | 'columns'>('columns')
+  const [showIrisChat, setShowIrisChat] = useState(false)
+  const [clickedImage, setClickedImage] = useState<BoardImage | null>(null)
 
   useEffect(() => {
     loadImages()
@@ -44,21 +47,18 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
     try {
       setLoading(true)
       
-      // Check for demo user - load from actual database
+      // Check for demo user - load from demo API endpoint
       const demoUser = localStorage.getItem('DEMO_USER')
       if (demoUser && board.homeowner_id === JSON.parse(demoUser).id) {
-        // Load demo images from actual database  
+        // Load demo images from demo API endpoint with the 3 images including vision  
         try {
-          const { data, error } = await supabase
-            .from('inspiration_images')
-            .select('*')
-            .eq('board_id', board.id)
-            .order('position', { ascending: true })
-
-          if (error) throw error
+          const response = await fetch(`http://localhost:8008/api/demo/inspiration/images?board_id=${board.id}`)
+          if (!response.ok) throw new Error('Failed to fetch demo images')
+          const data = await response.json()
+          console.log('Demo images loaded:', data.length, 'images')
           setImages(data || [])
         } catch (error) {
-          console.error('Error loading demo images:', error)
+          console.error('Error loading demo images from API:', error)
           setImages([])
         }
         setLoading(false)
@@ -131,6 +131,51 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
     }
   }
 
+  const handleImageClick = (image: BoardImage) => {
+    // If Iris chat is open, pass the clicked image to Iris
+    if (showIrisChat) {
+      setClickedImage(image)
+      return
+    }
+    // Otherwise, show image details
+    setSelectedImage(image)
+  }
+
+  const handleGenerateVision = async (selectedElements: string[]) => {
+    // This will call the image generation API with the specific elements
+    const currentImage = images.find(img => img.tags.includes('current'))
+    const inspirationImages = images.filter(img => !img.tags.includes('current') && !img.tags.includes('vision'))
+    
+    if (!currentImage || inspirationImages.length === 0) {
+      toast.error('Need both current space photo and inspiration images')
+      return
+    }
+
+    try {
+      const response = await fetch('http://localhost:8008/api/image-generation/generate-dream-space', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          board_id: board.id,
+          current_image_id: currentImage.id,
+          ideal_image_id: inspirationImages[0].id,
+          user_preferences: selectedElements.join('. ')
+        })
+      })
+
+      if (response.ok) {
+        toast.success('Vision generated! Check your My Vision column.')
+        // Reload images to show the new vision
+        loadImages()
+      } else {
+        toast.error('Failed to generate vision')
+      }
+    } catch (error) {
+      console.error('Generation error:', error)
+      toast.error('Failed to generate vision')
+    }
+  }
+
   const handleStartProject = () => {
     // Prepare vision data for CIA
     const visionImages = images.filter(img => img.tags.includes('vision'))
@@ -189,6 +234,17 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Iris Chat Toggle */}
+          <button
+            onClick={() => setShowIrisChat(!showIrisChat)}
+            className={`p-2 rounded-lg transition-colors ${showIrisChat 
+              ? 'bg-primary-100 text-primary-700' 
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <MessageCircle className="w-5 h-5" />
+          </button>
+
           {/* View Mode Toggle */}
           <div className="flex bg-gray-100 rounded-lg p-1">
             <button
@@ -339,7 +395,10 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
               <h3 className="font-medium text-gray-900 mb-4">Current Space</h3>
               <div className="space-y-4">
                 {images.filter(img => img.tags.includes('current')).map((image) => (
-                  <div key={image.id} className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer">
+                  <div key={image.id} 
+                       onClick={() => handleImageClick(image)}
+                       className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary-500">
+                  
                     <img
                       src={image.thumbnail_url || image.image_url}
                       alt="Current space"
@@ -366,7 +425,9 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
               <h3 className="font-medium text-gray-900 mb-4">Inspiration</h3>
               <div className="space-y-4">
                 {images.filter(img => !img.tags.includes('current') && !img.tags.includes('vision')).map((image) => (
-                  <div key={image.id} className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer">
+                  <div key={image.id} 
+                       onClick={() => handleImageClick(image)}
+                       className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary-500">
                     <img
                       src={image.thumbnail_url || image.image_url}
                       alt="Inspiration"
@@ -395,7 +456,9 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
               </div>
               <div className="space-y-4">
                 {images.filter(img => img.tags.includes('vision')).map((image) => (
-                  <div key={image.id} className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer">
+                  <div key={image.id} 
+                       onClick={() => handleImageClick(image)}
+                       className="group relative aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary-500">
                     <img
                       src={image.thumbnail_url || image.image_url}
                       alt="Vision"
@@ -430,6 +493,20 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
           </div>
         )}
       </div>
+
+      {/* Iris Chat Panel */}
+      {showIrisChat && (
+        <div className="border-t bg-gray-50 p-4">
+          <IrisChat
+            boardId={board.id}
+            boardTitle={board.title}
+            images={images}
+            onGenerateVision={handleGenerateVision}
+            clickedImage={clickedImage}
+            onImageProcessed={() => setClickedImage(null)}
+          />
+        </div>
+      )}
     </div>
   )
 }

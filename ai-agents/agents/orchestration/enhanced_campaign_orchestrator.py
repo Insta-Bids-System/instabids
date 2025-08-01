@@ -158,7 +158,7 @@ class EnhancedCampaignOrchestrator:
                 },
                 'check_ins': [
                     {
-                        'time': check_in['scheduled_at'],
+                        'time': check_in['scheduled_time'],
                         'expected_bids': check_in['expected_bids']
                     } for check_in in check_ins
                 ]
@@ -199,37 +199,19 @@ class EnhancedCampaignOrchestrator:
             state = location.get('state', '')
             city = location.get('city', '')
             
-            # Count Tier 1: Internal contractors (we'll assume these are in a separate contractors table)
-            # For now, we'll check if a contractors table exists, otherwise use contractor_leads
-            try:
-                tier1_result = self.supabase.table('contractors')\
-                    .select('id')\
-                    .execute()
-                tier1_count = len(tier1_result.data) if tier1_result.data else 0
-            except:
-                # Fallback: use potential_contractors with high lead_score as Tier 1  
-                tier1_result = self.supabase.table('potential_contractors')\
-                    .select('id')\
-                    .gte('lead_score', 80)\
-                    .eq('lead_status', 'contacted')\
-                    .execute()
-                tier1_count = len(tier1_result.data) if tier1_result.data else 0
-            
-            # Count Tier 2: Prospects (enriched but not contacted)
-            tier2_result = self.supabase.table('potential_contractors')\
+            # Count Tier 1: Internal contractors (signed up for InstaBids)
+            tier1_result = self.supabase.table('contractors')\
                 .select('id')\
-                .eq('lead_status', 'enriched')\
                 .execute()
+            tier1_count = len(tier1_result.data) if tier1_result.data else 0
             
-            tier2_count = len(tier2_result.data) if tier2_result.data else 0
+            # Count Tier 2: Previously contacted contractors (have outreach history)
+            tier2_result = self.supabase.rpc('count_contractors_with_outreach_history').execute()
+            tier2_count = tier2_result.data if tier2_result.data else 0
             
-            # Count Tier 3: New/Cold (new status, not contacted)
-            tier3_result = self.supabase.table('potential_contractors')\
-                .select('id')\
-                .in_('lead_status', ['new', 'qualified'])\
-                .execute()
-            
-            tier3_count = len(tier3_result.data) if tier3_result.data else 0
+            # Count Tier 3: Never contacted contractors (no outreach history)  
+            tier3_result = self.supabase.rpc('count_contractors_without_outreach_history').execute()
+            tier3_count = tier3_result.data if tier3_result.data else 0
             
             print(f"\n[Contractor Availability]")
             print(f"  Tier 1 (Internal): {tier1_count}")
@@ -461,7 +443,7 @@ class EnhancedCampaignOrchestrator:
                 .select('*')\
                 .eq('campaign_id', campaign_id)\
                 .is_('completed_at', 'null')\
-                .order('scheduled_at')\
+                .order('scheduled_time')\
                 .execute()
             
             if not check_ins.data:
@@ -470,7 +452,7 @@ class EnhancedCampaignOrchestrator:
             
             for check_in in check_ins.data:
                 # Wait until check-in time
-                scheduled_time = datetime.fromisoformat(check_in['scheduled_at'])
+                scheduled_time = datetime.fromisoformat(check_in['scheduled_time'])
                 wait_seconds = (scheduled_time - datetime.now()).total_seconds()
                 
                 if wait_seconds > 0:

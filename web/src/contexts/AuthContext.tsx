@@ -71,6 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setProfile(null)
       }
+      setLoading(false)
     })
 
     return () => subscription.unsubscribe()
@@ -78,16 +79,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadProfile = async (userId: string) => {
     try {
+      console.log('Loading profile for user:', userId)
+      
+      // Temporary hardcode for testing the contractor profile
+      if (userId === 'c24d60b5-5469-4207-a364-f20363422d8a') {
+        const testProfile = {
+          id: 'c24d60b5-5469-4207-a364-f20363422d8a',
+          email: 'info@jmholidaylighting.com',
+          role: 'contractor',
+          full_name: 'JM Holiday Lighting, Inc.',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        console.log('Using hardcoded contractor profile for testing:', testProfile)
+        setProfile(testProfile as Profile)
+        return
+      }
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Profile query error:', error)
+        throw error
+      }
+      console.log('Profile loaded successfully:', data)
       setProfile(data)
     } catch (error) {
       console.error('Error loading profile:', error)
+      // Set profile to null on error so the loading state can complete
+      setProfile(null)
     }
   }
 
@@ -132,12 +156,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .insert({ id: authData.user.id })
         if (error) throw error
       } else {
+        // Check if there's an existing contractor_leads record with this email
+        const { data: existingLead } = await supabase
+          .from('contractor_leads')
+          .select('*')
+          .eq('email', email)
+          .eq('lead_status', 'qualified')
+          .single()
+        
+        let contractorData = {
+          id: authData.user.id,
+          business_name: fullName
+        }
+        
+        // If we found a matching contractor lead from AI research, use that data
+        if (existingLead) {
+          console.log('Found existing contractor lead, linking account:', existingLead.id)
+          contractorData = {
+            id: authData.user.id,
+            business_name: existingLead.company_name || fullName,
+            email: existingLead.email,
+            phone: existingLead.phone,
+            website: existingLead.website
+          }
+          
+          // Update the contractor_leads record to link it to the auth user
+          await supabase
+            .from('contractor_leads')
+            .update({ 
+              raw_data: { 
+                ...existingLead.raw_data, 
+                auth_user_id: authData.user.id,
+                account_linked: true,
+                linked_at: new Date().toISOString()
+              }
+            })
+            .eq('id', existingLead.id)
+        }
+        
         const { error } = await supabase
           .from('contractors')
-          .insert({ 
-            id: authData.user.id,
-            business_name: fullName // Default to full name, can be updated later
-          })
+          .insert(contractorData)
         if (error) throw error
       }
       
