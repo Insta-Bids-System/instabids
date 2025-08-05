@@ -2,4 +2,5 @@
 
 from .agent import JobAssessmentAgent
 
-__all__ = ['JobAssessmentAgent']
+
+__all__ = ["JobAssessmentAgent"]

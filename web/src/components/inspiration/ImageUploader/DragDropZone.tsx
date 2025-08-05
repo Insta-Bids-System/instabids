@@ -1,13 +1,14 @@
-import React, { useCallback } from 'react'
-import { useDropzone } from 'react-dropzone'
-import { Upload, Image as ImageIcon, X } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { Image as ImageIcon, Upload, X } from "lucide-react";
+import type React from "react";
+import { useCallback } from "react";
+import { useDropzone } from "react-dropzone";
+import toast from "react-hot-toast";
 
 interface DragDropZoneProps {
-  onFilesAccepted: (files: File[]) => void
-  maxFiles?: number
-  maxSize?: number // in bytes
-  accept?: Record<string, string[]>
+  onFilesAccepted: (files: File[]) => void;
+  maxFiles?: number;
+  maxSize?: number; // in bytes
+  accept?: Record<string, string[]>;
 }
 
 const DragDropZone: React.FC<DragDropZoneProps> = ({
@@ -15,52 +16,57 @@ const DragDropZone: React.FC<DragDropZoneProps> = ({
   maxFiles = 10,
   maxSize = 10 * 1024 * 1024, // 10MB default
   accept = {
-    'image/*': ['.jpeg', '.jpg', '.png', '.webp', '.gif']
-  }
+    "image/*": [".jpeg", ".jpg", ".png", ".webp", ".gif"],
+  },
 }) => {
-  const onDrop = useCallback((acceptedFiles: File[], fileRejections: any[]) => {
-    if (fileRejections.length > 0) {
-      const errors = fileRejections.map(rejection => {
-        const error = rejection.errors[0]
-        if (error.code === 'file-too-large') {
-          return `${rejection.file.name} is too large. Max size is ${maxSize / 1024 / 1024}MB`
-        } else if (error.code === 'file-invalid-type') {
-          return `${rejection.file.name} is not a supported image format`
-        } else if (error.code === 'too-many-files') {
-          return `Too many files. Max ${maxFiles} files allowed`
-        }
-        return error.message
-      })
-      
-      errors.forEach(error => toast.error(error))
-      return
-    }
+  const onDrop = useCallback(
+    (acceptedFiles: File[], fileRejections: any[]) => {
+      if (fileRejections.length > 0) {
+        const errors = fileRejections.map((rejection) => {
+          const error = rejection.errors[0];
+          if (error.code === "file-too-large") {
+            return `${rejection.file.name} is too large. Max size is ${maxSize / 1024 / 1024}MB`;
+          } else if (error.code === "file-invalid-type") {
+            return `${rejection.file.name} is not a supported image format`;
+          } else if (error.code === "too-many-files") {
+            return `Too many files. Max ${maxFiles} files allowed`;
+          }
+          return error.message;
+        });
 
-    if (acceptedFiles.length > 0) {
-      onFilesAccepted(acceptedFiles)
-      toast.success(`${acceptedFiles.length} image${acceptedFiles.length > 1 ? 's' : ''} ready to upload`)
-    }
-  }, [onFilesAccepted, maxFiles, maxSize])
+        errors.forEach((error) => toast.error(error));
+        return;
+      }
+
+      if (acceptedFiles.length > 0) {
+        onFilesAccepted(acceptedFiles);
+        toast.success(
+          `${acceptedFiles.length} image${acceptedFiles.length > 1 ? "s" : ""} ready to upload`
+        );
+      }
+    },
+    [onFilesAccepted, maxFiles, maxSize]
+  );
 
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
     onDrop,
     accept,
     maxFiles,
-    maxSize
-  })
+    maxSize,
+  });
 
   return (
     <div
       {...getRootProps()}
       className={`
         relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all
-        ${isDragActive && !isDragReject ? 'border-primary-500 bg-primary-50' : ''}
-        ${isDragReject ? 'border-red-500 bg-red-50' : ''}
-        ${!isDragActive && !isDragReject ? 'border-gray-300 hover:border-gray-400' : ''}
+        ${isDragActive && !isDragReject ? "border-primary-500 bg-primary-50" : ""}
+        ${isDragReject ? "border-red-500 bg-red-50" : ""}
+        ${!isDragActive && !isDragReject ? "border-gray-300 hover:border-gray-400" : ""}
       `}
     >
       <input {...getInputProps()} />
-      
+
       <div className="flex flex-col items-center">
         {isDragReject ? (
           <>
@@ -88,7 +94,7 @@ const DragDropZone: React.FC<DragDropZoneProps> = ({
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default DragDropZone
+export default DragDropZone;

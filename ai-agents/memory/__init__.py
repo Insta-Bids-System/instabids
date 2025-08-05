@@ -1,17 +1,18 @@
 """
 Multi-project memory system for InstaBids AI agents
 """
-from .multi_project_store import memory_store, MultiProjectMemoryStore
 from .langgraph_integration import (
+    ProjectAwareAgentConfig,
     setup_project_aware_agent,
     update_agent_memory_after_conversation,
-    ProjectAwareAgentConfig
 )
+from .multi_project_store import MultiProjectMemoryStore, memory_store
+
 
 __all__ = [
-    'memory_store',
-    'MultiProjectMemoryStore', 
-    'setup_project_aware_agent',
-    'update_agent_memory_after_conversation',
-    'ProjectAwareAgentConfig'
+    "MultiProjectMemoryStore",
+    "ProjectAwareAgentConfig",
+    "memory_store",
+    "setup_project_aware_agent",
+    "update_agent_memory_after_conversation"
 ]

@@ -1,47 +1,59 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Shield, Star, Clock, Users } from 'lucide-react'
-import UltraInteractiveCIAChat from '@/components/chat/UltraInteractiveCIAChat'
-import { apiService } from '@/services/api'
-import { motion } from 'framer-motion'
-import { useAuth } from '@/contexts/AuthContext'
+import { motion } from "framer-motion";
+import { Clock, Shield, Star, Users } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import CIAChat from "@/components/chat/CIAChat";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiService } from "@/services/api";
 
 const HomePage: React.FC = () => {
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const [showSignupPrompt, setShowSignupPrompt] = useState(false)
-  const [conversationComplete, setConversationComplete] = useState(false)
-  const [projectData, setProjectData] = useState<any>(null)
-  const [sessionId] = useState(`session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [_conversationComplete, setConversationComplete] = useState(false);
+  const [_projectData, setProjectData] = useState<any>(null);
+  const [sessionId] = useState(() => {
+    // Try to get existing session ID from localStorage, or create new one
+    const existingSessionId = localStorage.getItem("cia_session_id");
+    if (existingSessionId) {
+      return existingSessionId;
+    }
+    const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem("cia_session_id", newSessionId);
+    return newSessionId;
+  });
 
   const handleSendMessage = async (message: string, images: string[]) => {
     try {
       // Use authenticated user ID if available, otherwise undefined for anonymous
-      const userId = user?.id
-      const result = await apiService.sendChatMessage(message, images, userId, sessionId)
-      
+      const userId = user?.id;
+      const result = await apiService.sendChatMessage(message, images, userId, sessionId);
+
       if (result.success && result.data) {
         // Check if conversation has reached a completion phase
-        if (result.data.phase === 'review' || result.data.phase === 'complete') {
-          setConversationComplete(true)
-          setProjectData(result.data.extractedData)
+        if (result.data.phase === "review" || result.data.phase === "complete") {
+          setConversationComplete(true);
+          setProjectData(result.data.extractedData);
           // Show signup prompt after a delay
-          setTimeout(() => setShowSignupPrompt(true), 2000)
+          setTimeout(() => setShowSignupPrompt(true), 2000);
         }
-        
-        return {
-          response: result.data.response,
-          phase: result.data.phase,
-          extractedData: result.data.extractedData
-        }
+
+        return result.data.response;
       } else {
-        throw new Error(result.error || 'Failed to send message')
+        throw new Error(result.error || "Failed to send message");
       }
     } catch (error) {
-      console.error('[HomePage] Error sending message:', error)
-      throw error
+      console.error("[HomePage] Error sending message:", error);
+      throw error;
     }
-  }
+  };
+
+  const handleAccountCreated = (userData: { name: string; email: string; userId: string }) => {
+    console.log("Account created:", userData);
+    // Redirect to dashboard or show success message
+    navigate("/dashboard");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -52,13 +64,31 @@ const HomePage: React.FC = () => {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               Instabids
             </h1>
-            <nav className="flex gap-4">
-              <button
-                onClick={() => navigate('/login')}
-                className="text-gray-700 hover:text-primary-600 transition-colors"
-              >
-                Contractor Login
-              </button>
+            <nav className="flex gap-6">
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-500">Login as:</span>
+                <button
+                  type="button"
+                  onClick={() => navigate("/login")}
+                  className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                >
+                  Homeowner
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/contractor")}
+                  className="text-green-600 hover:text-green-800 font-medium transition-colors"
+                >
+                  Contractor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/admin/login")}
+                  className="text-purple-600 hover:text-purple-800 font-medium transition-colors"
+                >
+                  Admin
+                </button>
+              </div>
             </nav>
           </div>
         </div>
@@ -78,7 +108,8 @@ const HomePage: React.FC = () => {
               Save 20% on Home Projects
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              No sales meetings. No hassle. Just chat with our AI to describe your project and get matched with pre-qualified contractors instantly.
+              No sales meetings. No hassle. Just chat with our AI to describe your project and get
+              matched with pre-qualified contractors instantly.
             </p>
           </motion.div>
 
@@ -115,9 +146,10 @@ const HomePage: React.FC = () => {
             className="max-w-4xl mx-auto"
           >
             <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-              <UltraInteractiveCIAChat 
+              <CIAChat
                 onSendMessage={handleSendMessage}
-                initialMessage="Welcome to Instabids! I'm Alex, your AI project assistant. Tell me about your home project and I'll help you get competitive bids from verified contractors. What are you looking to get done?"
+                onAccountCreated={handleAccountCreated}
+                sessionId={sessionId}
               />
             </div>
           </motion.div>
@@ -142,12 +174,14 @@ const HomePage: React.FC = () => {
                   Sign up now to receive bids from verified contractors. It only takes 30 seconds!
                 </p>
                 <button
-                  onClick={() => navigate('/signup', { state: { sessionId, projectData } })}
+                  type="button"
+                  onClick={() => navigate("/signup")}
                   className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-200 mb-3"
                 >
                   Sign Up with Google
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowSignupPrompt(false)}
                   className="w-full text-gray-500 py-2 hover:text-gray-700 transition-colors"
                 >
@@ -198,7 +232,8 @@ const HomePage: React.FC = () => {
                 ))}
               </div>
               <p className="text-gray-600 mb-2">
-                "The chat was so easy! Like texting a friend who knows everything about home projects."
+                "The chat was so easy! Like texting a friend who knows everything about home
+                projects."
               </p>
               <p className="text-sm font-semibold">- Emily R., New York</p>
             </div>
@@ -211,7 +246,7 @@ const HomePage: React.FC = () => {
         <p>© 2025 Instabids. All rights reserved. | Privacy | Terms</p>
       </footer>
     </div>
-  )
-}
+  );
+};
 
-export default HomePage
+export default HomePage;

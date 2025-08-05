@@ -1,27 +1,26 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useEffect } from 'react';
 import {
-  MainContainer,
+  AttachmentButton,
+  Avatar,
   ChatContainer,
-  MessageList,
+  MainContainer,
   Message,
   MessageInput,
-  Avatar,
-  MessageGroup,
-  MessageSeparator,
+  MessageList,
+  SendButton,
   TypingIndicator,
-  AttachmentButton,
-  SendButton
-} from '@chatscope/chat-ui-kit-react';
-import '@chatscope/chat-ui-kit-styles/dist/default/styles.min.css';
-import { Upload, Image as ImageIcon, X, User, Bot, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { StorageService } from '@/lib/storage';
-import toast from 'react-hot-toast';
+} from "@chatscope/chat-ui-kit-react";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import "@chatscope/chat-ui-kit-styles/dist/default/styles.min.css";
+import { AlertCircle, Bot, CheckCircle, Clock, Image as ImageIcon, User, X } from "lucide-react";
+import toast from "react-hot-toast";
+import { StorageService } from "@/lib/storage";
 
 interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   images?: string[];
   timestamp: Date;
@@ -33,12 +32,15 @@ interface ProjectPhase {
   id: string;
   name: string;
   description: string;
-  status: 'pending' | 'active' | 'completed';
+  status: "pending" | "active" | "completed";
   icon: React.ReactNode;
 }
 
 interface DynamicCIAChatProps {
-  onSendMessage?: (message: string, images: string[]) => Promise<{
+  onSendMessage?: (
+    message: string,
+    images: string[]
+  ) => Promise<{
     response: string;
     phase?: string;
     extractedData?: any;
@@ -48,61 +50,82 @@ interface DynamicCIAChatProps {
 export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: '1',
-      role: 'assistant',
-      content: "Hi! I'm Alex, your project assistant at Instabids. I'll help you describe your home project so we can find you the perfect contractors at the best prices. What kind of project brings you here today?",
+      id: "1",
+      role: "assistant",
+      content:
+        "Hi! I'm Alex, your project assistant at Instabids. I'll help you describe your home project so we can find you the perfect contractors at the best prices. What kind of project brings you here today?",
       timestamp: new Date(),
-      phase: 'intro'
+      phase: "intro",
     },
   ]);
-  
-  const [inputMessage, setInputMessage] = useState('');
+
+  const [inputMessage, setInputMessage] = useState("");
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreview, setImagePreview] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentPhase, setCurrentPhase] = useState('intro');
+  const [currentPhase, setCurrentPhase] = useState("intro");
   const [extractedData, setExtractedData] = useState<any>({});
   const [mounted, setMounted] = useState(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Project phases for progress tracking
   const phases: ProjectPhase[] = [
     {
-      id: 'intro',
-      name: 'Introduction',
-      description: 'Getting to know your project',
-      status: currentPhase === 'intro' ? 'active' : 'completed',
-      icon: <User className="w-4 h-4" />
+      id: "intro",
+      name: "Introduction",
+      description: "Getting to know your project",
+      status: currentPhase === "intro" ? "active" : "completed",
+      icon: <User className="w-4 h-4" />,
     },
     {
-      id: 'discovery',
-      name: 'Discovery',
-      description: 'Understanding project details',
-      status: currentPhase === 'discovery' ? 'active' : currentPhase === 'intro' ? 'pending' : 'completed',
-      icon: <AlertCircle className="w-4 h-4" />
+      id: "discovery",
+      name: "Discovery",
+      description: "Understanding project details",
+      status:
+        currentPhase === "discovery"
+          ? "active"
+          : currentPhase === "intro"
+            ? "pending"
+            : "completed",
+      icon: <AlertCircle className="w-4 h-4" />,
     },
     {
-      id: 'details',
-      name: 'Specifications',
-      description: 'Detailed requirements',
-      status: currentPhase === 'details' ? 'active' : ['intro', 'discovery'].includes(currentPhase) ? 'pending' : 'completed',
-      icon: <Clock className="w-4 h-4" />
+      id: "details",
+      name: "Specifications",
+      description: "Detailed requirements",
+      status:
+        currentPhase === "details"
+          ? "active"
+          : ["intro", "discovery"].includes(currentPhase)
+            ? "pending"
+            : "completed",
+      icon: <Clock className="w-4 h-4" />,
     },
     {
-      id: 'photos',
-      name: 'Photos',
-      description: 'Visual documentation',
-      status: currentPhase === 'photos' ? 'active' : ['intro', 'discovery', 'details'].includes(currentPhase) ? 'pending' : 'completed',
-      icon: <ImageIcon className="w-4 h-4" />
+      id: "photos",
+      name: "Photos",
+      description: "Visual documentation",
+      status:
+        currentPhase === "photos"
+          ? "active"
+          : ["intro", "discovery", "details"].includes(currentPhase)
+            ? "pending"
+            : "completed",
+      icon: <ImageIcon className="w-4 h-4" />,
     },
     {
-      id: 'review',
-      name: 'Review',
-      description: 'Final confirmation',
-      status: currentPhase === 'review' ? 'active' : currentPhase === 'complete' ? 'completed' : 'pending',
-      icon: <CheckCircle className="w-4 h-4" />
-    }
+      id: "review",
+      name: "Review",
+      description: "Final confirmation",
+      status:
+        currentPhase === "review"
+          ? "active"
+          : currentPhase === "complete"
+            ? "completed"
+            : "pending",
+      icon: <CheckCircle className="w-4 h-4" />,
+    },
   ];
 
   // Fix hydration error
@@ -113,7 +136,7 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length + selectedImages.length > 5) {
-      toast.error('You can upload a maximum of 5 images');
+      toast.error("You can upload a maximum of 5 images");
       return;
     }
 
@@ -127,19 +150,19 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
     }
 
     setSelectedImages([...selectedImages, ...files]);
-    
+
     // Create preview URLs
-    const newPreviews = files.map(file => URL.createObjectURL(file));
+    const newPreviews = files.map((file) => URL.createObjectURL(file));
     setImagePreview([...imagePreview, ...newPreviews]);
   };
 
   const removeImage = (index: number) => {
     const newImages = selectedImages.filter((_, i) => i !== index);
     const newPreviews = imagePreview.filter((_, i) => i !== index);
-    
+
     // Revoke the URL to prevent memory leaks
     URL.revokeObjectURL(imagePreview[index]);
-    
+
     setSelectedImages(newImages);
     setImagePreview(newPreviews);
   };
@@ -149,14 +172,14 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
 
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
-      role: 'user',
+      role: "user",
       content: inputMessage,
       images: imagePreview.length > 0 ? [...imagePreview] : undefined,
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, newMessage]);
-    setInputMessage('');
+    setMessages((prev) => [...prev, newMessage]);
+    setInputMessage("");
     setIsLoading(true);
 
     try {
@@ -169,14 +192,14 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
 
       // Call the message handler
       let result: { response: string; phase?: string; extractedData?: any };
-      
+
       if (onSendMessage) {
-        console.log('Sending message to CIA API...');
+        console.log("Sending message to CIA API...");
         result = await onSendMessage(inputMessage, imageDataUrls);
       } else {
         // Fallback mock response with phase progression
-        console.log('No API handler provided, using mock response with phases');
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        console.log("No API handler provided, using mock response with phases");
+        await new Promise((resolve) => setTimeout(resolve, 1500));
         result = generateMockResponseWithPhase(inputMessage, currentPhase);
       }
 
@@ -187,30 +210,30 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
       }
 
       if (result.extractedData) {
-        setExtractedData(prev => ({ ...prev, ...result.extractedData }));
+        setExtractedData((prev) => ({ ...prev, ...result.extractedData }));
       }
 
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        role: 'assistant',
+        role: "assistant",
         content: result.response,
         timestamp: new Date(),
         phase: result.phase || currentPhase,
-        extractedData: result.extractedData
+        extractedData: result.extractedData,
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
-
+      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('Failed to send message. Please try again.');
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message. Please try again.");
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: "I'm sorry, I encountered an error. Please make sure the backend is running (cd ai-agents && python main.py).",
+        role: "assistant",
+        content:
+          "I'm sorry, I encountered an error. Please make sure the backend is running (cd ai-agents && python main.py).",
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
       setSelectedImages([]);
@@ -219,67 +242,81 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
   };
 
   // Generate mock responses with phase progression
-  const generateMockResponseWithPhase = (message: string, phase: string): { response: string; phase?: string; extractedData?: any } => {
+  const generateMockResponseWithPhase = (
+    message: string,
+    phase: string
+  ): { response: string; phase?: string; extractedData?: any } => {
     const lower = message.toLowerCase();
-    
+
     switch (phase) {
-      case 'intro':
-        if (lower.includes('kitchen') || lower.includes('bathroom') || lower.includes('roof')) {
+      case "intro":
+        if (lower.includes("kitchen") || lower.includes("bathroom") || lower.includes("roof")) {
           return {
-            response: `Great! A ${lower.includes('kitchen') ? 'kitchen' : lower.includes('bathroom') ? 'bathroom' : 'roofing'} project. Let me gather some details to match you with the right contractors. What's your timeline for this project - is this something urgent or can we plan it out?`,
-            phase: 'discovery',
-            extractedData: { 
-              projectType: lower.includes('kitchen') ? 'kitchen' : lower.includes('bathroom') ? 'bathroom' : 'roofing'
-            }
+            response: `Great! A ${lower.includes("kitchen") ? "kitchen" : lower.includes("bathroom") ? "bathroom" : "roofing"} project. Let me gather some details to match you with the right contractors. What's your timeline for this project - is this something urgent or can we plan it out?`,
+            phase: "discovery",
+            extractedData: {
+              projectType: lower.includes("kitchen")
+                ? "kitchen"
+                : lower.includes("bathroom")
+                  ? "bathroom"
+                  : "roofing",
+            },
           };
         }
         return {
-          response: "I'd love to help! Could you tell me what type of home improvement project you're considering?",
-          phase: 'intro'
+          response:
+            "I'd love to help! Could you tell me what type of home improvement project you're considering?",
+          phase: "intro",
         };
 
-      case 'discovery':
-        if (lower.includes('budget') || lower.includes('cost') || lower.includes('price')) {
+      case "discovery":
+        if (lower.includes("budget") || lower.includes("cost") || lower.includes("price")) {
           return {
-            response: "Perfect! Budget planning is crucial. Based on the project type, I can help estimate costs. Could you share what you're hoping to spend or any specific requirements you have in mind?",
-            phase: 'details',
-            extractedData: { budgetDiscussed: true }
+            response:
+              "Perfect! Budget planning is crucial. Based on the project type, I can help estimate costs. Could you share what you're hoping to spend or any specific requirements you have in mind?",
+            phase: "details",
+            extractedData: { budgetDiscussed: true },
           };
         }
-        if (lower.includes('urgent') || lower.includes('asap') || lower.includes('emergency')) {
+        if (lower.includes("urgent") || lower.includes("asap") || lower.includes("emergency")) {
           return {
-            response: "I understand this is urgent. Let's fast-track your project. What specific details can you share about the work needed?",
-            phase: 'details',
-            extractedData: { urgency: 'urgent' }
+            response:
+              "I understand this is urgent. Let's fast-track your project. What specific details can you share about the work needed?",
+            phase: "details",
+            extractedData: { urgency: "urgent" },
           };
         }
         return {
-          response: "Thanks for that info! Can you tell me more about your budget range and any specific requirements?",
-          phase: 'discovery'
+          response:
+            "Thanks for that info! Can you tell me more about your budget range and any specific requirements?",
+          phase: "discovery",
         };
 
-      case 'details':
+      case "details":
         return {
-          response: "Excellent details! It would be really helpful to see some photos of the area. This helps contractors provide more accurate estimates. Can you upload a few photos?",
-          phase: 'photos'
+          response:
+            "Excellent details! It would be really helpful to see some photos of the area. This helps contractors provide more accurate estimates. Can you upload a few photos?",
+          phase: "photos",
         };
 
-      case 'photos':
+      case "photos":
         return {
-          response: "Perfect! I have all the information needed. Let me review what we've discussed and then we can connect you with qualified contractors in your area.",
-          phase: 'review'
+          response:
+            "Perfect! I have all the information needed. Let me review what we've discussed and then we can connect you with qualified contractors in your area.",
+          phase: "review",
         };
 
-      case 'review':
+      case "review":
         return {
-          response: "Great! I'll now process your project information and match you with 3-5 qualified contractors. They'll receive your project details and reach out with estimates. You should hear back within 24 hours!",
-          phase: 'complete'
+          response:
+            "Great! I'll now process your project information and match you with 3-5 qualified contractors. They'll receive your project details and reach out with estimates. You should hear back within 24 hours!",
+          phase: "complete",
         };
 
       default:
         return {
           response: "I'd be happy to help with your project! What brings you to Instabids today?",
-          phase: 'intro'
+          phase: "intro",
         };
     }
   };
@@ -297,20 +334,28 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
             <p className="text-sm opacity-90">Your Instabids Project Assistant</p>
           </div>
           <div className="text-right">
-            <p className="text-sm opacity-90">Phase: {phases.find(p => p.id === currentPhase)?.name}</p>
-            <p className="text-xs opacity-75">{Object.keys(extractedData).length} details collected</p>
+            <p className="text-sm opacity-90">
+              Phase: {phases.find((p) => p.id === currentPhase)?.name}
+            </p>
+            <p className="text-xs opacity-75">
+              {Object.keys(extractedData).length} details collected
+            </p>
           </div>
         </div>
-        
+
         {/* Progress Bar */}
         <div className="flex gap-2">
-          {phases.map((phase, index) => (
+          {phases.map((phase, _index) => (
             <div key={phase.id} className="flex-1">
-              <div className={`h-2 rounded-full transition-all duration-300 ${
-                phase.status === 'completed' ? 'bg-green-400' :
-                phase.status === 'active' ? 'bg-yellow-400' :
-                'bg-white/20'
-              }`} />
+              <div
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  phase.status === "completed"
+                    ? "bg-green-400"
+                    : phase.status === "active"
+                      ? "bg-yellow-400"
+                      : "bg-white/20"
+                }`}
+              />
               <div className="flex items-center gap-1 mt-1">
                 {phase.icon}
                 <span className="text-xs opacity-75">{phase.name}</span>
@@ -328,27 +373,25 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
             <MainContainer>
               <ChatContainer>
                 <MessageList
-                  typingIndicator={isLoading ? <TypingIndicator content="Alex is thinking..." /> : null}
+                  typingIndicator={
+                    isLoading ? <TypingIndicator content="Alex is thinking..." /> : null
+                  }
                 >
                   {messages.map((message) => (
                     <Message
                       key={message.id}
                       model={{
                         message: message.content,
-                        sentTime: mounted ? message.timestamp.toLocaleTimeString() : 'now',
-                        sender: message.role === 'assistant' ? 'Alex' : 'You',
-                        direction: message.role === 'user' ? 'outgoing' : 'incoming',
-                        position: 'single'
+                        sentTime: mounted ? message.timestamp.toLocaleTimeString() : "now",
+                        sender: message.role === "assistant" ? "Alex" : "You",
+                        direction: message.role === "user" ? "outgoing" : "incoming",
+                        position: "single",
                       }}
                     >
-                      {message.role === 'assistant' && (
-                        <Avatar
-                          src="/api/placeholder/32/32"
-                          name="Alex"
-                          status="available"
-                        />
+                      {message.role === "assistant" && (
+                        <Avatar src="/api/placeholder/32/32" name="Alex" status="available" />
                       )}
-                      
+
                       {/* Display images if any */}
                       {message.images && message.images.length > 0 && (
                         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -365,7 +408,7 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
                     </Message>
                   ))}
                 </MessageList>
-                
+
                 {/* Image Preview Area */}
                 {imagePreview.length > 0 && (
                   <div className="px-4 py-2 border-t bg-gray-50">
@@ -378,6 +421,7 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
                             className="w-20 h-20 object-cover rounded-md"
                           />
                           <button
+                            type="button"
                             onClick={() => removeImage(index)}
                             className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                           >
@@ -426,16 +470,16 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
         {/* Sidebar with Extracted Data */}
         <div className="w-80 border-l bg-gray-50 p-4 overflow-y-auto">
           <h3 className="font-semibold text-gray-800 mb-3">Project Details</h3>
-          
+
           {Object.keys(extractedData).length > 0 ? (
             <div className="space-y-3">
               {Object.entries(extractedData).map(([key, value]) => (
                 <div key={key} className="bg-white p-3 rounded-lg shadow-sm">
                   <dt className="text-sm font-medium text-gray-600 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                    {key.replace(/([A-Z])/g, " $1").trim()}
                   </dt>
                   <dd className="mt-1 text-sm text-gray-900">
-                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                    {typeof value === "object" ? JSON.stringify(value) : String(value)}
                   </dd>
                 </div>
               ))}
@@ -450,12 +494,12 @@ export default function DynamicCIAChat({ onSendMessage }: DynamicCIAChatProps) {
           <div className="mt-6">
             <h4 className="font-medium text-gray-800 mb-2">What's Next?</h4>
             <div className="text-sm text-gray-600">
-              {currentPhase === 'intro' && "Tell Alex about your project type"}
-              {currentPhase === 'discovery' && "Share your timeline and basic requirements"}
-              {currentPhase === 'details' && "Discuss budget and specific needs"}
-              {currentPhase === 'photos' && "Upload photos of the project area"}
-              {currentPhase === 'review' && "Review your project details"}
-              {currentPhase === 'complete' && "Your project is ready for contractor matching!"}
+              {currentPhase === "intro" && "Tell Alex about your project type"}
+              {currentPhase === "discovery" && "Share your timeline and basic requirements"}
+              {currentPhase === "details" && "Discuss budget and specific needs"}
+              {currentPhase === "photos" && "Upload photos of the project area"}
+              {currentPhase === "review" && "Review your project details"}
+              {currentPhase === "complete" && "Your project is ready for contractor matching!"}
             </div>
           </div>
         </div>

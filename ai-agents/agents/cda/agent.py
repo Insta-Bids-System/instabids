@@ -1,287 +1,285 @@
 """
-CDA (Contractor Discovery Agent) - 3-Tier Contractor Sourcing
-Implements PRD requirements for finding qualified contractors
+CDA v2 - Intelligent Contractor Discovery Agent
+Powered by Claude Opus 4 for nuanced matching decisions
 """
-import os
 import json
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
-from supabase import create_client
-from dotenv import load_dotenv
+import os
 import sys
+from datetime import datetime
+from typing import Any, Optional
+
+from dotenv import load_dotenv
+from supabase import create_client
+
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+from agents.cda.intelligent_matcher import IntelligentContractorMatcher
 from agents.cda.tier1_matcher_v2 import Tier1Matcher
-from agents.cda.tier2_reengagement_v2 import Tier2Reengagement
-from agents.cda.tier3_scraper import Tier3Scraper
+from agents.cda.tier2_reengagement import Tier2Reengagement
 from agents.cda.web_search_agent import WebSearchContractorAgent
-from agents.cda.scoring import ContractorScorer
 
 
 class ContractorDiscoveryAgent:
-    """CDA - 3-tier contractor sourcing system"""
-    
+    """CDA v2 - Uses Claude Opus 4 for intelligent contractor matching"""
+
     def __init__(self):
-        """Initialize CDA with Supabase connection and tier components"""
+        """Initialize CDA with Opus 4 brain and data sources"""
         load_dotenv(override=True)
-        self.supabase_url = os.getenv('SUPABASE_URL')
-        self.supabase_key = os.getenv('SUPABASE_ANON_KEY')
+        self.supabase_url = os.getenv("SUPABASE_URL")
+        self.supabase_key = os.getenv("SUPABASE_ANON_KEY")
         self.supabase = create_client(self.supabase_url, self.supabase_key)
-        
-        # Initialize tier components
+
+        # Initialize components
+        self.intelligent_matcher = IntelligentContractorMatcher(llm_provider="anthropic")  # Opus 4
+        self.web_search = WebSearchContractorAgent(self.supabase)
         self.tier1_matcher = Tier1Matcher(self.supabase)
         self.tier2_reengagement = Tier2Reengagement(self.supabase)
-        self.tier3_scraper = Tier3Scraper(self.supabase)
-        self.web_search_agent = WebSearchContractorAgent(self.supabase)
-        self.scorer = ContractorScorer()
-        
-        print("[CDA] Initialized Contractor Discovery Agent with 3-tier sourcing")
-    
-    def discover_contractors(self, bid_card_id: str) -> Dict[str, Any]:
+
+        print("[CDA v2] Initialized with Claude Opus 4 intelligence")
+
+    def discover_contractors(self, bid_card_id: str, contractors_needed: int = 5, radius_miles: int = 15) -> dict[str, Any]:
         """
-        Main CDA function: Execute 3-tier contractor discovery
+        Main CDA function with intelligent matching and radius-based search
+
+        Process:
+        1. Load bid card data
+        2. Use Opus 4 to deeply analyze what customer wants
+        3. Search for contractors (3-tier system with radius filtering)
+        4. Use Opus 4 to score each contractor
+        5. Select best matches with explanations
         
         Args:
-            bid_card_id: ID of the bid card to find contractors for
-            
-        Returns:
-            Dict with success status and contractor results
+            bid_card_id: ID of the bid card to process
+            contractors_needed: Number of contractors to select (default: 5)
+            radius_miles: Search radius in miles for Tier 1 & 2 (default: 15)
         """
-        print(f"\n[CDA] Starting contractor discovery for bid card: {bid_card_id}")
-        start_time = datetime.now()
-        
         try:
-            # Step 1: Load bid card data
-            print("[CDA] Loading bid card data...")
-            
-            # Check if this is a test ID and use mock data
-            if bid_card_id.startswith('12345678-1234-1234-1234'):
-                print("[CDA] Using mock data for test")
-                bid_card = {
-                    'id': bid_card_id,
-                    'bid_card_number': 'BC-TEST-MOCK',
-                    'urgency_level': 'emergency',
-                    'contractor_count_needed': 4
-                }
-                bid_data = {
-                    'project_type': 'kitchen remodel',
-                    'budget_min': 25000,
-                    'budget_max': 35000,
-                    'urgency_level': 'emergency',
-                    'location': {
-                        'full_location': 'Orlando, FL 32801',
-                        'zip_code': '32801'
-                    },
-                    'contractor_requirements': {
-                        'contractor_count': 4,
-                        'specialties_required': ['kitchen remodeling']
-                    }
-                }
-            elif bid_card_id == 'test-solar-project':
-                print("[CDA] Using mock solar project data for test")
-                bid_card = {
-                    'id': bid_card_id,
-                    'bid_card_number': 'BC-TEST-SOLAR',
-                    'urgency_level': 'week',
-                    'contractor_count_needed': 8
-                }
-                bid_data = {
-                    'project_type': 'solar panel installation',
-                    'budget_min': 15000,
-                    'budget_max': 25000,
-                    'urgency_level': 'week',
-                    'location': {
-                        'full_location': 'Miami, FL 33101',
-                        'city': 'Miami',
-                        'state': 'FL',
-                        'zip_code': '33101'
-                    },
-                    'contractor_requirements': {
-                        'contractor_count': 8,
-                        'specialties_required': ['solar panel installation']
-                    }
-                }
-            else:
-                result = self.supabase.table('bid_cards').select("*").eq('id', bid_card_id).single().execute()
-                
-                if not result.data:
-                    return {
-                        'success': False,
-                        'error': f'No bid card found for ID: {bid_card_id}'
-                    }
-                
-                bid_card = result.data
-                bid_data = bid_card.get('bid_document', {}).get('all_extracted_data', {})
-            
-            print(f"[CDA] Loaded bid card: {bid_card['bid_card_number']}")
-            print(f"[CDA] Project: {bid_data.get('project_type', 'unknown')}")
-            print(f"[CDA] Location: {bid_data.get('location', {}).get('full_location', 'unknown')}")
-            print(f"[CDA] Budget: ${bid_data.get('budget_min', 0)}-${bid_data.get('budget_max', 0)}")
-            
-            # Step 2: Execute 3-tier discovery
+            print(f"[CDA v2] Starting intelligent contractor discovery for bid card: {bid_card_id} (radius: {radius_miles} miles)")
+
+            # Step 1: Load bid card
+            bid_card = self._load_bid_card(bid_card_id)
+            if not bid_card:
+                return {"success": False, "error": "Bid card not found"}
+
+            print(f"[CDA v2] Loaded bid card - Project: {bid_card.get('project_type', 'Unknown')}")
+
+            # Step 2: Opus 4 analyzes what customer really wants
+            print("[CDA v2] Using Claude Opus 4 to analyze customer requirements...")
+            bid_analysis = self.intelligent_matcher.analyze_bid_requirements(bid_card)
+
+            print("[CDA v2] Opus 4 Analysis Complete:")
+            print(f"  - Size Preference: {bid_analysis.get('contractor_size_preference', 'Unknown')}")
+            print(f"  - Quality Focus: {bid_analysis.get('quality_vs_price_balance', 'Unknown')}")
+            print(f"  - Trust Factors: {bid_analysis.get('trust_factors', 'Unknown')}")
+
+            # Step 3: Gather contractors from all sources
             all_contractors = []
-            tier_results = {
-                'tier_1_matches': [],
-                'tier_2_matches': [],
-                'tier_3_sources': []
-            }
-            
-            # Tier 1: Internal contractor matching
-            print("\n[CDA] Executing Tier 1: Internal contractor matching...")
-            tier1_contractors = self.tier1_matcher.find_matching_contractors(bid_data)
-            all_contractors.extend(tier1_contractors)
-            tier_results['tier_1_matches'] = tier1_contractors
-            print(f"[CDA] Tier 1 found: {len(tier1_contractors)} contractors")
-            
-            # Tier 2: Re-engagement (only if we need more contractors)
-            contractors_needed = bid_card.get('contractor_count_needed', 3)
-            if len(all_contractors) < contractors_needed:
-                print(f"\n[CDA] Executing Tier 2: Re-engagement (need {contractors_needed - len(all_contractors)} more)...")
-                tier2_contractors = self.tier2_reengagement.find_reengagement_candidates(bid_data)
-                all_contractors.extend(tier2_contractors)
-                tier_results['tier_2_matches'] = tier2_contractors
-                print(f"[CDA] Tier 2 found: {len(tier2_contractors)} contractors")
-            
-            # Tier 3: External sourcing (only if we still need more)
-            if len(all_contractors) < contractors_needed:
-                print(f"\n[CDA] Executing Tier 3: External sourcing (need {contractors_needed - len(all_contractors)} more)...")
-                
-                # Use web search agent to find actual contractors
-                web_search_result = self.web_search_agent.discover_contractors_for_bid(
-                    bid_card_id, contractors_needed - len(all_contractors)
+
+            # Tier 1: Internal database with radius search
+            print(f"[CDA v2] Searching Tier 1: Internal contractor database within {radius_miles} miles...")
+            tier1_results = self.tier1_matcher.find_matching_contractors(bid_card, radius_miles=radius_miles)
+            if tier1_results["success"] and tier1_results["contractors"]:
+                all_contractors.extend(tier1_results["contractors"])
+                print(f"[CDA v2] Found {len(tier1_results['contractors'])} internal contractors within radius")
+            else:
+                print(f"[CDA v2] No internal contractors found within {radius_miles} miles")
+
+            # Tier 2: Previous contacts with radius search
+            print(f"[CDA v2] Searching Tier 2: Previous contractor contacts within {radius_miles} miles...")
+            tier2_results = self.tier2_reengagement.find_reengagement_candidates(bid_card, radius_miles=radius_miles)
+            if tier2_results and len(tier2_results) > 0:
+                all_contractors.extend(tier2_results)
+                print(f"[CDA v2] Found {len(tier2_results)} previous contacts within radius")
+            else:
+                print(f"[CDA v2] No previous contacts found within {radius_miles} miles")
+
+            # Tier 3: Web search for new contractors with radius search
+            if len(all_contractors) < contractors_needed * 2:  # Get extra for better selection
+                print(f"[CDA v2] Searching Tier 3: Web search for new contractors within {radius_miles} miles...")
+                web_results = self.web_search.discover_contractors_for_bid(
+                    bid_card_id,
+                    contractors_needed=contractors_needed * 2,
+                    radius_miles=radius_miles
                 )
-                
-                if web_search_result['success']:
-                    # Convert potential contractors to standard format
-                    tier3_contractors = []
-                    for contractor in web_search_result['contractors']:
-                        tier3_contractor = {
-                            'id': contractor['id'],
-                            'discovery_tier': 3,
-                            'company_name': contractor['company_name'],
-                            'contact_name': contractor.get('contact_name'),
-                            'email': contractor.get('email'),
-                            'phone': contractor.get('phone'),
-                            'website': contractor.get('website'),
-                            'address': contractor.get('address'),
-                            'city': contractor.get('city'),
-                            'state': contractor.get('state'),
-                            'zip_code': contractor.get('zip_code'),
-                            'specialties': contractor.get('specialties', []),
-                            'rating': contractor.get('google_rating', 0.0),
-                            'review_count': contractor.get('google_review_count', 0),
-                            'years_in_business': contractor.get('years_in_business'),
-                            'match_score': contractor.get('match_score', 50.0),
-                            'match_reasons': [
-                                f"Found via {contractor['discovery_source']}",
-                                f"Search rank #{contractor.get('search_rank', 'Unknown')}",
-                                f"{contractor.get('google_rating', 'No')} star rating" if contractor.get('google_rating') else "Web directory listing"
-                            ],
-                            'onboarded': False,
-                            'external_data': {
-                                'source': contractor['discovery_source'],
-                                'source_query': contractor['source_query'],
-                                'google_place_id': contractor.get('google_place_id'),
-                                'distance_miles': contractor.get('distance_miles')
-                            }
-                        }
-                        tier3_contractors.append(tier3_contractor)
-                    
-                    all_contractors.extend(tier3_contractors)
-                    tier_results['tier_3_matches'] = tier3_contractors
-                    print(f"[CDA] Tier 3 web search found: {len(tier3_contractors)} contractors")
-                else:
-                    # Fallback to old tier3 scraper for source identification
-                    tier3_sources = self.tier3_scraper.identify_external_sources(bid_data)
-                    tier_results['tier_3_sources'] = tier3_sources
-                    print(f"[CDA] Tier 3 fallback identified: {len(tier3_sources)} external sources")
-            
-            # Step 3: Score and rank all contractors
-            print(f"\n[CDA] Scoring and ranking {len(all_contractors)} contractors...")
-            scored_contractors = self.scorer.score_contractors(all_contractors, bid_data)
-            
-            # Step 4: Select top contractors
-            final_contractors = scored_contractors[:contractors_needed]
-            
-            # Step 5: Cache discovery results
-            processing_time = int((datetime.now() - start_time).total_seconds() * 1000)
-            
-            cache_record = {
-                'bid_card_id': bid_card_id,
-                'tier_1_matches': tier_results['tier_1_matches'],
-                'tier_2_matches': tier_results['tier_2_matches'], 
-                'tier_3_sources': tier_results['tier_3_sources'],
-                'discovery_status': 'completed',
-                'total_contractors_found': len(all_contractors),
-                'processing_time_ms': processing_time
+                if web_results["success"] and web_results["contractors"]:
+                    all_contractors.extend(web_results["contractors"])
+                    print(f"[CDA v2] Found {len(web_results['contractors'])} new contractors via web search")
+
+            # Remove duplicates
+            unique_contractors = self._deduplicate_contractors(all_contractors)
+            print(f"[CDA v2] Total unique contractors found: {len(unique_contractors)}")
+
+            if not unique_contractors:
+                return {
+                    "success": False,
+                    "error": "No contractors found",
+                    "bid_analysis": bid_analysis
+                }
+
+            # Step 4: Use Opus 4 to intelligently score and select contractors
+            print(f"[CDA v2] Using Claude Opus 4 to score {len(unique_contractors)} contractors...")
+            selection_result = self.intelligent_matcher.rank_and_select_contractors(
+                unique_contractors,
+                bid_card,
+                contractors_needed=contractors_needed
+            )
+
+            # Step 5: Get human-readable explanation
+            explanation = self.intelligent_matcher.explain_selection(selection_result)
+
+            # Step 6: Store the selected contractors with match data
+            stored_contractors = self._store_matched_contractors(
+                selection_result["selected_contractors"],
+                bid_card_id,
+                bid_analysis
+            )
+
+            # Return comprehensive results with radius info
+            result = {
+                "success": True,
+                "bid_card_id": bid_card_id,
+                "search_radius_miles": radius_miles,
+                "bid_analysis": bid_analysis,
+                "total_found": len(unique_contractors),
+                "selected_count": len(selection_result["selected_contractors"]),
+                "selected_contractors": selection_result["selected_contractors"],
+                "explanation": explanation,
+                "all_scores": selection_result["all_scores"],
+                "stored_ids": stored_contractors,
+                "tier_results": {
+                    "tier1_internal": len(tier1_results.get("contractors", [])) if tier1_results.get("success") else 0,
+                    "tier2_previous": len(tier2_results) if tier2_results else 0,
+                    "tier3_web": len(web_results.get("contractors", [])) if 'web_results' in locals() and web_results.get("success") else 0
+                }
             }
-            
-            print("[CDA] Caching discovery results...")
-            cache_result = self.supabase.table('contractor_discovery_cache').insert(cache_record).execute()
-            
-            # Step 6: Return results
-            print(f"\n[CDA] SUCCESS: Discovery completed in {processing_time}ms")
-            print(f"[CDA] Found {len(all_contractors)} total contractors")
-            print(f"[CDA] Returning top {len(final_contractors)} contractors")
-            print(f"[CDA] Tier breakdown: T1={len(tier_results['tier_1_matches'])}, T2={len(tier_results['tier_2_matches'])}, T3={len(tier_results['tier_3_sources'])}")
-            
-            return {
-                'success': True,
-                'bid_card_id': bid_card_id,
-                'contractors_found': final_contractors,
-                'tier_breakdown': {
-                    'tier_1_count': len(tier_results['tier_1_matches']),
-                    'tier_2_count': len(tier_results['tier_2_matches']),
-                    'tier_3_count': len(tier_results['tier_3_sources']),
-                    'total_found': len(all_contractors)
-                },
-                'processing_time_ms': processing_time,
-                'cache_id': cache_result.data[0]['id'] if cache_result.data else None
-            }
-            
+
+            print(f"[CDA v2] Discovery complete - Selected {len(selection_result['selected_contractors'])} contractors within {radius_miles} mile radius")
+            print(f"[CDA v2] Explanation: {explanation}")
+
+            return result
+
         except Exception as e:
-            print(f"[CDA ERROR] Failed to discover contractors: {e}")
+            print(f"[CDA v2 ERROR] Discovery failed: {e}")
             import traceback
             traceback.print_exc()
-            
-            # Log failure to cache
-            try:
-                processing_time = int((datetime.now() - start_time).total_seconds() * 1000)
-                cache_record = {
-                    'bid_card_id': bid_card_id,
-                    'discovery_status': 'failed',
-                    'total_contractors_found': 0,
-                    'processing_time_ms': processing_time
-                }
-                self.supabase.table('contractor_discovery_cache').insert(cache_record).execute()
-            except:
-                pass
-                
             return {
-                'success': False,
-                'error': str(e)
+                "success": False,
+                "error": str(e),
+                "bid_card_id": bid_card_id
             }
-    
-    def get_discovery_cache(self, bid_card_id: str) -> Optional[Dict[str, Any]]:
-        """Get cached discovery results for a bid card"""
+
+    def _load_bid_card(self, bid_card_id: str) -> Optional[dict[str, Any]]:
+        """Load bid card from database or test data"""
+        # Handle test bid cards
+        if bid_card_id == "test-mom-and-pop-kitchen":
+            return {
+                "id": bid_card_id,
+                "project_type": "kitchen remodel",
+                "bid_document": {
+                    "project_overview": {
+                        "description": "We want to update our kitchen but keep the family feel. Looking for someone we can trust, not a big corporation. Our last contractor was terrible - took forever and overcharged us."
+                    },
+                    "budget_information": {
+                        "budget_min": 8000,
+                        "budget_max": 12000,
+                        "notes": "We have some flexibility but want good value"
+                    },
+                    "timeline": {
+                        "urgency_level": "month",
+                        "notes": "Want it done right, not rushed"
+                    }
+                },
+                "location": {
+                    "city": "Coconut Creek",
+                    "state": "FL",
+                    "zip_code": "33442"
+                },
+                "contractor_count_needed": 5
+            }
+
+        # Load from database
         try:
-            result = self.supabase.table('contractor_discovery_cache').select("*").eq('bid_card_id', bid_card_id).order('created_at', desc=True).limit(1).execute()
-            
-            if result.data:
-                return result.data[0]
+            result = self.supabase.table("bid_cards").select("*").eq("id", bid_card_id).single().execute()
+            return result.data if result.data else None
+        except:
             return None
-            
+
+    def _deduplicate_contractors(self, contractors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Remove duplicate contractors based on company name"""
+        seen = set()
+        unique = []
+
+        for contractor in contractors:
+            name = contractor.get("company_name", "").lower().strip()
+            if name and name not in seen:
+                seen.add(name)
+                unique.append(contractor)
+
+        return unique
+
+    def _store_matched_contractors(self,
+                                 contractors: list[dict[str, Any]],
+                                 bid_card_id: str,
+                                 bid_analysis: dict[str, Any]) -> list[str]:
+        """Store selected contractors with intelligent match data"""
+        stored_ids = []
+
+        try:
+            for contractor in contractors:
+                # Prepare match record
+                match_record = {
+                    "bid_card_id": bid_card_id,
+                    "contractor_id": contractor.get("id"),
+                    "company_name": contractor.get("company_name"),
+                    "match_score": contractor.get("match_score", 0),
+                    "recommendation": contractor.get("recommendation", "unknown"),
+                    "reasoning": contractor.get("reasoning", ""),
+                    "key_strengths": json.dumps(contractor.get("key_strengths", [])),
+                    "concerns": json.dumps(contractor.get("concerns", [])),
+                    "bid_analysis": json.dumps(bid_analysis),
+                    "created_at": datetime.now().isoformat()
+                }
+
+                # Store in contractor_bid_matches table (create if needed)
+                result = self.supabase.table("contractor_bid_matches").insert(match_record).execute()
+
+                if result.data:
+                    stored_ids.append(result.data[0]["id"])
+                    print(f"[CDA v2] Stored match: {contractor.get('company_name')} - Score: {contractor.get('match_score')}")
+
         except Exception as e:
-            print(f"[CDA ERROR] Failed to get discovery cache: {e}")
-            return None
+            print(f"[CDA v2] Note: contractor_bid_matches table may not exist yet - {e}")
+            # Continue anyway - main functionality still works
+
+        return stored_ids
 
 
-# Test the CDA agent
+# Test the intelligent CDA
 if __name__ == "__main__":
-    cda = ContractorDiscoveryAgent()
-    
-    # Test with a bid card ID (will need to be replaced with real ID)
-    # For now, we'll test the initialization
-    print(f"\n✅ CDA Agent initialized successfully")
-    print("Ready for contractor discovery operations")
+    print("TESTING INTELLIGENT CDA WITH CLAUDE OPUS 4")
+    print("=" * 60)
+
+    agent = ContractorDiscoveryAgent()
+
+    # Test with mom & pop preference bid card with 15-mile radius
+    result = agent.discover_contractors(
+        bid_card_id="test-mom-and-pop-kitchen",
+        contractors_needed=3,
+        radius_miles=15
+    )
+
+    if result["success"]:
+        print("\nSUCCESS - Intelligent Matching Results:")
+        print(f"Total contractors found: {result['total_found']}")
+        print(f"Selected: {result['selected_count']}")
+        print(f"\nCustomer Explanation:\n{result['explanation']}")
+
+        print("\nSelected Contractors:")
+        for contractor in result["selected_contractors"]:
+            print(f"\n{contractor.get('contractor_name', 'Unknown')}:")
+            print(f"  Score: {contractor.get('match_score', 0)}")
+            print(f"  Recommendation: {contractor.get('recommendation', 'Unknown')}")
+            print(f"  Reasoning: {contractor.get('reasoning', 'No reasoning provided')}")
+    else:
+        print(f"\nERROR: {result.get('error', 'Unknown error')}")

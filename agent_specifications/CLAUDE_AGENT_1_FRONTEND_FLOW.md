@@ -1,27 +1,59 @@
 # Agent 1: Frontend Flow Systems
 **Domain**: Initial Homeowner Experience → Bid Card Generation  
 **Agent Identity**: Frontend Flow Specialist  
-**Last Updated**: January 30, 2025 (Accurate Revision)
+**Last Updated**: August 1, 2025 (CIA Conversational Improvements)
 
 ## 🎯 **YOUR DOMAIN - FRONTEND INITIAL FLOW**
 
 You are **Agent 1** - responsible for the **first impression and intake flow** that captures homeowner project information and converts it into structured bid cards.
 
-## ⚠️ **RECENT CRITICAL CHANGES** (January 30, 2025)
-- **CIA Prompts**: Completely rewritten in `new_prompts.py` with InstaBids value messaging
-- **Frontend Opening**: Updated to emphasize "no corporate middleman" approach  
-- **API Port**: Changed from 8003 to 8008 in backend configuration
-- **Contact Info**: Removed all external contact requests - everything stays in-app
+## ⚠️ **RECENT CRITICAL CHANGES** (August 1, 2025)
+
+### CIA Conversational Improvements ✅ COMPLETE
+- **CIA Conversational Flow**: Fixed pushy budget questioning - now explores planning stage naturally
+- **Emergency Recognition**: CIA skips budget discussion for urgent situations (leaks, flooding)
+- **Group Bidding Integration**: Actively mentions 15-25% savings for appropriate projects  
+- **Memory Persistence**: Fixed context retention across conversation turns and projects
+- **Budget Context Approach**: Uses "Have you gotten quotes before?" instead of "What's your budget?"
+- **Value-First Messaging**: Always leads with InstaBids advantages before diving into project details
+
+## 🚨 **NEW: BID TRACKING SYSTEM** (August 1, 2025) ✅ READY FOR YOUR INTEGRATION
+
+### **CRITICAL**: Bid Cards Now Track Submitted Bids!
+**What Changed**: Agent 2 built the missing piece - contractors can now submit bids back to the system!
+
+**Your bid card display code needs to handle**:
+- **New Status Values**: `collecting_bids`, `bids_complete` (in addition to `generated`)  
+- **Bid Progress Tracking**: Show "3/5 bids received" progress
+- **Submitted Bid Display**: Show actual contractor bids with amounts and timelines
+
+### **Integration Required**
+- **Read This**: `BID_TRACKING_SYSTEM_INTEGRATION_GUIDE.md` (created for you)
+- **New API Available**: `from bid_submission_api import bid_api`
+- **Key Method**: `bid_api.get_bid_card_summary(bid_card_id)` returns complete bid data
+
+**Your Users Will Now See**:
+- Real-time bid collection progress
+- Actual contractor bids with pricing
+- Automatic status updates when target reached
 
 ---
 
 ## 🗂️ **FILE OWNERSHIP - WHAT YOU CONTROL**
 
-### **✅ YOUR CODE** (Simple List)
+### **⚠️ REFACTORING UPDATE** (August 2, 2025)
+**main.py has been refactored!** Your endpoints are now in modular router files:
+
+### **✅ YOUR CODE** (Updated Structure)
 ```
 # AI AGENTS
 ai-agents/agents/cia/         # Customer Interface Agent (Claude Opus 4)
 ai-agents/agents/jaa/         # Job Assessment Agent (Bid card generation)
+
+# 🆕 NEW: ROUTER FILES (Your API Endpoints)
+ai-agents/routers/cia_routes.py     # Your CIA chat endpoints
+ai-agents/routers/homeowner_routes.py # Your homeowner UI endpoints
+ai-agents/main.py                   # Now only ~100 lines (imports your routers)
 
 # FRONTEND - MAIN WEB APP
 web/src/components/chat/      # Chat UI components
@@ -32,14 +64,17 @@ web/src/lib/storage.ts        # File upload handling
 frontend/src/components/      # Specialized bid card components
 └── BidCard.tsx              # Multi-channel bid card display
 
-# API ENDPOINTS
-ai-agents/api/bid_cards*.py   # Bid card operations
-ai-agents/main.py             # Server endpoints
-
 # TESTS
 ai-agents/test_cia_*.py       # CIA tests
 ai-agents/test_jaa_*.py       # JAA tests
 ```
+
+### **🔧 WHAT THIS MEANS FOR YOU**
+- **Work exactly as before** - Edit your agent files in `agents/cia/`, `agents/jaa/`
+- **Add endpoints normally** - Put new API logic in `api/` files or ask where to add
+- **Router files are internal** - System automatically organizes your endpoints
+- **No workflow changes** - You don't need to touch router files directly
+- **All API URLs identical** - Your frontend code works unchanged
 
 ### **✅ KEY FILES THAT ACTUALLY EXIST**
 ```
@@ -86,15 +121,16 @@ While you (Agent 1) generate bid cards via JAA, Agent 2 uses this component for:
 ## 🎯 **YOUR CURRENT MISSION**
 
 ### **🚨 PRIORITY 1: Perfect CIA Intelligence**
-**Status**: ✅ WORKING but needs enhancement  
-**Current**: CIA uses Claude Opus 4 for intelligent project extraction  
-**Goal**: 95%+ accuracy in extracting all project components
+**Status**: ✅ RECENTLY ENHANCED - Conversational flow dramatically improved  
+**Current**: CIA uses Claude Opus 4 with fixed budget conversation approach  
+**Goal**: 95%+ accuracy with natural, non-pushy conversation flow
 
 **Your Focus**:
-- **Conversation Flow**: Natural, engaging homeowner conversations
-- **Information Extraction**: Budget, timeline, location, project details
-- **Edge Cases**: Handle unclear or incomplete information gracefully
-- **State Management**: Maintain conversation context perfectly
+- **Natural Conversation Flow**: No pushy budget questions, explore planning stage instead
+- **Emergency Handling**: Skip budget talk entirely for urgent situations (roof leaks, flooding)
+- **Group Bidding Value**: Mention 15-25% savings opportunities for appropriate projects
+- **Memory Persistence**: Context maintained across conversation turns and projects
+- **Information Extraction**: Budget context, timeline, location, project details extracted naturally
 
 **Key Files**:
 - `ai-agents/agents/cia/agent.py` - Core intelligence
@@ -310,18 +346,23 @@ When your system works perfectly, a homeowner can describe any home improvement 
 
 ## 🚨 **CURRENT STATUS & NEXT STEPS**
 
-### **✅ COMPLETED RECENTLY** (January 30, 2025)
+### **✅ COMPLETED RECENTLY** (August 1, 2025)
 - JAA database query issue resolved ✅
 - CIA Claude Opus 4 integration working ✅
-- Basic conversation flow operational ✅
+- **NEW: CIA Conversational Improvements** ✅
+  - Fixed pushy budget questioning completely ✅
+  - Emergency situation recognition working ✅
+  - Group bidding value messaging active ✅
+  - Memory persistence across turns verified ✅
+  - Research stage exploration implemented ✅
 - Multi-project memory system implemented ✅
-- **NEW: InstaBids messaging overhaul** ✅
-- **NEW: Removed external contact requests** ✅
-- **NEW: Updated to emphasize cost savings** ✅
-- **NEW: Removed Next.js, using React + Vite** ✅
+- InstaBids messaging overhaul ✅
+- Removed external contact requests ✅
+- Updated to emphasize cost savings ✅
+- Removed Next.js, using React + Vite ✅
 
 ### **🔄 IMMEDIATE PRIORITIES**
-1. **Test New CIA Prompts** - Validate InstaBids messaging effectiveness
+1. **Fix Database Schema Issues** - Resolve foreign key constraint errors preventing bid card saves
 2. **Complete Frontend UX** - Build missing components (bid card preview, etc.)
 3. **Add Account Creation Flow** - Implement signup within conversation
 4. **Mobile Responsiveness** - Ensure chat works perfectly on mobile
@@ -331,6 +372,21 @@ When your system works perfectly, a homeowner can describe any home improvement 
 - Perfect CIA → JAA → Bid Card flow with 100% reliability
 - Outstanding frontend UX that builds trust and confidence  
 - Smooth handoff to Agent 2's contractor outreach systems
+
+---
+
+## 🐳 **DOCKER MCP MONITORING**
+
+### **Essential Docker Tools for Agent 1:**
+- **`mcp__docker__check-instabids-health`** - Verify frontend and backend connectivity
+- **`mcp__docker__get-logs`** - Check frontend container logs for React errors
+- **`mcp__docker__container-stats`** - Monitor frontend performance and memory usage
+- **`mcp__docker__analyze-error-logs`** - Scan for frontend JavaScript/React errors
+
+### **Frontend-Specific Monitoring:**
+- **Always check** `instabids-instabids-frontend-1` container status before debugging
+- **Monitor** frontend logs when Vite/React issues occur
+- **Use Docker MCP** instead of raw docker commands for consistency
 
 ---
 

@@ -1,48 +1,49 @@
-import React, { useState } from 'react'
-import { X, Home, Sparkles } from 'lucide-react'
-import { InspirationBoard } from './InspirationDashboard'
+import { Sparkles, X } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+import type { InspirationBoard } from "./InspirationDashboard";
 
 interface BoardCreatorProps {
-  onClose: () => void
-  onCreate: (boardData: Partial<InspirationBoard>) => void
+  onClose: () => void;
+  onCreate: (boardData: Partial<InspirationBoard>) => void;
 }
 
 const ROOM_TYPES = [
-  { value: 'kitchen', label: 'Kitchen', icon: '🍳' },
-  { value: 'bathroom', label: 'Bathroom', icon: '🚿' },
-  { value: 'bedroom', label: 'Bedroom', icon: '🛏️' },
-  { value: 'living_room', label: 'Living Room', icon: '🛋️' },
-  { value: 'dining_room', label: 'Dining Room', icon: '🍽️' },
-  { value: 'outdoor', label: 'Outdoor', icon: '🌳' },
-  { value: 'office', label: 'Home Office', icon: '💼' },
-  { value: 'basement', label: 'Basement', icon: '🏠' },
-  { value: 'garage', label: 'Garage', icon: '🚗' },
-  { value: 'other', label: 'Other', icon: '✨' }
-]
+  { value: "kitchen", label: "Kitchen", icon: "🍳" },
+  { value: "bathroom", label: "Bathroom", icon: "🚿" },
+  { value: "bedroom", label: "Bedroom", icon: "🛏️" },
+  { value: "living_room", label: "Living Room", icon: "🛋️" },
+  { value: "dining_room", label: "Dining Room", icon: "🍽️" },
+  { value: "outdoor", label: "Outdoor", icon: "🌳" },
+  { value: "office", label: "Home Office", icon: "💼" },
+  { value: "basement", label: "Basement", icon: "🏠" },
+  { value: "garage", label: "Garage", icon: "🚗" },
+  { value: "other", label: "Other", icon: "✨" },
+];
 
 const BoardCreator: React.FC<BoardCreatorProps> = ({ onClose, onCreate }) => {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [roomType, setRoomType] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [roomType, setRoomType] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!title.trim()) return
+    e.preventDefault();
 
-    setIsSubmitting(true)
-    
+    if (!title.trim()) return;
+
+    setIsSubmitting(true);
+
     const boardData: Partial<InspirationBoard> = {
       title: title.trim(),
       description: description.trim() || undefined,
       room_type: roomType || undefined,
-      status: 'collecting'
-    }
+      status: "collecting",
+    };
 
-    await onCreate(boardData)
-    setIsSubmitting(false)
-  }
+    await onCreate(boardData);
+    setIsSubmitting(false);
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -51,7 +52,8 @@ const BoardCreator: React.FC<BoardCreatorProps> = ({ onClose, onCreate }) => {
         <div className="border-b px-6 py-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">Create New Board</h2>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={match.match(/onClick={[^}]+}/)[0]}
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -73,7 +75,6 @@ const BoardCreator: React.FC<BoardCreatorProps> = ({ onClose, onCreate }) => {
               placeholder="e.g., Kitchen Renovation Ideas"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               required
-              autoFocus
             />
           </div>
 
@@ -105,9 +106,10 @@ const BoardCreator: React.FC<BoardCreatorProps> = ({ onClose, onCreate }) => {
                   onClick={() => setRoomType(room.value)}
                   className={`
                     flex flex-col items-center p-3 border rounded-lg transition-all
-                    ${roomType === room.value 
-                      ? 'border-primary-500 bg-primary-50 text-primary-700' 
-                      : 'border-gray-300 hover:border-gray-400 text-gray-700'
+                    ${
+                      roomType === room.value
+                        ? "border-primary-500 bg-primary-50 text-primary-700"
+                        : "border-gray-300 hover:border-gray-400 text-gray-700"
                     }
                   `}
                 >
@@ -123,7 +125,7 @@ const BoardCreator: React.FC<BoardCreatorProps> = ({ onClose, onCreate }) => {
             <div className="flex items-start gap-3">
               <Sparkles className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-blue-800">
-                <strong>Tip:</strong> Give your board a descriptive name to help you stay organized. 
+                <strong>Tip:</strong> Give your board a descriptive name to help you stay organized.
                 You can always add more details later!
               </p>
             </div>
@@ -144,13 +146,13 @@ const BoardCreator: React.FC<BoardCreatorProps> = ({ onClose, onCreate }) => {
               className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!title.trim() || isSubmitting}
             >
-              {isSubmitting ? 'Creating...' : 'Create Board'}
+              {isSubmitting ? "Creating..." : "Create Board"}
             </button>
           </div>
         </form>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default BoardCreator
+export default BoardCreator;

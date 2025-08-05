@@ -1,0 +1,858 @@
+{
+  "last_updated": "2025-08-02T12:00:00",
+  "table_count": 41,
+  "tables": {
+    "bid_cards": {
+      "name": "bid_cards",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "bid_card_number": {
+          "type": "varchar(50)",
+          "nullable": true
+        },
+        "title": {
+          "type": "text",
+          "nullable": true
+        },
+        "description": {
+          "type": "text",
+          "nullable": true
+        },
+        "project_type": {
+          "type": "varchar(100)",
+          "nullable": true
+        },
+        "urgency_level": {
+          "type": "varchar(20)",
+          "nullable": true
+        },
+        "complexity_score": {
+          "type": "integer",
+          "nullable": true
+        },
+        "budget_min": {
+          "type": "decimal(10,2)",
+          "nullable": true
+        },
+        "budget_max": {
+          "type": "decimal(10,2)",
+          "nullable": true
+        },
+        "contractor_count_needed": {
+          "type": "integer",
+          "nullable": true
+        },
+        "status": {
+          "type": "varchar(20)",
+          "nullable": false,
+          "default": "'generated'"
+        },
+        "bid_document": {
+          "type": "jsonb",
+          "nullable": true
+        },
+        "bids_received_count": {
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        },
+        "bids_target_met": {
+          "type": "boolean",
+          "nullable": false,
+          "default": "false"
+        },
+        "cia_thread_id": {
+          "type": "varchar(255)",
+          "nullable": true
+        },
+        "homeowner_id": {
+          "type": "uuid",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamp",
+          "nullable": false,
+          "default": "NOW()"
+        },
+        "updated_at": {
+          "type": "timestamp",
+          "nullable": false,
+          "default": "NOW()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [
+        {
+          "column": "homeowner_id",
+          "references": "homeowners.id"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_bid_cards_status",
+          "columns": [
+            "status"
+          ]
+        },
+        {
+          "name": "idx_bid_cards_homeowner",
+          "columns": [
+            "homeowner_id"
+          ]
+        },
+        {
+          "name": "idx_bid_cards_bid_card_number",
+          "columns": [
+            "bid_card_number"
+          ],
+          "unique": true
+        },
+        {
+          "name": "idx_bid_cards_created",
+          "columns": [
+            "created_at"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "type": "check",
+          "name": "valid_budget",
+          "condition": "budget_min <= budget_max"
+        },
+        {
+          "type": "check",
+          "name": "valid_status",
+          "condition": "status IN ('generated', 'collecting_bids', 'bids_complete', 'closed')"
+        },
+        {
+          "type": "check",
+          "name": "valid_urgency",
+          "condition": "urgency_level IN ('emergency', 'urgent', 'standard', 'group', 'flexible')"
+        }
+      ]
+    },
+    "bid_card_distributions": {
+      "name": "bid_card_distributions",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "bid_card_engagement_events": {
+      "name": "bid_card_engagement_events",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "bid_card_views": {
+      "name": "bid_card_views",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "bids": {
+      "name": "bids",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "outreach_campaigns": {
+      "name": "outreach_campaigns",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "contractor_outreach_attempts": {
+      "name": "contractor_outreach_attempts",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "campaign_check_ins": {
+      "name": "campaign_check_ins",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "campaign_contractors": {
+      "name": "campaign_contractors",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "contractor_responses": {
+      "name": "contractor_responses",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "response_events": {
+      "name": "response_events",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "manual_followup_tasks": {
+      "name": "manual_followup_tasks",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "notifications": {
+      "name": "notifications",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "followup_attempts": {
+      "name": "followup_attempts",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "followup_logs": {
+      "name": "followup_logs",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "contractors": {
+      "name": "contractors",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()"
+        },
+        "business_name": {
+          "type": "varchar(255)",
+          "nullable": false
+        },
+        "contact_name": {
+          "type": "varchar(255)",
+          "nullable": false
+        },
+        "email": {
+          "type": "varchar(255)",
+          "nullable": false
+        },
+        "phone": {
+          "type": "varchar(50)",
+          "nullable": true
+        },
+        "website": {
+          "type": "varchar(255)",
+          "nullable": true
+        },
+        "specialty": {
+          "type": "varchar(100)",
+          "nullable": true
+        },
+        "location_city": {
+          "type": "varchar(100)",
+          "nullable": true
+        },
+        "location_state": {
+          "type": "varchar(50)",
+          "nullable": true
+        },
+        "tier": {
+          "type": "integer",
+          "nullable": true,
+          "default": "3"
+        },
+        "response_rate": {
+          "type": "decimal(5,2)",
+          "nullable": true
+        },
+        "verified": {
+          "type": "boolean",
+          "nullable": false,
+          "default": "false"
+        },
+        "profile_data": {
+          "type": "jsonb",
+          "nullable": true
+        },
+        "last_contacted": {
+          "type": "timestamp",
+          "nullable": true
+        },
+        "created_at": {
+          "type": "timestamp",
+          "nullable": false,
+          "default": "NOW()"
+        },
+        "updated_at": {
+          "type": "timestamp",
+          "nullable": false,
+          "default": "NOW()"
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_contractors_email",
+          "columns": [
+            "email"
+          ],
+          "unique": true
+        },
+        {
+          "name": "idx_contractors_specialty",
+          "columns": [
+            "specialty"
+          ]
+        },
+        {
+          "name": "idx_contractors_location",
+          "columns": [
+            "location_city",
+            "location_state"
+          ]
+        },
+        {
+          "name": "idx_contractors_tier",
+          "columns": [
+            "tier"
+          ]
+        },
+        {
+          "name": "idx_contractors_verified",
+          "columns": [
+            "verified"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "type": "unique",
+          "name": "unique_contractor_email",
+          "columns": [
+            "email"
+          ]
+        },
+        {
+          "type": "check",
+          "name": "valid_tier",
+          "condition": "tier IN (1, 2, 3)"
+        },
+        {
+          "type": "check",
+          "name": "valid_response_rate",
+          "condition": "response_rate >= 0 AND response_rate <= 100"
+        }
+      ]
+    },
+    "contractor_leads": {
+      "name": "contractor_leads",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "potential_contractors": {
+      "name": "potential_contractors",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "potential_contractors_backup": {
+      "name": "potential_contractors_backup",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "contractor_discovery_cache": {
+      "name": "contractor_discovery_cache",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "contractor_engagement_summary": {
+      "name": "contractor_engagement_summary",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "discovery_runs": {
+      "name": "discovery_runs",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "email_tracking_events": {
+      "name": "email_tracking_events",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "homeowners": {
+      "name": "homeowners",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "projects": {
+      "name": "projects",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "project_contexts": {
+      "name": "project_contexts",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "project_summaries": {
+      "name": "project_summaries",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "project_photos": {
+      "name": "project_photos",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "user_memories": {
+      "name": "user_memories",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "agent_conversations": {
+      "name": "agent_conversations",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "messages": {
+      "name": "messages",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "profiles": {
+      "name": "profiles",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "reviews": {
+      "name": "reviews",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "inspiration_boards": {
+      "name": "inspiration_boards",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "inspiration_conversations": {
+      "name": "inspiration_conversations",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "inspiration_images": {
+      "name": "inspiration_images",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "generated_dream_spaces": {
+      "name": "generated_dream_spaces",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "vision_compositions": {
+      "name": "vision_compositions",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "photo_storage": {
+      "name": "photo_storage",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "payments": {
+      "name": "payments",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    },
+    "message_templates": {
+      "name": "message_templates",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false
+        }
+      },
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "constraints": []
+    }
+  }
+}

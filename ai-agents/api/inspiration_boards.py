@@ -2,18 +2,20 @@
 Inspiration Boards API - Handle inspiration board CRUD operations
 """
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
 import os
 import uuid
 from datetime import datetime
-from supabase import create_client, Client
+from typing import Optional
 
 # Load environment
 from dotenv import load_dotenv
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from supabase import Client, create_client
+
+
 # Load from the instabids root directory
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
 router = APIRouter()
 
@@ -41,7 +43,7 @@ class InspirationBoardResponse(BaseModel):
     updated_at: str
     image_count: int = 0
 
-@router.get("/api/inspiration/boards", response_model=List[InspirationBoardResponse])
+@router.get("/api/inspiration/boards", response_model=list[InspirationBoardResponse])
 async def get_inspiration_boards(homeowner_id: str):
     """
     Get all inspiration boards for a homeowner
@@ -52,10 +54,10 @@ async def get_inspiration_boards(homeowner_id: str):
             *,
             inspiration_images(count)
         """).eq("homeowner_id", homeowner_id).order("created_at", desc=True).execute()
-        
+
         if result.data is None:
             return []
-            
+
         # Transform the data to include image count
         boards = []
         for board in result.data:
@@ -63,7 +65,7 @@ async def get_inspiration_boards(homeowner_id: str):
             if board.get("inspiration_images") and isinstance(board["inspiration_images"], list):
                 if len(board["inspiration_images"]) > 0 and "count" in board["inspiration_images"][0]:
                     image_count = board["inspiration_images"][0]["count"]
-            
+
             boards.append(InspirationBoardResponse(
                 id=board["id"],
                 title=board["title"],
@@ -75,11 +77,11 @@ async def get_inspiration_boards(homeowner_id: str):
                 updated_at=board["updated_at"],
                 image_count=image_count
             ))
-        
+
         return boards
-        
+
     except Exception as e:
-        print(f"Error loading boards: {str(e)}")
+        print(f"Error loading boards: {e!s}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/api/inspiration/boards", response_model=InspirationBoardResponse)
@@ -90,7 +92,7 @@ async def create_inspiration_board(board_data: InspirationBoardCreate):
     try:
         # Create board data
         board_id = f"demo_board_{datetime.now().timestamp()}" if board_data.is_demo else str(uuid.uuid4())
-        
+
         new_board = {
             "id": board_id,
             "homeowner_id": board_data.homeowner_id,
@@ -101,15 +103,15 @@ async def create_inspiration_board(board_data: InspirationBoardCreate):
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
-        
+
         # Insert into database
         result = supabase.table("inspiration_boards").insert(new_board).execute()
-        
+
         if not result.data:
             raise HTTPException(status_code=500, detail="Failed to create board")
-        
+
         created_board = result.data[0]
-        
+
         return InspirationBoardResponse(
             id=created_board["id"],
             title=created_board["title"],
@@ -121,9 +123,9 @@ async def create_inspiration_board(board_data: InspirationBoardCreate):
             updated_at=created_board["updated_at"],
             image_count=0
         )
-        
+
     except Exception as e:
-        print(f"Error creating board: {str(e)}")
+        print(f"Error creating board: {e!s}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/api/inspiration/boards/{board_id}", response_model=InspirationBoardResponse)
@@ -136,16 +138,16 @@ async def get_inspiration_board(board_id: str):
             *,
             inspiration_images(count)
         """).eq("id", board_id).single().execute()
-        
+
         if not result.data:
             raise HTTPException(status_code=404, detail="Board not found")
-        
+
         board = result.data
         image_count = 0
         if board.get("inspiration_images") and isinstance(board["inspiration_images"], list):
             if len(board["inspiration_images"]) > 0 and "count" in board["inspiration_images"][0]:
                 image_count = board["inspiration_images"][0]["count"]
-        
+
         return InspirationBoardResponse(
             id=board["id"],
             title=board["title"],
@@ -157,7 +159,7 @@ async def get_inspiration_board(board_id: str):
             updated_at=board["updated_at"],
             image_count=image_count
         )
-        
+
     except Exception as e:
-        print(f"Error getting board: {str(e)}")
+        print(f"Error getting board: {e!s}")
         raise HTTPException(status_code=500, detail=str(e))

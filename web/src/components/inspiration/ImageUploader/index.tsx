@@ -1,2 +1,2 @@
-export { default as ImageUploader } from './ImageUploader'
-export { default as DragDropZone } from './DragDropZone'
+export { default as DragDropZone } from "./DragDropZone";
+export { default as ImageUploader } from "./ImageUploader";

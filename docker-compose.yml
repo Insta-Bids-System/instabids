@@ -1,0 +1,88 @@
+services:
+  # InstaBids Frontend (Single source of truth)
+  instabids-frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8008
+      - VITE_SUPABASE_URL=${SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+    restart: unless-stopped
+    networks:
+      - instabids-network
+
+  # InstaBids Backend (FastAPI + AI Agents)
+  instabids-backend:
+    build:
+      context: ./ai-agents
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ./ai-agents:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8008 --reload
+    restart: unless-stopped
+    networks:
+      - instabids-network
+    depends_on:
+      - supabase
+
+  # PostgreSQL Database (Supabase Compatible)
+  supabase:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=your-super-secret-and-long-postgres-password
+    volumes:
+      - supabase-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - instabids-network
+
+  # MailHog for Email Testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"  # SMTP
+      - "8080:8080"  # Web UI
+    restart: unless-stopped
+    networks:
+      - instabids-network
+
+  # Playwright Testing Container
+  playwright-tests:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.playwright
+    volumes:
+      - ./web:/app
+      - ./test-results:/app/test-results
+    networks:
+      - instabids-network
+    depends_on:
+      - instabids-frontend
+      - instabids-backend
+    profiles:
+      - testing
+
+networks:
+  instabids-network:
+    driver: bridge
+
+volumes:
+  supabase-data:

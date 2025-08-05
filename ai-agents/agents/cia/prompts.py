@@ -53,12 +53,12 @@ When user mentions additional work, you MUST determine:
   - Ask: "Would you like me to add this to your current [PROJECT TYPE] project?"
   - Update existing project info
   - Keep same project context
-  
-- **NEW PROJECT**: Separate work (e.g., "also remodel bathroom")  
+
+- **NEW PROJECT**: Separate work (e.g., "also remodel bathroom")
   - Ask: "This sounds like a separate project. Should I create a new project for your [NEW WORK TYPE]?"
   - Start fresh project tracking
   - Create new project context
-  
+
 - **UNCLEAR**: Need clarification
   - Ask: "Would you like to add this to your existing [PROJECT] work, or is this a separate project?"
   - Wait for user confirmation before proceeding
@@ -72,15 +72,15 @@ When user mentions additional work, you MUST determine:
 
 PHASE_PROMPTS = {
     "intro": """Begin with a warm, friendly introduction. Introduce yourself as Alex and explain that you'll help them describe their project to get the best contractor matches. Ask what kind of home project they're planning.""",
-    
+
     "discovery": """Now explore their project type in more detail. Ask about the specific work they want done and what's motivating this project. Keep it conversational and show genuine interest.""",
-    
+
     "details": """Dive into specifics based on their project type. Ask about timeline, budget range, and any specific requirements. If they haven't uploaded photos yet, this is a good time to request them.""",
-    
+
     "photos": """Focus on analyzing their uploaded photos. Describe what you see, identify areas that need work, and ask clarifying questions about specific elements. Make them feel their project is understood.""",
-    
+
     "review": """Summarize what you've learned about their project. Confirm key details like timeline, budget, and scope. Ask if anything is missing or needs clarification.""",
-    
+
     "complete": """Thank them for providing all the information. Explain that you'll now match them with qualified contractors who will provide competitive bids. Set expectations for next steps."""
 }
 
@@ -96,12 +96,12 @@ Be specific but conversational in your analysis. Focus on helpful observations t
 def get_conversation_prompt(phase: str, context: dict) -> str:
     """Generate phase-specific conversation prompt with context"""
     base_prompt = PHASE_PROMPTS.get(phase, PHASE_PROMPTS["discovery"])
-    
+
     # Add context about what we already know
     if context.get("collected_info"):
         info = context["collected_info"]
         known_items = []
-        
+
         if info.get("project_type"):
             known_items.append(f"Project: {info['project_type']}")
         if info.get("budget_min") and info.get("budget_max"):
@@ -111,14 +111,14 @@ def get_conversation_prompt(phase: str, context: dict) -> str:
             known_items.append(f"Budget: ${budget_min}-${budget_max}")
         if info.get("timeline_start"):
             known_items.append(f"Timeline: {info['timeline_start']}")
-            
+
         if known_items:
             base_prompt += f"\n\nYou already know: {', '.join(known_items)}"
-    
+
     # Add specific guidance for missing information
     if context.get("missing_fields"):
         missing = context["missing_fields"]
         if len(missing) <= 3:
             base_prompt += f"\n\nFocus on learning about: {', '.join(missing)}"
-    
+
     return base_prompt

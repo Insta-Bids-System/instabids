@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .bid-card { border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 5px; }
+        #logs { background: #f8f9fa; padding: 10px; height: 300px; overflow-y: scroll; font-family: monospace; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>Admin Dashboard Test - Real-Time Bid Cards</h1>
+    
+    <div id="connection-status" class="status info">Connecting...</div>
+    
+    <div>
+        <button onclick="login()">Login</button>
+        <button onclick="connectWebSocket()">Connect WebSocket</button>
+        <button onclick="requestBidCards()">Request Bid Cards</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+    </div>
+    
+    <h2>Bid Cards (<span id="bid-count">0</span>)</h2>
+    <div id="bid-cards"></div>
+    
+    <h2>WebSocket Logs</h2>
+    <div id="logs"></div>
+
+    <script>
+        let sessionId = null;
+        let websocket = null;
+        
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('connection-status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        async function login() {
+            try {
+                const response = await fetch('http://localhost:8008/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@instabids.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    sessionId = data.session.session_id;
+                    log(`Login successful: ${sessionId}`);
+                    updateStatus('Logged in successfully', 'success');
+                } else {
+                    log(`Login failed: ${data.error}`);
+                    updateStatus('Login failed', 'error');
+                }
+            } catch (error) {
+                log(`Login error: ${error.message}`);
+                updateStatus('Login error', 'error');
+            }
+        }
+        
+        function connectWebSocket() {
+            if (!sessionId) {
+                log('Please login first');
+                return;
+            }
+            
+            websocket = new WebSocket('ws://localhost:8008/api/admin/ws/admin');
+            
+            websocket.onopen = () => {
+                log('WebSocket connected');
+                updateStatus('WebSocket connected', 'success');
+            };
+            
+            websocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                log(`Received: ${data.type}`);
+                
+                if (data.type === 'test') {
+                    log('Got test message, sending auth...');
+                    websocket.send(JSON.stringify({
+                        type: 'auth',
+                        session_id: sessionId
+                    }));
+                } else if (data.type === 'auth_success') {
+                    log('Authentication successful');
+                    updateStatus('Authenticated successfully', 'success');
+                } else if (data.type === 'bid_cards_data') {
+                    const bidCards = data.data.bid_cards || [];
+                    displayBidCards(bidCards);
+                    log(`Received ${bidCards.length} bid cards`);
+                } else if (data.type === 'dashboard_overview') {
+                    log(`Dashboard data: ${data.data.system_metrics.bid_cards_active} active bid cards`);
+                }
+            };
+            
+            websocket.onerror = (error) => {
+                log(`WebSocket error: ${error}`);
+                updateStatus('WebSocket error', 'error');
+            };
+            
+            websocket.onclose = () => {
+                log('WebSocket closed');
+                updateStatus('WebSocket disconnected', 'error');
+            };
+        }
+        
+        function requestBidCards() {
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                log('WebSocket not connected');
+                return;
+            }
+            
+            websocket.send(JSON.stringify({
+                type: 'get_data',
+                data_type: 'bid_cards'
+            }));
+            log('Requested bid cards data');
+        }
+        
+        function displayBidCards(bidCards) {
+            const container = document.getElementById('bid-cards');
+            const count = document.getElementById('bid-count');
+            
+            count.textContent = bidCards.length;
+            
+            if (bidCards.length === 0) {
+                container.innerHTML = '<p>No bid cards found</p>';
+                return;
+            }
+            
+            container.innerHTML = bidCards.map(card => `
+                <div class="bid-card">
+                    <strong>${card.bid_card_number}</strong> - ${card.project_type}
+                    <br>Status: ${card.status} | Progress: ${card.progress}/${card.target_bids}
+                    <br>Budget: $${card.budget_min?.toLocaleString()} - $${card.budget_max?.toLocaleString()}
+                    <br>Location: ${card.location}
+                    <br>Created: ${new Date(card.created_at).toLocaleString()}
+                </div>
+            `).join('');
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        // Auto-login and connect on page load
+        window.addEventListener('load', async () => {
+            await login();
+            setTimeout(connectWebSocket, 1000);
+            setTimeout(requestBidCards, 3000);
+        });
+    </script>
+</body>
+</html>

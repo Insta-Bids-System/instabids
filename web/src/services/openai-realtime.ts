@@ -1,4 +1,4 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from "events";
 
 interface RealtimeConfig {
   apiKey: string;
@@ -9,7 +9,7 @@ interface RealtimeConfig {
 }
 
 interface Tool {
-  type: 'function';
+  type: "function";
   name: string;
   description: string;
   parameters: Record<string, any>;
@@ -33,9 +33,9 @@ export class OpenAIRealtimeClient extends EventEmitter {
   constructor(config: RealtimeConfig) {
     super();
     this.config = {
-      model: 'gpt-4o-realtime-preview-2024-12-17',
-      voice: 'alloy',
-      ...config
+      model: "gpt-4o-realtime-preview-2024-12-17",
+      voice: "alloy",
+      ...config,
     };
   }
 
@@ -43,42 +43,42 @@ export class OpenAIRealtimeClient extends EventEmitter {
     return new Promise((resolve, reject) => {
       try {
         // Connect to our backend proxy which handles authentication
-        const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8008";
         // Convert http to ws protocol
-        const wsUrl = backendUrl.replace(/^http/, 'ws');
+        const wsUrl = backendUrl.replace(/^http/, "ws");
         const url = `${wsUrl}/ws/realtime`;
-        
+
         this.ws = new WebSocket(url);
-        
+
         this.ws.onopen = () => {
-          console.log('WebSocket connected to Realtime API proxy');
+          console.log("WebSocket connected to Realtime API proxy");
           this.isConnected = true;
           this.reconnectAttempts = 0;
-          
+
           // Send session configuration
           this.send({
-            type: 'session.update',
+            type: "session.update",
             session: {
-              modalities: ['text', 'audio'],
-              instructions: this.config.instructions || '',
+              modalities: ["text", "audio"],
+              instructions: this.config.instructions || "",
               voice: this.config.voice,
-              input_audio_format: 'pcm16',
-              output_audio_format: 'pcm16',
+              input_audio_format: "pcm16",
+              output_audio_format: "pcm16",
               input_audio_transcription: {
-                model: 'whisper-1'
+                model: "whisper-1",
               },
               turn_detection: {
-                type: 'server_vad',
+                type: "server_vad",
                 threshold: 0.5,
                 prefix_padding_ms: 300,
-                silence_duration_ms: 500
+                silence_duration_ms: 500,
               },
               tools: this.config.tools || [],
-              tool_choice: 'auto'
-            }
+              tool_choice: "auto",
+            },
           });
-          
-          this.emit('connected');
+
+          this.emit("connected");
           resolve();
         };
 
@@ -87,20 +87,20 @@ export class OpenAIRealtimeClient extends EventEmitter {
             const data = JSON.parse(event.data);
             this.handleEvent(data);
           } catch (error) {
-            console.error('Failed to parse WebSocket message:', error);
+            console.error("Failed to parse WebSocket message:", error);
           }
         };
 
         this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          this.emit('error', error);
+          console.error("WebSocket error:", error);
+          this.emit("error", error);
           reject(error);
         };
 
         this.ws.onclose = () => {
-          console.log('WebSocket disconnected');
+          console.log("WebSocket disconnected");
           this.isConnected = false;
-          this.emit('disconnected');
+          this.emit("disconnected");
           this.attemptReconnect();
         };
       } catch (error) {
@@ -110,96 +110,97 @@ export class OpenAIRealtimeClient extends EventEmitter {
   }
 
   private handleEvent(event: RealtimeEvent) {
-    console.log('Received event:', event.type);
-    
+    console.log("Received event:", event.type);
+
     switch (event.type) {
-      case 'error':
-        console.error('Server error:', event.error);
-        this.emit('error', event.error);
+      case "error":
+        console.error("Server error:", event.error);
+        this.emit("error", event.error);
         break;
-        
-      case 'session.created':
-        console.log('Session created:', event.session);
-        this.emit('session.created', event.session);
+
+      case "session.created":
+        console.log("Session created:", event.session);
+        this.emit("session.created", event.session);
         break;
-        
-      case 'session.updated':
-        console.log('Session updated:', event.session);
-        this.emit('session.updated', event.session);
+
+      case "session.updated":
+        console.log("Session updated:", event.session);
+        this.emit("session.updated", event.session);
         break;
-        
-      case 'conversation.item.created':
-        this.emit('conversation.item.created', event.item);
+
+      case "conversation.item.created":
+        this.emit("conversation.item.created", event.item);
         break;
-        
-      case 'conversation.item.input_audio_transcription.completed':
-        this.emit('input_audio_transcription.completed', event);
+
+      case "conversation.item.input_audio_transcription.completed":
+        this.emit("input_audio_transcription.completed", event);
         break;
-        
-      case 'response.created':
-        this.emit('response.created', event.response);
+
+      case "response.created":
+        this.emit("response.created", event.response);
         break;
-        
-      case 'response.done':
-        this.emit('response.done', event.response);
+
+      case "response.done":
+        this.emit("response.done", event.response);
         break;
-        
-      case 'response.output_item.added':
-        this.emit('response.output_item.added', event.item);
+
+      case "response.output_item.added":
+        this.emit("response.output_item.added", event.item);
         break;
-        
-      case 'response.output_item.done':
-        this.emit('response.output_item.done', event.item);
+
+      case "response.output_item.done":
+        this.emit("response.output_item.done", event.item);
         break;
-        
-      case 'response.audio_transcript.delta':
-        this.emit('response.audio_transcript.delta', event);
+
+      case "response.audio_transcript.delta":
+        this.emit("response.audio_transcript.delta", event);
         break;
-        
-      case 'response.audio_transcript.done':
-        this.emit('response.audio_transcript.done', event);
+
+      case "response.audio_transcript.done":
+        this.emit("response.audio_transcript.done", event);
         break;
-        
-      case 'response.audio.delta':
+
+      case "response.audio.delta":
         // Handle audio chunk
         if (event.delta) {
           const audioData = this.base64ToArrayBuffer(event.delta);
           this.audioBuffer.push(audioData);
-          this.emit('response.audio.delta', audioData);
+          this.emit("response.audio.delta", audioData);
         }
         break;
-        
-      case 'response.audio.done':
+
+      case "response.audio.done": {
         // Audio response complete
         const completeAudio = this.mergeAudioBuffers(this.audioBuffer);
         this.audioBuffer = [];
-        this.emit('response.audio.done', completeAudio);
+        this.emit("response.audio.done", completeAudio);
         break;
-        
-      case 'response.function_call_arguments.delta':
-        this.emit('response.function_call_arguments.delta', event);
+      }
+
+      case "response.function_call_arguments.delta":
+        this.emit("response.function_call_arguments.delta", event);
         break;
-        
-      case 'response.function_call_arguments.done':
-        this.emit('response.function_call_arguments.done', event);
+
+      case "response.function_call_arguments.done":
+        this.emit("response.function_call_arguments.done", event);
         break;
-        
-      case 'input_audio_buffer.speech_started':
-        this.emit('input_audio_buffer.speech_started', event);
+
+      case "input_audio_buffer.speech_started":
+        this.emit("input_audio_buffer.speech_started", event);
         break;
-        
-      case 'input_audio_buffer.speech_stopped':
-        this.emit('input_audio_buffer.speech_stopped', event);
+
+      case "input_audio_buffer.speech_stopped":
+        this.emit("input_audio_buffer.speech_stopped", event);
         break;
-        
-      case 'input_audio_buffer.committed':
-        this.emit('input_audio_buffer.committed', event);
+
+      case "input_audio_buffer.committed":
+        this.emit("input_audio_buffer.committed", event);
         break;
-        
-      case 'input_audio_buffer.cleared':
-        this.emit('input_audio_buffer.cleared', event);
+
+      case "input_audio_buffer.cleared":
+        this.emit("input_audio_buffer.cleared", event);
         break;
-        
+
       default:
         this.emit(event.type, event);
     }
@@ -207,90 +208,92 @@ export class OpenAIRealtimeClient extends EventEmitter {
 
   send(event: RealtimeEvent): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not connected');
+      console.error("WebSocket is not connected");
       return;
     }
-    
+
     this.ws.send(JSON.stringify(event));
   }
 
   sendAudio(audioData: ArrayBuffer): void {
     // Convert ArrayBuffer to base64
     const base64Audio = this.arrayBufferToBase64(audioData);
-    
+
     this.send({
-      type: 'input_audio_buffer.append',
-      audio: base64Audio
+      type: "input_audio_buffer.append",
+      audio: base64Audio,
     });
   }
 
   commitAudio(): void {
     this.send({
-      type: 'input_audio_buffer.commit'
+      type: "input_audio_buffer.commit",
     });
   }
 
   clearAudio(): void {
     this.send({
-      type: 'input_audio_buffer.clear'
+      type: "input_audio_buffer.clear",
     });
   }
 
   sendText(text: string): void {
     this.send({
-      type: 'conversation.item.create',
+      type: "conversation.item.create",
       item: {
-        type: 'message',
-        role: 'user',
-        content: [{
-          type: 'input_text',
-          text: text
-        }]
-      }
+        type: "message",
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: text,
+          },
+        ],
+      },
     });
-    
+
     // Trigger response
     this.createResponse();
   }
 
-  createResponse(modalities: string[] = ['text', 'audio']): void {
+  createResponse(modalities: string[] = ["text", "audio"]): void {
     this.send({
-      type: 'response.create',
+      type: "response.create",
       response: {
         modalities: modalities,
-        instructions: this.config.instructions
-      }
+        instructions: this.config.instructions,
+      },
     });
   }
 
   cancelResponse(): void {
     this.send({
-      type: 'response.cancel'
+      type: "response.cancel",
     });
   }
 
   updateSession(session: Partial<any>): void {
     this.send({
-      type: 'session.update',
-      session: session
+      type: "session.update",
+      session: session,
     });
   }
 
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
-      this.emit('max_reconnect_failed');
+      console.error("Max reconnection attempts reached");
+      this.emit("max_reconnect_failed");
       return;
     }
 
     this.reconnectAttempts++;
-    const timeout = this.reconnectTimeout * Math.pow(2, this.reconnectAttempts - 1);
-    
+    const timeout = this.reconnectTimeout * 2 ** (this.reconnectAttempts - 1);
+
     console.log(`Attempting to reconnect in ${timeout}ms (attempt ${this.reconnectAttempts})`);
-    
+
     setTimeout(() => {
-      this.connect().catch(error => {
-        console.error('Reconnection failed:', error);
+      this.connect().catch((error) => {
+        console.error("Reconnection failed:", error);
       });
     }, timeout);
   }
@@ -309,7 +312,7 @@ export class OpenAIRealtimeClient extends EventEmitter {
 
   private arrayBufferToBase64(buffer: ArrayBuffer): string {
     const bytes = new Uint8Array(buffer);
-    let binary = '';
+    let binary = "";
     for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
@@ -329,13 +332,13 @@ export class OpenAIRealtimeClient extends EventEmitter {
     const totalLength = buffers.reduce((sum, buf) => sum + buf.byteLength, 0);
     const result = new ArrayBuffer(totalLength);
     const view = new Uint8Array(result);
-    
+
     let offset = 0;
     for (const buffer of buffers) {
       view.set(new Uint8Array(buffer), offset);
       offset += buffer.byteLength;
     }
-    
+
     return result;
   }
 }
@@ -352,29 +355,29 @@ export class AudioProcessor {
   async microphoneToBuffer(stream: MediaStream): Promise<AudioBuffer> {
     const source = this.audioContext.createMediaStreamSource(stream);
     const processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-    
+
     return new Promise((resolve) => {
       const chunks: Float32Array[] = [];
-      
+
       processor.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
         chunks.push(new Float32Array(inputData));
       };
-      
+
       source.connect(processor);
       processor.connect(this.audioContext.destination);
-      
+
       // Return method to get current buffer
       (resolve as any).getBuffer = () => {
         const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
         const result = new Float32Array(totalLength);
-        
+
         let offset = 0;
         for (const chunk of chunks) {
           result.set(chunk, offset);
           offset += chunk.length;
         }
-        
+
         return this.float32ToPCM16(result);
       };
     });
@@ -383,24 +386,24 @@ export class AudioProcessor {
   float32ToPCM16(float32Array: Float32Array): ArrayBuffer {
     const buffer = new ArrayBuffer(float32Array.length * 2);
     const view = new DataView(buffer);
-    
+
     for (let i = 0; i < float32Array.length; i++) {
       const sample = Math.max(-1, Math.min(1, float32Array[i]));
-      view.setInt16(i * 2, sample * 0x7FFF, true); // little-endian
+      view.setInt16(i * 2, sample * 0x7fff, true); // little-endian
     }
-    
+
     return buffer;
   }
 
   pcm16ToFloat32(pcm16Buffer: ArrayBuffer): Float32Array {
     const view = new DataView(pcm16Buffer);
     const float32Array = new Float32Array(pcm16Buffer.byteLength / 2);
-    
+
     for (let i = 0; i < float32Array.length; i++) {
       const sample = view.getInt16(i * 2, true); // little-endian
-      float32Array[i] = sample / 0x7FFF;
+      float32Array[i] = sample / 0x7fff;
     }
-    
+
     return float32Array;
   }
 
@@ -408,11 +411,11 @@ export class AudioProcessor {
     const float32Data = this.pcm16ToFloat32(pcm16Buffer);
     const audioBuffer = this.audioContext.createBuffer(1, float32Data.length, this.sampleRate);
     audioBuffer.getChannelData(0).set(float32Data);
-    
+
     const source = this.audioContext.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(this.audioContext.destination);
-    
+
     return new Promise((resolve) => {
       source.onended = () => resolve();
       source.start();

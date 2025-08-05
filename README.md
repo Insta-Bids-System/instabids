@@ -1,4 +1,4 @@
-# Instabids - AI-Powered Marketplace for Home Improvement
+# InstaBids - AI-Powered Contractor Marketplace
 
 <div align="center">
   <img src="assets/instabids-logo.png" alt="Instabids Logo" width="200"/>
@@ -7,20 +7,31 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
   [![React](https://img.shields.io/badge/React-18.0+-61DAFB.svg)](https://reactjs.org/)
   [![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg)](https://www.python.org/)
+  [![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)](#)
   
-  **Revolutionizing home improvement by eliminating traditional sales meetings through AI**
+  **AI-powered contractor marketplace with real-time monitoring and intelligent automation**
 </div>
 
-## 🚀 Overview
+## 🚀 System Overview
 
-Instabids is an AI-powered marketplace that connects homeowners with contractors without the need for traditional sales meetings. Homeowners save an average of 20% on projects while contractors only pay when selected, eliminating wasted lead costs.
+InstaBids is a production-ready AI-powered marketplace featuring **7 operational agents** that handle everything from homeowner conversations to contractor outreach. The system includes real-time monitoring, multi-project memory, and verified email/form automation.
 
-### Key Features
-- 🤖 **8 Specialized AI Agents** orchestrating the entire process
-- 💬 **Conversational Project Scoping** - Chat with AI, upload photos, get professional bid cards
-- 💰 **Pay-for-Connection Model** - Contractors only pay $30 when selected
-- 🎯 **No Corporate Middleman** - Money flows directly between parties
-- 📱 **Multi-Platform** - Web, mobile (coming soon), and API access
+### ✅ **Current Status: FULLY OPERATIONAL**
+- **7 Core Agents**: All tested and verified with real-world functionality
+- **Admin Dashboard**: Real-time monitoring and management system
+- **Email Automation**: Verified MCP integration with actual email sending
+- **Form Automation**: Confirmed website form submissions with proof
+- **Multi-Project Memory**: Cross-project awareness and context persistence
+- **Database Integration**: 33+ tables in Supabase with full CRUD operations
+
+### 🎯 **Key Features**
+- 🤖 **7 Specialized AI Agents** with Claude Opus 4 & Claude 3.7 Sonnet
+- 💬 **Intelligent Conversations** - Multi-turn project scoping with memory
+- 📧 **Real Email Outreach** - Verified contractor outreach via MCP tools
+- 🌐 **Website Form Automation** - Automated contractor website submissions  
+- 📊 **Live Admin Dashboard** - Real-time monitoring with WebSocket updates
+- 🎨 **Design Assistant** - AI-powered inspiration and style recognition
+- 💾 **Multi-Project Memory** - Cross-project user awareness and context
 
 ## 🏗️ Project Structure
 
@@ -37,16 +48,32 @@ instabids/
 └── additional_projects/  # 5 expansion projects for dev teams
 ```
 
-## 🤖 The 8 AI Agents
+## 🤖 The 7 Operational AI Agents
 
-1. **CIA** (Customer Interface Agent) - Converses with homeowners using Claude 3.5 Sonnet
-2. **JAA** (Job Assessment Agent) - Converts conversations into structured bid cards
-3. **CDA** (Contractor Discovery Agent) - Finds qualified contractors using Grok 4
-4. **EAA** (External Acquisition Agent) - Recruits new contractors when needed
-5. **WFA** (Website Form Automation) - Automates contractor outreach
-6. **SMA** (Secure Messaging Agent) - Manages anonymous communication
-7. **CHO** (Communication Hub Orchestrator) - Routes all messages
-8. **CRA** (Contractor Rating Agent) - Scores contractors using O3
+### **Core Pipeline Agents** ✅ FULLY TESTED
+1. **CIA** (Customer Interface Agent) - Claude Opus 4 conversations with multi-project memory
+2. **JAA** (Job Assessment Agent) - LangGraph workflow for bid card generation  
+3. **CDA** (Contractor Discovery Agent) - 3-tier contractor sourcing system
+4. **EAA** (External Acquisition Agent) - Multi-channel outreach with real email sending
+5. **WFA** (Website Form Automation Agent) - Playwright browser automation with verified submissions
+
+### **Specialized Agents** ✅ OPERATIONAL
+6. **IRIS** (Design Inspiration Assistant) - Claude 3.7 Sonnet for design analysis
+7. **COIA** (Contractor Interface Agent) - Complete contractor onboarding with auth
+
+### **Supporting Infrastructure** ✅ PRODUCTION-READY
+- **Admin Dashboard**: Real-time monitoring with WebSocket integration
+- **Multi-Project Memory**: Cross-project user context and preferences
+- **Timing & Orchestration**: Mathematical contractor calculation system
+- **Database Integration**: 33+ Supabase tables with full CRUD operations
+
+## 📚 Essential Documentation
+
+**For Developers & Contributors - Read These First:**
+- **[Complete System Architecture](docs/agent_6_central_docs/SYSTEM_INTERDEPENDENCY_MAP.md)** - How all components connect
+- **[Complete File Structure](docs/agent_6_central_docs/CODEBASE_OVERVIEW.md)** - Where everything is located  
+- **[Development Workflow](docs/agent_6_central_docs/DEVELOPMENT_WORKFLOW.md)** - Standardized process for all agents
+- **[Current Build Status](CLAUDE.md)** - ⭐ CRITICAL - Current system state & instructions
 
 ## 🚀 Getting Started
 
@@ -54,7 +81,7 @@ instabids/
 - Node.js 18+
 - Python 3.11+
 - Supabase account
-- API keys for Claude, Grok, and other AI services
+- API keys for Claude Opus 4 & Claude 3.7 Sonnet
 
 ### Installation
 

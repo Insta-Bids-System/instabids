@@ -4,72 +4,73 @@ Creates professional contractor bid cards from project information
 """
 import json
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any, Optional
+
 import anthropic
 
 
 class BidCardGenerator:
     """Generates professional bid cards for contractors"""
-    
+
     def __init__(self, anthropic_client: Optional[anthropic.Anthropic]):
         self.client = anthropic_client
-        
-    async def generate_document(self, 
-                              project_info: Dict[str, Any], 
-                              urgency_level: str, 
+
+    async def generate_document(self,
+                              project_info: dict[str, Any],
+                              urgency_level: str,
                               contractor_count: int,
-                              conversation_data: Dict[str, Any]) -> Dict[str, Any]:
+                              conversation_data: dict[str, Any]) -> dict[str, Any]:
         """Generate complete professional bid card document"""
-        
+
         print("[BidCardGenerator] Generating professional bid card document")
-        
+
         # If no API client, generate basic bid card
         if not self.client:
             return self._generate_basic_bid_card(project_info, urgency_level, contractor_count)
-        
+
         # Generate AI-enhanced bid card with Claude
         return await self._generate_ai_bid_card(project_info, urgency_level, contractor_count, conversation_data)
-    
-    def _generate_basic_bid_card(self, project_info: Dict[str, Any], urgency_level: str, contractor_count: int) -> Dict[str, Any]:
+
+    def _generate_basic_bid_card(self, project_info: dict[str, Any], urgency_level: str, contractor_count: int) -> dict[str, Any]:
         """Generate basic bid card without AI enhancement"""
-        
+
         return {
-            'project_overview': {
-                'title': f"{project_info.get('project_type', 'Home Improvement Project')}",
-                'description': "Project details extracted from homeowner conversation",
-                'location': project_info.get('address', 'Location provided by homeowner'),
-                'urgency': urgency_level,
-                'contractors_needed': contractor_count
+            "project_overview": {
+                "title": f"{project_info.get('project_type', 'Home Improvement Project')}",
+                "description": "Project details extracted from homeowner conversation",
+                "location": project_info.get("address", "Location provided by homeowner"),
+                "urgency": urgency_level,
+                "contractors_needed": contractor_count
             },
-            'budget_information': {
-                'budget_min': project_info.get('budget_min', 0),
-                'budget_max': project_info.get('budget_max', 0),
-                'budget_range': f"${project_info.get('budget_min', 0):,} - ${project_info.get('budget_max', 0):,}"
+            "budget_information": {
+                "budget_min": project_info.get("budget_min", 0),
+                "budget_max": project_info.get("budget_max", 0),
+                "budget_range": f"${project_info.get('budget_min', 0):,} - ${project_info.get('budget_max', 0):,}"
             },
-            'timeline': {
-                'preferred_start': project_info.get('timeline_start', 'To be discussed'),
-                'completion_target': project_info.get('timeline_end', 'To be discussed'),
-                'urgency_level': urgency_level
+            "timeline": {
+                "preferred_start": project_info.get("timeline_start", "To be discussed"),
+                "completion_target": project_info.get("timeline_end", "To be discussed"),
+                "urgency_level": urgency_level
             },
-            'requirements': project_info.get('requirements', {}),
-            'specifications': project_info.get('specifications', {}),
-            'concerns': project_info.get('concerns', []),
-            'homeowner_preferences': project_info.get('preferences', {}),
-            'images': len(project_info.get('images', [])),
-            'generated_at': datetime.now().isoformat(),
-            'format': 'basic'
+            "requirements": project_info.get("requirements", {}),
+            "specifications": project_info.get("specifications", {}),
+            "concerns": project_info.get("concerns", []),
+            "homeowner_preferences": project_info.get("preferences", {}),
+            "images": len(project_info.get("images", [])),
+            "generated_at": datetime.now().isoformat(),
+            "format": "basic"
         }
-    
-    async def _generate_ai_bid_card(self, 
-                                  project_info: Dict[str, Any], 
-                                  urgency_level: str, 
+
+    async def _generate_ai_bid_card(self,
+                                  project_info: dict[str, Any],
+                                  urgency_level: str,
                                   contractor_count: int,
-                                  conversation_data: Dict[str, Any]) -> Dict[str, Any]:
+                                  conversation_data: dict[str, Any]) -> dict[str, Any]:
         """Generate AI-enhanced professional bid card using Claude"""
-        
+
         # Create prompt for Claude
         prompt = self._create_bid_card_prompt(project_info, urgency_level, contractor_count, conversation_data)
-        
+
         try:
             response = await self.client.messages.create(
                 model="claude-3-5-sonnet-20241022",
@@ -78,36 +79,36 @@ class BidCardGenerator:
                     {"role": "user", "content": prompt}
                 ]
             )
-            
+
             # Parse Claude's response into structured bid card
             bid_card_content = response.content[0].text
-            
+
             # Enhance basic bid card with AI-generated content
             basic_card = self._generate_basic_bid_card(project_info, urgency_level, contractor_count)
-            
+
             # Add AI-enhanced sections
             basic_card.update({
-                'professional_summary': self._extract_summary_from_ai(bid_card_content),
-                'detailed_scope': self._extract_scope_from_ai(bid_card_content),
-                'contractor_guidance': self._extract_guidance_from_ai(bid_card_content),
-                'ai_enhanced': True,
-                'format': 'professional'
+                "professional_summary": self._extract_summary_from_ai(bid_card_content),
+                "detailed_scope": self._extract_scope_from_ai(bid_card_content),
+                "contractor_guidance": self._extract_guidance_from_ai(bid_card_content),
+                "ai_enhanced": True,
+                "format": "professional"
             })
-            
+
             return basic_card
-            
+
         except Exception as e:
             print(f"[BidCardGenerator ERROR] AI generation failed: {e}")
             # Fallback to basic bid card
             return self._generate_basic_bid_card(project_info, urgency_level, contractor_count)
-    
-    def _create_bid_card_prompt(self, 
-                              project_info: Dict[str, Any], 
-                              urgency_level: str, 
+
+    def _create_bid_card_prompt(self,
+                              project_info: dict[str, Any],
+                              urgency_level: str,
                               contractor_count: int,
-                              conversation_data: Dict[str, Any]) -> str:
+                              conversation_data: dict[str, Any]) -> str:
         """Create prompt for Claude to generate professional bid card"""
-        
+
         return f"""
 Please create a professional contractor bid card based on this homeowner project information:
 
@@ -139,52 +140,52 @@ Please provide:
 
 Format as clear, professional content that contractors can use to submit accurate bids.
 """
-    
+
     def _extract_summary_from_ai(self, ai_content: str) -> str:
         """Extract professional summary from AI response"""
-        lines = ai_content.split('\n')
+        lines = ai_content.split("\n")
         summary_section = []
         in_summary = False
-        
+
         for line in lines:
-            if 'PROFESSIONAL SUMMARY' in line.upper():
+            if "PROFESSIONAL SUMMARY" in line.upper():
                 in_summary = True
                 continue
-            elif line.strip().startswith('2.') or 'DETAILED SCOPE' in line.upper():
+            elif line.strip().startswith("2.") or "DETAILED SCOPE" in line.upper():
                 break
             elif in_summary and line.strip():
                 summary_section.append(line.strip())
-        
-        return ' '.join(summary_section) if summary_section else "Professional summary generated from homeowner conversation."
-    
+
+        return " ".join(summary_section) if summary_section else "Professional summary generated from homeowner conversation."
+
     def _extract_scope_from_ai(self, ai_content: str) -> str:
         """Extract detailed scope from AI response"""
-        lines = ai_content.split('\n')
+        lines = ai_content.split("\n")
         scope_section = []
         in_scope = False
-        
+
         for line in lines:
-            if 'DETAILED SCOPE' in line.upper():
+            if "DETAILED SCOPE" in line.upper():
                 in_scope = True
                 continue
-            elif line.strip().startswith('3.') or 'CONTRACTOR GUIDANCE' in line.upper():
+            elif line.strip().startswith("3.") or "CONTRACTOR GUIDANCE" in line.upper():
                 break
             elif in_scope and line.strip():
                 scope_section.append(line.strip())
-        
-        return '\n'.join(scope_section) if scope_section else "Detailed scope to be discussed with contractor."
-    
+
+        return "\n".join(scope_section) if scope_section else "Detailed scope to be discussed with contractor."
+
     def _extract_guidance_from_ai(self, ai_content: str) -> str:
         """Extract contractor guidance from AI response"""
-        lines = ai_content.split('\n')
+        lines = ai_content.split("\n")
         guidance_section = []
         in_guidance = False
-        
+
         for line in lines:
-            if 'CONTRACTOR GUIDANCE' in line.upper():
+            if "CONTRACTOR GUIDANCE" in line.upper():
                 in_guidance = True
                 continue
             elif in_guidance and line.strip():
                 guidance_section.append(line.strip())
-        
-        return '\n'.join(guidance_section) if guidance_section else "Standard contractor guidelines apply."
+
+        return "\n".join(guidance_section) if guidance_section else "Standard contractor guidelines apply."

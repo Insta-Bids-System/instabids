@@ -1,74 +1,75 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { useAuth } from '@/contexts/AuthContext'
-import toast from 'react-hot-toast'
-import { Mail, Lock, Sparkles } from 'lucide-react'
-import { motion } from 'framer-motion'
-import { supabase } from '@/lib/supabase'
+import { motion } from "framer-motion";
+import { Sparkles } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+import toast from "react-hot-toast";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const SignupPage: React.FC = () => {
-  const [loading, setLoading] = useState(false)
-  const [manualSignup, setManualSignup] = useState(false)
+  const [loading, setLoading] = useState(false);
+  const [manualSignup, _setManualSignup] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    fullName: '',
-  })
-  const { signUp } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
-  
+    email: "",
+    password: "",
+    fullName: "",
+  });
+  const { signUp } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // Get session data from landing page
-  const { sessionId, projectData } = location.state || {}
+  const { sessionId, projectData } = location.state || {};
 
   const handleGoogleSignup = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
+            access_type: "offline",
+            prompt: "consent",
           },
         },
-      })
-      
-      if (error) throw error
-      
+      });
+
+      if (error) throw error;
+
       // Store session data in localStorage to retrieve after redirect
       if (sessionId) {
-        localStorage.setItem('pendingSessionId', sessionId)
-        localStorage.setItem('pendingProjectData', JSON.stringify(projectData))
+        localStorage.setItem("pendingSessionId", sessionId);
+        localStorage.setItem("pendingProjectData", JSON.stringify(projectData));
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to sign up with Google')
-      setLoading(false)
+    } catch (error: unknown) {
+      toast.error(error.message || "Failed to sign up with Google");
+      setLoading(false);
     }
-  }
+  };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+    e.preventDefault();
+    setLoading(true);
 
     try {
-      await signUp(formData.email, formData.password, formData.fullName, 'homeowner')
-      
+      await signUp(formData.email, formData.password, formData.fullName, "homeowner");
+
       // Store session data for after email verification
       if (sessionId) {
-        localStorage.setItem('pendingSessionId', sessionId)
-        localStorage.setItem('pendingProjectData', JSON.stringify(projectData))
+        localStorage.setItem("pendingSessionId", sessionId);
+        localStorage.setItem("pendingProjectData", JSON.stringify(projectData));
       }
-      
-      toast.success('Account created! Please check your email to verify.')
-      navigate('/login')
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to create account')
+
+      toast.success("Account created! Please check your email to verify.");
+      navigate("/login");
+    } catch (error: unknown) {
+      toast.error(error.message || "Failed to create account");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -84,9 +85,7 @@ const SignupPage: React.FC = () => {
               Instabids
             </h1>
           </Link>
-          <h2 className="text-center text-2xl font-bold text-gray-900">
-            Get Your Project Started
-          </h2>
+          <h2 className="text-center text-2xl font-bold text-gray-900">Get Your Project Started</h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Sign up to receive competitive bids from verified contractors
           </p>
@@ -104,7 +103,8 @@ const SignupPage: React.FC = () => {
               <span className="font-semibold text-gray-800">Your Project Summary</span>
             </div>
             <p className="text-sm text-gray-600">
-              {projectData.project_type || 'Home improvement'} project in {projectData.location?.city || 'your area'}
+              {projectData.project_type || "Home improvement"} project in{" "}
+              {projectData.location?.city || "your area"}
             </p>
           </motion.div>
         )}
@@ -137,7 +137,7 @@ const SignupPage: React.FC = () => {
               />
               <path fill="none" d="M1 1h22v22H1z" />
             </svg>
-            {loading ? 'Signing up...' : 'Continue with Google'}
+            {loading ? "Signing up..." : "Continue with Google"}
           </motion.button>
 
           <div className="relative">
@@ -152,7 +152,8 @@ const SignupPage: React.FC = () => {
           {/* Manual Sign Up Option */}
           {!manualSignup ? (
             <button
-              onClick={() => setManualSignup(true)}
+              type="button"
+              onClick={match.match(/onClick={[^}]+}/)[0]}
               className="w-full text-sm text-gray-600 hover:text-gray-800 transition-colors"
             >
               Sign up with email instead
@@ -160,7 +161,7 @@ const SignupPage: React.FC = () => {
           ) : (
             <motion.form
               initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
+              animate={{ opacity: 1, height: "auto" }}
               transition={{ duration: 0.3 }}
               className="space-y-4"
               onSubmit={handleManualSubmit}
@@ -210,7 +211,7 @@ const SignupPage: React.FC = () => {
                 disabled={loading}
                 className="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
-                {loading ? 'Creating account...' : 'Create account'}
+                {loading ? "Creating account..." : "Create account"}
               </button>
             </motion.form>
           )}
@@ -218,17 +219,17 @@ const SignupPage: React.FC = () => {
 
         <div className="text-center space-y-2">
           <p className="text-xs text-gray-500">
-            By signing up, you agree to our{' '}
+            By signing up, you agree to our{" "}
             <a href="#" className="text-blue-600 hover:text-blue-500">
               Terms of Service
-            </a>{' '}
-            and{' '}
+            </a>{" "}
+            and{" "}
             <a href="#" className="text-blue-600 hover:text-blue-500">
               Privacy Policy
             </a>
           </p>
           <p className="text-sm text-gray-600">
-            Already have an account?{' '}
+            Already have an account?{" "}
             <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
               Sign in
             </Link>
@@ -236,7 +237,7 @@ const SignupPage: React.FC = () => {
         </div>
       </motion.div>
     </div>
-  )
-}
+  );
+};
 
-export default SignupPage
+export default SignupPage;
