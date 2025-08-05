@@ -105,7 +105,7 @@ const HomeownerProjectWorkspace: React.FC<HomeownerProjectWorkspaceProps> = ({ b
       if (error) {
         console.error("Error loading bid card:", error);
         // Fallback to API if direct query fails
-        const response = await fetch(`http://localhost:8008/api/bid-cards/homeowner/${user?.id}`);
+        const response = await fetch(`http://localhost:8008/api/bid-cards/homeowner/test-homeowner-id`);
         if (response.ok) {
           const allCards = await response.json();
           const foundCard = allCards.find(

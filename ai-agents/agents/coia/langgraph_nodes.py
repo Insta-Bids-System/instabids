@@ -242,7 +242,9 @@ async def conversation_node(state: UnifiedCoIAState) -> Command:
                 updates["current_mode"] = "conversation"  # Ensure we stay for completion
                 return Command(goto="END", update=updates)
             else:
-                return updates
+                # Stay in conversation mode - always return Command with END to prevent infinite loop
+                updates["current_mode"] = "conversation"
+                return Command(goto="END", update=updates)
     
     except Exception as e:
         logger.error(f"Error in conversation node: {e}")
