@@ -1,22 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  DollarSign, 
-  Users, 
-  CheckCircle, 
-  ArrowRight, 
-  Star,
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ArrowRight,
+  Award,
   Camera,
-  Zap,
+  CheckCircle,
+  Clock,
+  DollarSign,
+  MapPin,
   Shield,
   Target,
   TrendingUp,
-  Award
-} from 'lucide-react';
+  Users,
+  Zap,
+} from "lucide-react";
+import type React from "react";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 interface BidCard {
   id: string;
@@ -44,17 +43,17 @@ const ExternalBidCardLanding: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    company: '',
-    trade: '',
-    zipCode: ''
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    company: "",
+    trade: "",
+    zipCode: "",
   });
 
-  const bidToken = searchParams.get('bid');
-  const source = searchParams.get('src') || 'direct';
+  const bidToken = searchParams.get("bid");
+  const source = searchParams.get("src") || "direct";
 
   useEffect(() => {
     if (bidToken) {
@@ -63,15 +62,13 @@ const ExternalBidCardLanding: React.FC = () => {
     } else {
       setLoading(false);
     }
-  }, [bidToken, source]);
+  }, [bidToken, source, loadBidCard, trackBidCardClick]);
 
   // Auto-rotate photos
   useEffect(() => {
     if (bidCard?.photo_urls && bidCard.photo_urls.length > 1) {
       const interval = setInterval(() => {
-        setCurrentPhotoIndex((prev) => 
-          prev === bidCard.photo_urls!.length - 1 ? 0 : prev + 1
-        );
+        setCurrentPhotoIndex((prev) => (prev === bidCard.photo_urls?.length - 1 ? 0 : prev + 1));
       }, 4000);
       return () => clearInterval(interval);
     }
@@ -79,17 +76,17 @@ const ExternalBidCardLanding: React.FC = () => {
 
   const trackBidCardClick = async (token: string, source: string) => {
     try {
-      await fetch('/api/track/bid-card-click', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/track/bid-card-click", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bid_token: token,
           source_channel: source,
-          user_agent: navigator.userAgent
-        })
+          user_agent: navigator.userAgent,
+        }),
       });
     } catch (error) {
-      console.error('Failed to track click:', error);
+      console.error("Failed to track click:", error);
     }
   };
 
@@ -101,7 +98,7 @@ const ExternalBidCardLanding: React.FC = () => {
         setBidCard(data);
       }
     } catch (error) {
-      console.error('Failed to load bid card:', error);
+      console.error("Failed to load bid card:", error);
     } finally {
       setLoading(false);
     }
@@ -113,70 +110,78 @@ const ExternalBidCardLanding: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
-      const response = await fetch('/api/contractors/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/contractors/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
           source: source,
-          bid_context: bidToken
-        })
+          bid_context: bidToken,
+        }),
       });
 
       if (response.ok) {
         const contractor = await response.json();
-        
-        await fetch('/api/track/bid-card-conversion', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+
+        await fetch("/api/track/bid-card-conversion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             bid_token: bidToken,
-            contractor_id: contractor.id
-          })
+            contractor_id: contractor.id,
+          }),
         });
 
-        navigate('/contractor/welcome');
+        navigate("/contractor/welcome");
       }
     } catch (error) {
-      console.error('Signup failed:', error);
+      console.error("Signup failed:", error);
     }
   };
 
   const formatProjectType = (type: string) => {
-    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency?.toLowerCase()) {
-      case 'emergency':
-        return 'from-red-500 to-red-600';
-      case 'week':
-        return 'from-orange-500 to-orange-600';
-      case 'month':
-        return 'from-blue-500 to-blue-600';
+      case "emergency":
+        return "from-red-500 to-red-600";
+      case "week":
+        return "from-orange-500 to-orange-600";
+      case "month":
+        return "from-blue-500 to-blue-600";
       default:
-        return 'from-gray-500 to-gray-600';
+        return "from-gray-500 to-gray-600";
     }
   };
 
   const getUrgencyText = (urgency: string) => {
     switch (urgency?.toLowerCase()) {
-      case 'emergency':
-        return 'Urgent - ASAP';
-      case 'week':
-        return 'Within 7 Days';
-      case 'month':
-        return 'Within 30 Days';
+      case "emergency":
+        return "Urgent - ASAP";
+      case "week":
+        return "Within 7 Days";
+      case "month":
+        return "Within 30 Days";
       default:
-        return 'Flexible Timeline';
+        return "Flexible Timeline";
     }
   };
 
   const commonTrades = [
-    'General Contractor', 'Electrician', 'Plumber', 'HVAC', 'Carpenter',
-    'Painter', 'Roofer', 'Landscaper', 'Handyman', 'Other'
+    "General Contractor",
+    "Electrician",
+    "Plumber",
+    "HVAC",
+    "Carpenter",
+    "Painter",
+    "Roofer",
+    "Landscaper",
+    "Handyman",
+    "Other",
   ];
 
   const benefits = [
@@ -184,38 +189,38 @@ const ExternalBidCardLanding: React.FC = () => {
       icon: Shield,
       title: "Zero Lead Fees",
       description: "Submit unlimited quotes for free. Pay only when you win the job.",
-      gradient: "from-green-400 to-green-600"
+      gradient: "from-green-400 to-green-600",
     },
     {
       icon: Target,
       title: "Pre-Qualified Projects",
       description: "Every homeowner has confirmed budget and is ready to hire immediately.",
-      gradient: "from-blue-400 to-blue-600"
+      gradient: "from-blue-400 to-blue-600",
     },
     {
       icon: TrendingUp,
       title: "Higher Win Rates",
       description: "Our contractors average 40% higher win rates than industry standard.",
-      gradient: "from-purple-400 to-purple-600"
+      gradient: "from-purple-400 to-purple-600",
     },
     {
       icon: Zap,
       title: "Instant Notifications",
       description: "Get notified within minutes of new projects in your area.",
-      gradient: "from-yellow-400 to-yellow-600"
-    }
+      gradient: "from-yellow-400 to-yellow-600",
+    },
   ];
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <motion.div 
+        <motion.div
           className="text-center"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6 }}
         >
-          <motion.div 
+          <motion.div
             className="w-16 h-16 border-4 border-white border-t-transparent rounded-full mx-auto mb-4"
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -237,7 +242,7 @@ const ExternalBidCardLanding: React.FC = () => {
 
       <div className="relative z-10">
         {/* Hero Section */}
-        <motion.div 
+        <motion.div
           className="text-center pt-20 pb-16 px-4"
           initial={{ opacity: 0, y: -50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -253,7 +258,7 @@ const ExternalBidCardLanding: React.FC = () => {
             <span className="text-sm text-white/90">Trusted by 10,000+ contractors</span>
           </motion.div>
 
-          <motion.h1 
+          <motion.h1
             className="text-5xl md:text-7xl font-bold text-white mb-6"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -265,7 +270,7 @@ const ExternalBidCardLanding: React.FC = () => {
             </span>
           </motion.h1>
 
-          <motion.p 
+          <motion.p
             className="text-xl md:text-2xl text-white/80 mb-8 max-w-2xl mx-auto"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -275,7 +280,7 @@ const ExternalBidCardLanding: React.FC = () => {
           </motion.p>
 
           {/* Stats */}
-          <motion.div 
+          <motion.div
             className="flex justify-center gap-8 md:gap-16 mb-16"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -284,9 +289,9 @@ const ExternalBidCardLanding: React.FC = () => {
             {[
               { label: "Projects Available", value: "500+" },
               { label: "Active Contractors", value: "10K+" },
-              { label: "Jobs Completed", value: "$50M+" }
+              { label: "Jobs Completed", value: "$50M+" },
             ].map((stat, index) => (
-              <motion.div 
+              <motion.div
                 key={index}
                 className="text-center"
                 whileHover={{ scale: 1.05 }}
@@ -301,13 +306,13 @@ const ExternalBidCardLanding: React.FC = () => {
 
         {/* Dynamic Bid Card Showcase */}
         {bidCard && (
-          <motion.div 
+          <motion.div
             className="max-w-6xl mx-auto px-4 mb-20"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.8 }}
           >
-            <motion.div 
+            <motion.div
               className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 border border-white/20 shadow-2xl"
               whileHover={{ y: -5 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -324,7 +329,7 @@ const ExternalBidCardLanding: React.FC = () => {
               <div className="grid lg:grid-cols-2 gap-8">
                 {/* Project Details */}
                 <div>
-                  <motion.h2 
+                  <motion.h2
                     className="text-3xl md:text-4xl font-bold text-white mb-4"
                     initial={{ opacity: 0, x: -30 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -345,11 +350,14 @@ const ExternalBidCardLanding: React.FC = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     {[
-                      { icon: MapPin, label: `${bidCard.location.city}, ${bidCard.location.state}` },
+                      {
+                        icon: MapPin,
+                        label: `${bidCard.location.city}, ${bidCard.location.state}`,
+                      },
                       { icon: DollarSign, label: bidCard.budget_display },
-                      { icon: Users, label: `${bidCard.contractor_count} needed` }
+                      { icon: Users, label: `${bidCard.contractor_count} needed` },
                     ].map((item, index) => (
-                      <motion.div 
+                      <motion.div
                         key={index}
                         className="flex items-center gap-2 text-white/90"
                         initial={{ opacity: 0, x: -20 }}
@@ -371,7 +379,7 @@ const ExternalBidCardLanding: React.FC = () => {
                       <h3 className="text-lg font-semibold text-white mb-3">Project Scope:</h3>
                       <ul className="space-y-2">
                         {bidCard.project_details.scope_of_work.slice(0, 3).map((item, index) => (
-                          <motion.li 
+                          <motion.li
                             key={index}
                             className="flex items-start gap-2 text-white/80"
                             initial={{ opacity: 0, x: -20 }}
@@ -389,7 +397,7 @@ const ExternalBidCardLanding: React.FC = () => {
 
                 {/* Photo Gallery */}
                 {bidCard.photo_urls && bidCard.photo_urls.length > 0 && (
-                  <motion.div 
+                  <motion.div
                     className="relative"
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -408,7 +416,7 @@ const ExternalBidCardLanding: React.FC = () => {
                           transition={{ duration: 0.5 }}
                         />
                       </AnimatePresence>
-                      
+
                       {/* Photo Count Badge */}
                       <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
                         <Camera className="w-4 h-4 text-white" />
@@ -421,9 +429,10 @@ const ExternalBidCardLanding: React.FC = () => {
                           {bidCard.photo_urls.map((_, index) => (
                             <button
                               key={index}
-                              onClick={() => setCurrentPhotoIndex(index)}
+                              type="button"
+                              onClick={match.match(/onClick={[^}]+}/)[0]}
                               className={`w-2 h-2 rounded-full transition-all ${
-                                index === currentPhotoIndex ? 'bg-white' : 'bg-white/40'
+                                index === currentPhotoIndex ? "bg-white" : "bg-white/40"
                               }`}
                             />
                           ))}
@@ -438,7 +447,7 @@ const ExternalBidCardLanding: React.FC = () => {
         )}
 
         {/* Benefits Section */}
-        <motion.div 
+        <motion.div
           className="max-w-6xl mx-auto px-4 mb-20"
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -463,7 +472,9 @@ const ExternalBidCardLanding: React.FC = () => {
                 transition={{ delay: 1.0 + index * 0.1, duration: 0.6 }}
                 whileHover={{ y: -5, scale: 1.02 }}
               >
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${benefit.gradient} flex items-center justify-center mb-4`}>
+                <div
+                  className={`w-12 h-12 rounded-xl bg-gradient-to-br ${benefit.gradient} flex items-center justify-center mb-4`}
+                >
                   <benefit.icon className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">{benefit.title}</h3>
@@ -474,7 +485,7 @@ const ExternalBidCardLanding: React.FC = () => {
         </motion.div>
 
         {/* Signup Form */}
-        <motion.div 
+        <motion.div
           className="max-w-2xl mx-auto px-4 pb-20"
           initial={{ opacity: 0, y: 50 }}
           animate={{ opacity: 1, y: 0 }}
@@ -489,10 +500,10 @@ const ExternalBidCardLanding: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { name: 'firstName', label: 'First Name', type: 'text' },
-                  { name: 'lastName', label: 'Last Name', type: 'text' }
+                  { name: "firstName", label: "First Name", type: "text" },
+                  { name: "lastName", label: "Last Name", type: "text" },
                 ].map((field, index) => (
-                  <motion.div 
+                  <motion.div
                     key={field.name}
                     initial={{ opacity: 0, x: index === 0 ? -20 : 20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -514,19 +525,19 @@ const ExternalBidCardLanding: React.FC = () => {
               </div>
 
               {[
-                { name: 'email', label: 'Email Address', type: 'email' },
-                { name: 'phone', label: 'Phone Number', type: 'tel' },
-                { name: 'company', label: 'Company Name', type: 'text', required: false },
-                { name: 'zipCode', label: 'Service Area ZIP Code', type: 'text' }
+                { name: "email", label: "Email Address", type: "email" },
+                { name: "phone", label: "Phone Number", type: "tel" },
+                { name: "company", label: "Company Name", type: "text", required: false },
+                { name: "zipCode", label: "Service Area ZIP Code", type: "text" },
               ].map((field, index) => (
-                <motion.div 
+                <motion.div
                   key={field.name}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 1.4 + index * 0.1, duration: 0.6 }}
                 >
                   <label className="block text-sm font-medium text-white/90 mb-2">
-                    {field.label} {field.required !== false && '*'}
+                    {field.label} {field.required !== false && "*"}
                   </label>
                   <input
                     type={field.type}
@@ -554,9 +565,13 @@ const ExternalBidCardLanding: React.FC = () => {
                   onChange={handleInputChange}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm transition-all"
                 >
-                  <option value="" className="bg-gray-800">Select your trade</option>
-                  {commonTrades.map(trade => (
-                    <option key={trade} value={trade} className="bg-gray-800">{trade}</option>
+                  <option value="" className="bg-gray-800">
+                    Select your trade
+                  </option>
+                  {commonTrades.map((trade) => (
+                    <option key={trade} value={trade} className="bg-gray-800">
+                      {trade}
+                    </option>
                   ))}
                 </select>
               </motion.div>
@@ -574,7 +589,7 @@ const ExternalBidCardLanding: React.FC = () => {
                 <ArrowRight className="w-5 h-5" />
               </motion.button>
 
-              <motion.p 
+              <motion.p
                 className="text-xs text-white/50 text-center"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

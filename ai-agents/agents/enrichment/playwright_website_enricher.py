@@ -3,10 +3,9 @@ Playwright-based Website Enrichment Agent
 Uses MCP Playwright tools to intelligently extract business information
 """
 import re
-import json
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
-import asyncio
+from dataclasses import asdict, dataclass
+from typing import Any, Optional
+
 
 @dataclass
 class EnrichedContractorData:
@@ -14,18 +13,18 @@ class EnrichedContractorData:
     email: Optional[str] = None
     phone: Optional[str] = None  # Additional phones found
     business_size: Optional[str] = None
-    service_types: List[str] = None
+    service_types: list[str] = None
     service_description: Optional[str] = None
-    service_areas: List[str] = None  # Zip codes
+    service_areas: list[str] = None  # Zip codes
     team_size_estimate: Optional[str] = None
     years_in_business: Optional[int] = None
     about_text: Optional[str] = None
-    business_hours: Optional[Dict[str, str]] = None
-    social_media: Optional[Dict[str, str]] = None
-    certifications: List[str] = None
-    gallery_images: List[str] = None
-    
-    def to_dict(self) -> Dict[str, Any]:
+    business_hours: Optional[dict[str, str]] = None
+    social_media: Optional[dict[str, str]] = None
+    certifications: list[str] = None
+    gallery_images: list[str] = None
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for database storage"""
         data = asdict(self)
         # Remove None values
@@ -36,232 +35,232 @@ class PlaywrightWebsiteEnricher:
     Advanced website enrichment using Playwright MCP tools
     Intelligently navigates websites to extract comprehensive business data
     """
-    
+
     def __init__(self, mcp_client=None, llm_client=None):
         self.mcp_client = mcp_client  # For calling MCP tools
         self.llm_client = llm_client  # For intelligent content analysis
         self.browser_initialized = False
-        
-    async def enrich_contractor_from_website(self, contractor_data: Dict[str, Any]) -> EnrichedContractorData:
+
+    async def enrich_contractor_from_website(self, contractor_data: dict[str, Any]) -> EnrichedContractorData:
         """
         Main enrichment method - uses Playwright to extract everything from website
         """
-        website = contractor_data.get('website')
+        website = contractor_data.get("website")
         if not website:
             return EnrichedContractorData()
-            
+
         try:
             print(f"[PlaywrightEnricher] Starting enrichment for {website}")
-            
+
             # Initialize browser if needed
             if not self.browser_initialized:
                 await self._initialize_browser()
-            
+
             # Navigate to website
             await self._navigate_to_website(website)
-            
+
             # Take screenshot for visual analysis
-            screenshot_data = await self._capture_screenshot()
-            
+            await self._capture_screenshot()
+
             # Get page content
             page_content = await self._get_page_content()
-            
+
             # Extract structured data using multiple strategies
             enriched = EnrichedContractorData()
-            
+
             # 1. Extract contact information
             contact_data = await self._extract_contact_info(page_content)
-            enriched.email = contact_data.get('email')
-            enriched.phone = contact_data.get('phone')
-            enriched.business_hours = contact_data.get('hours')
-            
+            enriched.email = contact_data.get("email")
+            enriched.phone = contact_data.get("phone")
+            enriched.business_hours = contact_data.get("hours")
+
             # 2. Analyze business size and type
             enriched.business_size = await self._analyze_business_size(
-                page_content, 
-                contractor_data.get('company_name'),
-                contractor_data.get('google_review_count', 0)
+                page_content,
+                contractor_data.get("company_name"),
+                contractor_data.get("google_review_count", 0)
             )
-            
+
             # 3. Extract service information
             service_data = await self._extract_service_info(page_content)
-            enriched.service_types = service_data.get('types', [])
-            enriched.service_description = service_data.get('description')
-            enriched.certifications = service_data.get('certifications', [])
-            
+            enriched.service_types = service_data.get("types", [])
+            enriched.service_description = service_data.get("description")
+            enriched.certifications = service_data.get("certifications", [])
+
             # 4. Extract service areas
             enriched.service_areas = await self._extract_service_areas(page_content)
-            
+
             # 5. Look for About/Company info
             about_data = await self._extract_about_info()
-            enriched.about_text = about_data.get('about_text')
-            enriched.years_in_business = about_data.get('years_in_business')
-            enriched.team_size_estimate = about_data.get('team_size')
-            
+            enriched.about_text = about_data.get("about_text")
+            enriched.years_in_business = about_data.get("years_in_business")
+            enriched.team_size_estimate = about_data.get("team_size")
+
             # 6. Find social media links
             enriched.social_media = await self._extract_social_media_links()
-            
+
             # 7. Check for gallery/portfolio
             enriched.gallery_images = await self._extract_gallery_images()
-            
+
             # 8. Use LLM for intelligent analysis if available
             if self.llm_client and page_content:
                 llm_insights = await self._get_llm_insights(
-                    page_content, 
-                    contractor_data.get('project_type'),
-                    contractor_data.get('company_name')
+                    page_content,
+                    contractor_data.get("project_type"),
+                    contractor_data.get("company_name")
                 )
                 # Merge LLM insights with extracted data
-                if llm_insights.get('service_description') and not enriched.service_description:
-                    enriched.service_description = llm_insights['service_description']
-                if llm_insights.get('business_size') and not enriched.business_size:
-                    enriched.business_size = llm_insights['business_size']
-            
+                if llm_insights.get("service_description") and not enriched.service_description:
+                    enriched.service_description = llm_insights["service_description"]
+                if llm_insights.get("business_size") and not enriched.business_size:
+                    enriched.business_size = llm_insights["business_size"]
+
             print(f"[PlaywrightEnricher] Enrichment complete for {website}")
             return enriched
-            
+
         except Exception as e:
             print(f"[PlaywrightEnricher] Error enriching {website}: {e}")
             return EnrichedContractorData()
-    
+
     async def _initialize_browser(self):
         """Initialize Playwright browser"""
         # This would call mcp__playwright__browser_install if needed
         self.browser_initialized = True
         print("[PlaywrightEnricher] Browser initialized")
-    
+
     async def _navigate_to_website(self, url: str):
         """Navigate to contractor website"""
         # This would call mcp__playwright__browser_navigate
         print(f"[PlaywrightEnricher] Navigating to {url}")
         # In real implementation:
         # await self.mcp_client.call('mcp__playwright__browser_navigate', {'url': url})
-    
+
     async def _capture_screenshot(self) -> Optional[str]:
         """Capture screenshot for analysis"""
         # This would call mcp__playwright__browser_take_screenshot
         print("[PlaywrightEnricher] Capturing screenshot")
         return None
-    
+
     async def _get_page_content(self) -> str:
         """Get full page content"""
         # This would call mcp__playwright__browser_snapshot or browser_evaluate
         print("[PlaywrightEnricher] Getting page content")
         return ""
-    
-    async def _extract_contact_info(self, content: str) -> Dict[str, Any]:
+
+    async def _extract_contact_info(self, content: str) -> dict[str, Any]:
         """Extract contact information from page"""
         contact_data = {}
-        
+
         # Email pattern
-        email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        email_pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
         emails = re.findall(email_pattern, content)
         if emails:
             # Filter out images and non-business emails
             for email in emails:
-                if not any(ext in email for ext in ['.png', '.jpg', '.gif']):
-                    contact_data['email'] = email
+                if not any(ext in email for ext in [".png", ".jpg", ".gif"]):
+                    contact_data["email"] = email
                     break
-        
+
         # Phone pattern
-        phone_pattern = r'(?:\+?1[-.]?)?\(?(\d{3})\)?[-.]?(\d{3})[-.]?(\d{4})'
+        phone_pattern = r"(?:\+?1[-.]?)?\(?(\d{3})\)?[-.]?(\d{3})[-.]?(\d{4})"
         phones = re.findall(phone_pattern, content)
         if phones:
             area, prefix, number = phones[0]
-            contact_data['phone'] = f"({area}) {prefix}-{number}"
-        
+            contact_data["phone"] = f"({area}) {prefix}-{number}"
+
         # Business hours pattern
-        hours_pattern = r'(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[\s\-:]+(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)\s*[-–]\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)'
+        hours_pattern = r"(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[\s\-:]+(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)\s*[-–]\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)"
         hours_matches = re.findall(hours_pattern, content)
         if hours_matches:
-            contact_data['hours'] = {
-                'weekday': hours_matches[0] if hours_matches else None
+            contact_data["hours"] = {
+                "weekday": hours_matches[0] if hours_matches else None
             }
-        
+
         return contact_data
-    
+
     async def _analyze_business_size(self, content: str, company_name: str, review_count: int) -> str:
         """Determine business size category"""
         content_lower = content.lower()
-        name_lower = company_name.lower()
-        
+        company_name.lower()
+
         # National company indicators
         national_indicators = [
-            'franchise', 'nationwide', 'locations across', 'national', 
-            'corporate', 'fortune', '© 20', 'all rights reserved',
-            'multiple locations', 'serving america', 'coast to coast'
+            "franchise", "nationwide", "locations across", "national",
+            "corporate", "fortune", "© 20", "all rights reserved",
+            "multiple locations", "serving america", "coast to coast"
         ]
         if any(indicator in content_lower for indicator in national_indicators) or review_count > 500:
-            return 'NATIONAL_COMPANY'
-        
+            return "NATIONAL_COMPANY"
+
         # Local business with teams indicators
         team_indicators = [
-            'our team', 'our crews', 'employees', 'staff', 'technicians',
-            'fleet', 'trucks', 'established', 'since 19', 'since 20',
-            'our professionals', 'certified team', 'expert team'
+            "our team", "our crews", "employees", "staff", "technicians",
+            "fleet", "trucks", "established", "since 19", "since 20",
+            "our professionals", "certified team", "expert team"
         ]
         if (any(indicator in content_lower for indicator in team_indicators) and review_count > 30) or review_count > 100:
-            return 'LOCAL_BUSINESS_TEAMS'
-        
+            return "LOCAL_BUSINESS_TEAMS"
+
         # Owner operator indicators
         owner_indicators = [
-            'owner operated', 'family owned', 'family business', 
-            'locally owned', "i'm", "i am", "my name is",
-            'small business', 'independent'
+            "owner operated", "family owned", "family business",
+            "locally owned", "i'm", "i am", "my name is",
+            "small business", "independent"
         ]
         if any(indicator in content_lower for indicator in owner_indicators) or (10 < review_count <= 100):
-            return 'OWNER_OPERATOR'
-        
+            return "OWNER_OPERATOR"
+
         # Default to individual/handyman for small or unclear
-        return 'INDIVIDUAL_HANDYMAN'
-    
-    async def _extract_service_info(self, content: str) -> Dict[str, Any]:
+        return "INDIVIDUAL_HANDYMAN"
+
+    async def _extract_service_info(self, content: str) -> dict[str, Any]:
         """Extract service types and descriptions"""
         content_lower = content.lower()
         service_data = {
-            'types': [],
-            'description': None,
-            'certifications': []
+            "types": [],
+            "description": None,
+            "certifications": []
         }
-        
+
         # Service types
-        if any(word in content_lower for word in ['repair', 'fix', 'broken', 'damage', 'restore']):
-            service_data['types'].append('REPAIR')
-            
-        if any(word in content_lower for word in ['install', 'new', 'replacement', 'upgrade', 'setup']):
-            service_data['types'].append('INSTALLATION')
-            
-        if any(word in content_lower for word in ['maintenance', 'monthly', 'weekly', 'service plan', 'contract', 'regular']):
-            service_data['types'].append('MAINTENANCE')
-            
-        if any(word in content_lower for word in ['emergency', '24/7', '24 hour', 'urgent', 'same day', 'immediate']):
-            service_data['types'].append('EMERGENCY')
-            
-        if any(word in content_lower for word in ['consultation', 'estimate', 'quote', 'assessment', 'inspection']):
-            service_data['types'].append('CONSULTATION')
-        
+        if any(word in content_lower for word in ["repair", "fix", "broken", "damage", "restore"]):
+            service_data["types"].append("REPAIR")
+
+        if any(word in content_lower for word in ["install", "new", "replacement", "upgrade", "setup"]):
+            service_data["types"].append("INSTALLATION")
+
+        if any(word in content_lower for word in ["maintenance", "monthly", "weekly", "service plan", "contract", "regular"]):
+            service_data["types"].append("MAINTENANCE")
+
+        if any(word in content_lower for word in ["emergency", "24/7", "24 hour", "urgent", "same day", "immediate"]):
+            service_data["types"].append("EMERGENCY")
+
+        if any(word in content_lower for word in ["consultation", "estimate", "quote", "assessment", "inspection"]):
+            service_data["types"].append("CONSULTATION")
+
         # Default to maintenance if nothing specific found
-        if not service_data['types']:
-            service_data['types'] = ['MAINTENANCE']
-        
+        if not service_data["types"]:
+            service_data["types"] = ["MAINTENANCE"]
+
         # Extract certifications
         cert_patterns = [
-            r'licensed\s+(?:and\s+)?(?:insured|bonded)',
-            r'certified\s+\w+',
-            r'accredited\s+by\s+\w+',
-            r'member\s+of\s+\w+'
+            r"licensed\s+(?:and\s+)?(?:insured|bonded)",
+            r"certified\s+\w+",
+            r"accredited\s+by\s+\w+",
+            r"member\s+of\s+\w+"
         ]
         for pattern in cert_patterns:
             matches = re.findall(pattern, content_lower)
-            service_data['certifications'].extend(matches)
-        
+            service_data["certifications"].extend(matches)
+
         return service_data
-    
-    async def _extract_service_areas(self, content: str) -> List[str]:
+
+    async def _extract_service_areas(self, content: str) -> list[str]:
         """Extract zip codes served"""
         # Find all 5-digit zip codes
-        zip_pattern = r'\b\d{5}\b'
+        zip_pattern = r"\b\d{5}\b"
         zips = list(set(re.findall(zip_pattern, content)))
-        
+
         # Filter out years and other 5-digit numbers
         valid_zips = []
         for zip_code in zips:
@@ -269,77 +268,77 @@ class PlaywrightWebsiteEnricher:
                 # Additional check - not a year
                 if not (1900 <= int(zip_code) <= 2100):
                     valid_zips.append(zip_code)
-        
+
         return valid_zips
-    
-    async def _extract_about_info(self) -> Dict[str, Any]:
+
+    async def _extract_about_info(self) -> dict[str, Any]:
         """Navigate to About page and extract company info"""
         # This would use Playwright to click on About link and extract info
         # mcp__playwright__browser_click to click About link
         # mcp__playwright__browser_snapshot to get About page content
         return {
-            'about_text': None,
-            'years_in_business': None,
-            'team_size': None
+            "about_text": None,
+            "years_in_business": None,
+            "team_size": None
         }
-    
-    async def _extract_social_media_links(self) -> Dict[str, str]:
+
+    async def _extract_social_media_links(self) -> dict[str, str]:
         """Find social media profile links"""
         # This would use mcp__playwright__browser_evaluate to find links
         return {}
-    
-    async def _extract_gallery_images(self) -> List[str]:
+
+    async def _extract_gallery_images(self) -> list[str]:
         """Find portfolio/gallery images"""
         # This would navigate to gallery page and extract image URLs
         return []
-    
-    async def _get_llm_insights(self, content: str, project_type: str, company_name: str) -> Dict[str, Any]:
+
+    async def _get_llm_insights(self, content: str, project_type: str, company_name: str) -> dict[str, Any]:
         """Use LLM to intelligently analyze website content"""
         if not self.llm_client:
             return {}
-        
-        prompt = f"""
+
+        f"""
         Analyze this contractor website content and extract:
         1. A concise service description (max 200 words) focusing on {project_type} services
         2. Business size classification: INDIVIDUAL_HANDYMAN, OWNER_OPERATOR, LOCAL_BUSINESS_TEAMS, or NATIONAL_COMPANY
         3. Key specialties related to {project_type}
         4. Any unique selling points or differentiators
-        
+
         Company: {company_name}
         Content: {content[:3000]}...
-        
+
         Return as JSON with keys: service_description, business_size, specialties, unique_points
         """
-        
+
         # This would call the LLM
         # response = await self.llm_client.complete(prompt)
         # return json.loads(response)
-        
+
         return {}
 
 # Example usage with MCP integration
-async def enrich_contractor_with_mcp(contractor_data: Dict[str, Any], mcp_client) -> Dict[str, Any]:
+async def enrich_contractor_with_mcp(contractor_data: dict[str, Any], mcp_client) -> dict[str, Any]:
     """
     Example of how to use the enricher with MCP tools
     """
-    enricher = PlaywrightWebsiteEnricher(mcp_client=mcp_client)
-    
+    PlaywrightWebsiteEnricher(mcp_client=mcp_client)
+
     # Navigate to website
-    await mcp_client.call('mcp__playwright__browser_navigate', {
-        'url': contractor_data['website']
+    await mcp_client.call("mcp__playwright__browser_navigate", {
+        "url": contractor_data["website"]
     })
-    
+
     # Wait for page to load
-    await mcp_client.call('mcp__playwright__browser_wait_for', {
-        'time': 2  # Wait 2 seconds
+    await mcp_client.call("mcp__playwright__browser_wait_for", {
+        "time": 2  # Wait 2 seconds
     })
-    
+
     # Get page snapshot
-    snapshot = await mcp_client.call('mcp__playwright__browser_snapshot', {})
-    
+    await mcp_client.call("mcp__playwright__browser_snapshot", {})
+
     # Extract emails using JavaScript
-    emails = await mcp_client.call('mcp__playwright__browser_evaluate', {
-        'function': """
+    await mcp_client.call("mcp__playwright__browser_evaluate", {
+        "function": r"""
         () => {
             const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
             const text = document.body.innerText;
@@ -348,13 +347,13 @@ async def enrich_contractor_with_mcp(contractor_data: Dict[str, Any], mcp_client
         }
         """
     })
-    
+
     # Check for contact page
-    contact_link = await mcp_client.call('mcp__playwright__browser_evaluate', {
-        'function': """
+    contact_link = await mcp_client.call("mcp__playwright__browser_evaluate", {
+        "function": """
         () => {
             const links = Array.from(document.querySelectorAll('a'));
-            const contactLink = links.find(a => 
+            const contactLink = links.find(a =>
                 a.textContent.toLowerCase().includes('contact') ||
                 a.href.toLowerCase().includes('contact')
             );
@@ -362,14 +361,14 @@ async def enrich_contractor_with_mcp(contractor_data: Dict[str, Any], mcp_client
         }
         """
     })
-    
+
     if contact_link:
         # Navigate to contact page
-        await mcp_client.call('mcp__playwright__browser_navigate', {
-            'url': contact_link
+        await mcp_client.call("mcp__playwright__browser_navigate", {
+            "url": contact_link
         })
-        
+
         # Extract more contact info
         # ... more extraction logic
-    
+
     return enriched_data

@@ -1,21 +1,30 @@
-import React from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
-import { AuthProvider } from '@/contexts/AuthContext'
-import HomePage from '@/pages/HomePage'
-import LoginPage from '@/pages/LoginPage'
-import SignupPage from '@/pages/SignupPage'
-import DashboardPage from '@/pages/DashboardPage'
-import ContractorDashboardPage from '@/pages/ContractorDashboardPage'
-import ChatPage from '@/pages/ChatPage'
-import TestPage from '@/pages/TestPage'
-import WebRTCTestPage from '@/pages/WebRTCTestPage'
-import AuthCallbackPage from '@/pages/AuthCallbackPage'
-import ProjectDetailPage from '@/pages/ProjectDetailPage'
-import ExternalBidCardDemo from '@/pages/ExternalBidCardDemo'
-import ExternalBidCardLanding from '@/pages/ExternalBidCardLanding'
-import ContractorHeroLanding from '@/pages/ContractorHeroLanding'
-import ProtectedRoute from '@/components/auth/ProtectedRoute'
+import { Toaster } from "react-hot-toast";
+// Docker Live Reload Test - Agent 6
+import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import HomeownerProjectWorkspace from "@/components/HomeownerProjectWorkspace";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { AdminAuthProvider } from "@/hooks/useAdminAuth";
+import AuthCallbackPage from "@/pages/AuthCallbackPage";
+import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
+import AdminLoginPage from "@/pages/admin/AdminLoginPage";
+import BidCardTest from "@/pages/BidCardTest";
+import ChatPage from "@/pages/ChatPage";
+import CIATestPage from "@/pages/CIATestPage";
+import ContractorDashboardPage from "@/pages/ContractorDashboardPage";
+import ContractorLandingPage from "@/pages/contractor/ContractorLandingPage";
+import DashboardPage from "@/pages/DashboardPage";
+import ExternalBidCardDemo from "@/pages/ExternalBidCardDemo";
+import ExternalBidCardLanding from "@/pages/ExternalBidCardLanding";
+import HomePage from "@/pages/HomePage";
+import InspirationDemo from "@/pages/InspirationDemo";
+import LoginPage from "@/pages/LoginPage";
+import ProjectDetailPage from "@/pages/ProjectDetailPage";
+import SignupPage from "@/pages/SignupPage";
+import TestPage from "@/pages/TestPage";
+import WebRTCTestPage from "@/pages/WebRTCTestPage";
+import { MessagingDemo } from "@/test/MessagingDemo";
+import { TestMessagingPage } from "@/test/test-messaging-api";
 
 function App() {
   return (
@@ -27,11 +36,29 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/test" element={<TestPage />} />
+            <Route path="/bid-card-test" element={<BidCardTest />} />
+            <Route path="/cia-test" element={<CIATestPage />} />
+            <Route path="/test-messaging" element={<TestMessagingPage />} />
+            <Route path="/messaging-demo" element={<MessagingDemo />} />
+            <Route path="/inspiration-demo" element={<InspirationDemo />} />
+            <Route path="/demo/homeowner" element={<InspirationDemo />} />
+            <Route path="/demo/homeowner/inspiration" element={<InspirationDemo />} />
             <Route path="/webrtc-test" element={<WebRTCTestPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/external-bid-card-demo" element={<ExternalBidCardDemo />} />
             <Route path="/join" element={<ExternalBidCardLanding />} />
-            <Route path="/contractor" element={<ContractorHeroLanding />} />
+            <Route path="/contractor" element={<ContractorLandingPage />} />
+            <Route
+              path="/admin/*"
+              element={
+                <AdminAuthProvider>
+                  <Routes>
+                    <Route path="login" element={<AdminLoginPage />} />
+                    <Route path="dashboard" element={<AdminDashboardPage />} />
+                  </Routes>
+                </AdminAuthProvider>
+              }
+            />
             <Route
               path="/dashboard"
               element={
@@ -64,13 +91,21 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/bid-cards/:id"
+              element={
+                <ProtectedRoute requiredRole="homeowner">
+                  <HomeownerProjectWorkspace />
+                </ProtectedRoute>
+              }
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <Toaster position="top-right" />
         </div>
       </AuthProvider>
     </Router>
-  )
+  );
 }
 
-export default App
+export default App;

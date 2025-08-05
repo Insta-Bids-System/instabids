@@ -118,6 +118,11 @@
             transform: translateY(-2px);
         }
         
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
         .success-message {
             background: #dcfce7;
             border: 2px solid #bbf7d0;
@@ -126,6 +131,18 @@
             border-radius: 5px;
             margin-top: 20px;
             text-align: center;
+            display: none;
+        }
+        
+        .error-message {
+            background: #fee2e2;
+            border: 2px solid #fecaca;
+            color: #991b1b;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
         }
         
         .company-info {
@@ -138,6 +155,51 @@
         .company-info h3 {
             color: #16a34a;
             margin-bottom: 10px;
+        }
+        
+        .submissions-panel {
+            background: #f3f4f6;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 40px;
+        }
+        
+        .submissions-panel h3 {
+            color: #16a34a;
+            margin-bottom: 15px;
+        }
+        
+        .submission-item {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 4px solid #22c55e;
+        }
+        
+        .submission-time {
+            color: #6b7280;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        
+        .submission-data {
+            font-size: 0.9em;
+        }
+        
+        .clear-btn {
+            background: #ef4444;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .clear-btn:hover {
+            background: #dc2626;
         }
     </style>
 </head>
@@ -226,13 +288,146 @@
                               placeholder="Please describe your business opportunity, lead generation service, or partnership proposal..."></textarea>
                 </div>
                 
-                <button type="submit" class="submit-btn">
+                <button type="submit" class="submit-btn" id="submitBtn">
                     🚀 Submit Business Opportunity
                 </button>
                 
-                <div id="submitResult"></div>
+                <div id="successMessage" class="success-message">
+                    ✅ Thank you! Your submission has been received successfully.
+                </div>
+                
+                <div id="errorMessage" class="error-message">
+                    ❌ There was an error submitting the form. Please try again.
+                </div>
             </form>
         </div>
+        
+        <!-- Submissions Panel for Testing -->
+        <div class="submissions-panel" id="submissionsPanel">
+            <h3>📋 Form Submissions (For Testing)</h3>
+            <p style="color: #6b7280; font-size: 0.9em;">This panel shows all form submissions stored locally. Only visible for testing purposes.</p>
+            <div id="submissionsList"></div>
+            <button class="clear-btn" onclick="clearSubmissions()">Clear All Submissions</button>
+        </div>
     </div>
+
+    <script>
+        // Form submission handler
+        document.getElementById('businessForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const successMsg = document.getElementById('successMessage');
+            const errorMsg = document.getElementById('errorMessage');
+            
+            // Hide any previous messages
+            successMsg.style.display = 'none';
+            errorMsg.style.display = 'none';
+            
+            // Disable submit button
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Submitting...';
+            
+            // Get form data
+            const formData = new FormData(this);
+            const submission = {
+                timestamp: new Date().toISOString(),
+                data: Object.fromEntries(formData),
+                userAgent: navigator.userAgent,
+                referrer: document.referrer || 'Direct'
+            };
+            
+            try {
+                // Store in localStorage
+                let submissions = JSON.parse(localStorage.getItem('greenLawnProSubmissions') || '[]');
+                submissions.push(submission);
+                localStorage.setItem('greenLawnProSubmissions', JSON.stringify(submissions));
+                
+                // Optional: Send to webhook (uncomment and replace with your webhook URL)
+                /*
+                await fetch('YOUR_WEBHOOK_URL_HERE', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(submission)
+                });
+                */
+                
+                // Optional: Send to email using EmailJS (uncomment and set up)
+                /*
+                emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', {
+                    to_email: 'your-email@example.com',
+                    from_name: submission.data.contact_name,
+                    from_email: submission.data.email,
+                    company: submission.data.company_name,
+                    phone: submission.data.phone,
+                    message: submission.data.message,
+                    timestamp: new Date().toLocaleString()
+                });
+                */
+                
+                // Show success message
+                successMsg.style.display = 'block';
+                
+                // Reset form
+                this.reset();
+                
+                // Update submissions display
+                displaySubmissions();
+                
+                // Log to console for debugging
+                console.log('Form submitted successfully:', submission);
+                
+            } catch (error) {
+                console.error('Error submitting form:', error);
+                errorMsg.style.display = 'block';
+            } finally {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🚀 Submit Business Opportunity';
+            }
+        });
+        
+        // Display submissions
+        function displaySubmissions() {
+            const submissions = JSON.parse(localStorage.getItem('greenLawnProSubmissions') || '[]');
+            const submissionsList = document.getElementById('submissionsList');
+            
+            if (submissions.length === 0) {
+                submissionsList.innerHTML = '<p style="color: #9ca3af;">No submissions yet.</p>';
+                return;
+            }
+            
+            submissionsList.innerHTML = submissions.reverse().map((sub, index) => `
+                <div class="submission-item">
+                    <div class="submission-time">
+                        <strong>Submission #${submissions.length - index}</strong> - ${new Date(sub.timestamp).toLocaleString()}
+                    </div>
+                    <div class="submission-data">
+                        <strong>Company:</strong> ${sub.data.company_name}<br>
+                        <strong>Contact:</strong> ${sub.data.contact_name}<br>
+                        <strong>Email:</strong> ${sub.data.email}<br>
+                        <strong>Phone:</strong> ${sub.data.phone}<br>
+                        <strong>Website:</strong> ${sub.data.website || 'Not provided'}<br>
+                        <strong>Type:</strong> ${sub.data.opportunity_type || 'Not specified'}<br>
+                        <strong>Message:</strong> ${sub.data.message}<br>
+                        <strong>User Agent:</strong> <small>${sub.userAgent}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Clear all submissions
+        function clearSubmissions() {
+            if (confirm('Are you sure you want to clear all submissions?')) {
+                localStorage.removeItem('greenLawnProSubmissions');
+                displaySubmissions();
+            }
+        }
+        
+        // Load submissions on page load
+        displaySubmissions();
+    </script>
 </body>
 </html>

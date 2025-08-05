@@ -28,24 +28,38 @@ You are **Agent 3** - responsible for the **homeowner's logged-in experience** i
 
 ## 🗂️ **FILE OWNERSHIP - WHAT YOU CONTROL**
 
-### **✅ YOUR CODE** (Simple List)
+### **⚠️ REFACTORING UPDATE** (August 2, 2025)
+**main.py has been refactored!** Your endpoints are now in modular router files:
+
+### **✅ YOUR CODE** (Updated Structure)
 ```
 # AI AGENT
 ai-agents/agents/iris/        # Inspiration AI system
+
+# 🆕 NEW: ROUTER FILES (Your API Endpoints)
+ai-agents/routers/homeowner_routes.py  # Your homeowner dashboard endpoints
+ai-agents/main.py                      # Now only ~100 lines (imports your routers)
 
 # FRONTEND  
 web/src/components/inspiration/  # Inspiration board UI
 web/src/components/dashboard/    # Homeowner dashboard (minimal)
 web/src/pages/DashboardPage.tsx  # Main dashboard page
 
-# API ENDPOINTS
-ai-agents/api/iris_chat.py       # Iris chat API
-ai-agents/api/inspiration_boards.py  # Board operations
-ai-agents/api/image_generation.py    # DALL-E integration
+# API ENDPOINTS (Legacy files - endpoints moved to routers)
+ai-agents/api/iris_chat.py       # Iris chat API (logic used by homeowner router)
+ai-agents/api/inspiration_boards.py  # Board operations (logic used by router)
+ai-agents/api/image_generation.py    # DALL-E integration (logic used by router)
 
 # TESTS
 ai-agents/test_iris_*.py         # Iris tests
 ```
+
+### **🔧 WHAT THIS MEANS FOR YOU**
+- **Work exactly as before** - Edit your agent files in `agents/iris/`
+- **Add endpoints normally** - Put new API logic in `api/` files or ask where to add
+- **Router files are internal** - System automatically organizes your endpoints
+- **No workflow changes** - You don't need to touch router files directly
+- **All API URLs identical** - Your Iris and dashboard APIs work unchanged
 
 ---
 
@@ -382,5 +396,18 @@ python test_iris_supabase.py  # Test database connection
 ```
 
 ---
+
+## 🐳 **DOCKER MCP MONITORING**
+
+### **Essential Docker Tools for Agent 3:**
+- **`mcp__docker__check-instabids-health`** - Verify homeowner dashboard systems
+- **`mcp__docker__get-logs`** - Check for UX-related errors in frontend/backend  
+- **`mcp__docker__check-api-endpoints`** - Test homeowner-specific API endpoints
+- **`mcp__docker__analyze-error-logs`** - Monitor for Iris and dashboard issues
+
+### **Homeowner UX Monitoring:**
+- **Focus containers**: Frontend (UX) and Backend (Iris AI)
+- **Monitor** user interaction logs and AI conversation errors
+- **Track** dashboard performance and real-time updates
 
 **Remember: Focus on making what exists work perfectly before adding new features.**

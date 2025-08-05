@@ -1,0 +1,13 @@
+{
+  "last_updated": "2025-08-02T12:00:00",
+  "relationship_count": 1,
+  "relationships": {
+    "bid_cards.homeowner_id": {
+      "from_table": "bid_cards",
+      "from_column": "homeowner_id",
+      "to_table": "homeowners",
+      "to_column": "id",
+      "relationship_type": "many_to_one"
+    }
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "tables": {
+    "bid_cards": {
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "project_type",
+          "data_type": "text",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "contractor_count_needed",
+          "data_type": "integer",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "status",
+          "data_type": "text",
+          "is_nullable": "YES"
+        }
+      ],
+      "column_count": 4
+    },
+    "contractors": {
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO"
+        },
+        {
+          "column_name": "company_name",
+          "data_type": "text",
+          "is_nullable": "YES"
+        },
+        {
+          "column_name": "specialization",
+          "data_type": "text",
+          "is_nullable": "YES"
+        }
+      ],
+      "column_count": 3
+    },
+    "projects": {
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO"
+        }
+      ],
+      "column_count": 1
+    },
+    "homeowners": {
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO"
+        }
+      ],
+      "column_count": 1
+    },
+    "contractor_leads": {
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO"
+        }
+      ],
+      "column_count": 1
+    },
+    "outreach_campaigns": {
+      "columns": [
+        {
+          "column_name": "id",
+          "data_type": "uuid",
+          "is_nullable": "NO"
+        }
+      ],
+      "column_count": 1
+    }
+  },
+  "relationships": [
+    {
+      "table_name": "bid_cards",
+      "column_name": "contractor_id",
+      "foreign_table": "contractors"
+    },
+    {
+      "table_name": "projects",
+      "column_name": "homeowner_id",
+      "foreign_table": "homeowners"
+    }
+  ],
+  "last_scanned": "2025-08-02T14:47:57.063202",
+  "total_tables": 6,
+  "scan_method": "real_mcp_tools"
+}

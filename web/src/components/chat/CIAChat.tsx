@@ -1,13 +1,15 @@
-'use client';
+"use client";
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Send, Image as ImageIcon, X } from 'lucide-react';
-import { StorageService } from '@/lib/storage';
-import toast from 'react-hot-toast';
+import { Image as ImageIcon, Send, X } from "lucide-react";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
+import { StorageService } from "@/lib/storage";
+import { AccountSignupModal } from "./AccountSignupModal";
 
 interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   images?: string[];
   timestamp: Date;
@@ -15,24 +17,32 @@ interface Message {
 
 interface CIAChatProps {
   onSendMessage?: (message: string, images: string[]) => Promise<string>;
+  onAccountCreated?: (userData: { name: string; email: string; userId: string }) => void;
+  sessionId?: string;
 }
 
-export default function CIAChat({ onSendMessage }: CIAChatProps) {
+export default function CIAChat({ onSendMessage, onAccountCreated, sessionId }: CIAChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: '1',
-      role: 'assistant',
-      content: "Hi! I'm Alex, your project assistant at InstaBids. Here's what makes us different: We eliminate the expensive lead fees and wasted sales meetings that drive up costs on other platforms. Instead, contractors and homeowners interact directly through our app using photos and conversations to create solid quotes - no sales meetings needed. This keeps all the money savings between you and your contractor, not going to corporations. Contractors save on lead costs and sales time, so they can offer you better prices.\n\nWhat kind of home project brings you here today?",
+      id: "1",
+      role: "assistant",
+      content:
+        "Hi! I'm Alex, your project assistant at InstaBids. Here's what makes us different: We eliminate the expensive lead fees and wasted sales meetings that drive up costs on other platforms. Instead, contractors and homeowners interact directly through our app using photos and conversations to create solid quotes - no sales meetings needed. This keeps all the money savings between you and your contractor, not going to corporations. Contractors save on lead costs and sales time, so they can offer you better prices.\n\nWhat kind of home project brings you here today?",
       timestamp: new Date(),
     },
   ]);
-  
-  const [inputMessage, setInputMessage] = useState('');
+
+  const [inputMessage, setInputMessage] = useState("");
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreview, setImagePreview] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
-  
+  const [showSignupModal, setShowSignupModal] = useState(false);
+  const [extractedProjectInfo, setExtractedProjectInfo] = useState<{
+    projectType?: string;
+    description?: string;
+  }>({});
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -41,15 +51,121 @@ export default function CIAChat({ onSendMessage }: CIAChatProps) {
     setMounted(true);
   }, []);
 
-  // Auto scroll to bottom
+  // Load conversation history if sessionId is provided
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    const loadConversationHistory = async () => {
+      if (!sessionId) return;
+
+      try {
+        const response = await fetch(`http://localhost:8008/cia/conversation/${sessionId}`);
+        const data = await response.json();
+
+        if (data.success && data.messages && data.messages.length > 0) {
+          // Convert API format to component format
+          const loadedMessages = data.messages.map((msg: any) => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            timestamp: new Date(msg.timestamp),
+            images: msg.images,
+          }));
+
+          console.log(`Loaded ${loadedMessages.length} messages from session ${sessionId}`);
+          setMessages(loadedMessages);
+        } else {
+          console.log(`No conversation history found for session ${sessionId}`);
+        }
+      } catch (error) {
+        console.error("Error loading conversation history:", error);
+        // Keep default messages if loading fails
+      }
+    };
+
+    loadConversationHistory();
+  }, [sessionId]);
+
+  // Auto scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  // Detect account creation prompts from CIA agent
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.role === "assistant") {
+      const content = lastMessage.content.toLowerCase();
+
+      // Detect various account creation triggers
+      const accountTriggers = [
+        "create an account",
+        "sign up to get",
+        "would you like to create",
+        "get your professional bids",
+        "start receiving bids",
+        "to receive your bid cards",
+        "register to get contractors",
+        "create your instabids account",
+        "let's get your instabids account set up",
+        "create a password for your instabids account",
+      ];
+
+      const shouldShowSignup = accountTriggers.some((trigger) => content.includes(trigger));
+
+      if (shouldShowSignup && !showSignupModal) {
+        // Extract project information from conversation for modal context
+        const projectKeywords = {
+          kitchen: "kitchen renovation",
+          bathroom: "bathroom renovation",
+          roofing: "roofing project",
+          flooring: "flooring project",
+          plumbing: "plumbing work",
+          electrical: "electrical work",
+          painting: "painting project",
+          landscaping: "landscaping project",
+        };
+
+        let detectedProject = "home project";
+        let projectDescription = "";
+
+        // Check all messages for project context (prioritize more specific matches)
+        for (const msg of messages) {
+          if (msg.role === "user") {
+            const userContent = msg.content.toLowerCase();
+
+            // Check for specific keywords, prioritizing more specific ones
+            if (userContent.includes("plumbing")) {
+              detectedProject = "plumbing work";
+              projectDescription = msg.content;
+            } else if (userContent.includes("painting")) {
+              detectedProject = "painting project";
+              projectDescription = msg.content;
+            } else {
+              // Check other keywords
+              for (const [key, value] of Object.entries(projectKeywords)) {
+                if (userContent.includes(key)) {
+                  detectedProject = value;
+                  projectDescription = msg.content;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        setExtractedProjectInfo({
+          projectType: detectedProject,
+          description: projectDescription,
+        });
+
+        setShowSignupModal(true);
+      }
+    }
+  }, [messages, showSignupModal]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length + selectedImages.length > 5) {
-      toast.error('You can upload a maximum of 5 images');
+      toast.error("You can upload a maximum of 5 images");
       return;
     }
 
@@ -63,19 +179,19 @@ export default function CIAChat({ onSendMessage }: CIAChatProps) {
     }
 
     setSelectedImages([...selectedImages, ...files]);
-    
+
     // Create preview URLs
-    const newPreviews = files.map(file => URL.createObjectURL(file));
+    const newPreviews = files.map((file) => URL.createObjectURL(file));
     setImagePreview([...imagePreview, ...newPreviews]);
   };
 
   const removeImage = (index: number) => {
     const newImages = selectedImages.filter((_, i) => i !== index);
     const newPreviews = imagePreview.filter((_, i) => i !== index);
-    
+
     // Revoke the URL to prevent memory leaks
     URL.revokeObjectURL(imagePreview[index]);
-    
+
     setSelectedImages(newImages);
     setImagePreview(newPreviews);
   };
@@ -85,18 +201,46 @@ export default function CIAChat({ onSendMessage }: CIAChatProps) {
 
     const newMessage: Message = {
       id: Date.now().toString(),
-      role: 'user',
+      role: "user",
       content: inputMessage,
       images: imagePreview.length > 0 ? [...imagePreview] : undefined,
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, newMessage]);
-    setInputMessage('');
+    setMessages((prev) => [...prev, newMessage]);
+    setInputMessage("");
     setIsLoading(true);
 
     try {
-      // Convert images to base64 for sending
+      // Upload images first if any are selected
+      const uploadedImageUrls: string[] = [];
+
+      if (selectedImages.length > 0) {
+        console.log(`Uploading ${selectedImages.length} images...`);
+
+        for (const [index, file] of selectedImages.entries()) {
+          try {
+            // Upload to storage service
+            const uploadResult = await StorageService.uploadImage(file);
+            if (uploadResult.success && uploadResult.url) {
+              uploadedImageUrls.push(uploadResult.url);
+              console.log(`Image ${index + 1} uploaded successfully: ${uploadResult.url}`);
+            } else {
+              console.error(`Failed to upload image ${index + 1}:`, uploadResult.error);
+              toast.error(`Failed to upload image ${index + 1}`);
+            }
+          } catch (uploadError) {
+            console.error(`Error uploading image ${index + 1}:`, uploadError);
+            toast.error(`Error uploading image ${index + 1}`);
+          }
+        }
+
+        if (uploadedImageUrls.length > 0) {
+          toast.success(`Successfully uploaded ${uploadedImageUrls.length} image(s)`);
+        }
+      }
+
+      // Convert images to base64 for API sending (keep existing functionality)
       const imageDataUrls: string[] = [];
       for (const file of selectedImages) {
         const dataUrl = await StorageService.fileToBase64(file);
@@ -105,61 +249,118 @@ export default function CIAChat({ onSendMessage }: CIAChatProps) {
 
       // Call the message handler - use default mock if not provided
       let response: string;
-      
+
       if (onSendMessage) {
-        console.log('Sending message to API...');
+        console.log("Sending message to API...", {
+          messageLength: inputMessage.length,
+          imageCount: imageDataUrls.length,
+          uploadedUrls: uploadedImageUrls.length,
+        });
         response = await onSendMessage(inputMessage, imageDataUrls);
       } else {
-        // Fallback mock response
-        console.log('No API handler provided, using mock response');
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
-        response = generateMockResponse(inputMessage);
+        // Enhanced fallback mock response with photo awareness
+        console.log("No API handler provided, using mock response");
+        await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API delay
+        response = generateMockResponse(inputMessage, uploadedImageUrls.length > 0);
       }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        role: 'assistant',
+        role: "assistant",
         content: response,
         timestamp: new Date(),
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('Failed to send message. Please try again.');
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message. Please try again.");
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: "I'm sorry, I encountered an error. Please make sure the backend is running (cd backend && python main.py).",
+        role: "assistant",
+        content:
+          "I'm sorry, I encountered an error. Please make sure the backend is running (cd ai-agents && python main.py).",
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
       setSelectedImages([]);
       setImagePreview([]);
+
+      // Clean up preview URLs to prevent memory leaks
+      imagePreview.forEach((url) => {
+        if (url.startsWith("blob:")) {
+          URL.revokeObjectURL(url);
+        }
+      });
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
 
+  const handleAccountCreated = (userData: { name: string; email: string; userId: string }) => {
+    // Call parent callback if provided
+    onAccountCreated?.(userData);
+
+    // Add a system message to continue the conversation
+    const welcomeMessage: Message = {
+      id: (Date.now() + 2).toString(),
+      role: "assistant",
+      content: `Welcome to InstaBids, ${userData.name}! Your account has been created successfully. I'll now prepare your project details and start connecting you with qualified contractors in your area. You'll receive email notifications when contractors submit their bids.`,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, welcomeMessage]);
+
+    // Close the modal
+    setShowSignupModal(false);
+  };
+
+  const handleCloseSignupModal = () => {
+    setShowSignupModal(false);
+
+    // Add a message indicating they can sign up later
+    const laterMessage: Message = {
+      id: (Date.now() + 2).toString(),
+      role: "assistant",
+      content:
+        "No problem! You can continue exploring your project options. When you're ready to receive contractor bids, just let me know and I'll help you create an account.",
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, laterMessage]);
+  };
+
   // Generate mock responses when API is not connected
-  const generateMockResponse = (message: string): string => {
+  const generateMockResponse = (message: string, hasPhotos: boolean = false): string => {
     const lower = message.toLowerCase();
-    
-    if (lower.includes('kitchen')) {
-      return "A kitchen renovation - great choice! Kitchen updates offer excellent ROI. Are you planning a full remodel or focusing on specific areas like cabinets, countertops, or appliances?";
-    } else if (lower.includes('bathroom')) {
-      return "Bathroom renovations can really transform your daily routine! What's motivating this project - is it updating the style, fixing issues, or adding functionality?";
-    } else if (lower.includes('budget')) {
-      return "Budget planning is smart! Kitchen remodels typically range from $15,000-$60,000, while bathrooms run $8,000-$25,000. What range feels comfortable for your project?";
+
+    // Photo-aware responses
+    if (hasPhotos) {
+      if (lower.includes("kitchen")) {
+        return "Thanks for sharing those kitchen photos! I can see the space you're working with. This looks like a great project for contractors to bid on. Are you looking at a full remodel or specific updates like cabinets and countertops?";
+      } else if (lower.includes("bathroom")) {
+        return "Great photos! I can see the current bathroom layout. Based on what I'm seeing, there are several directions we could go. What's your main goal - updating the style, improving functionality, or fixing specific issues?";
+      } else {
+        return "Perfect! Those photos really help me understand your project. The visual context makes it much easier for contractors to provide accurate bids. What specific work are you looking to have done?";
+      }
+    }
+
+    // Regular text-based responses
+    if (lower.includes("kitchen")) {
+      return "A kitchen renovation - great choice! Kitchen updates offer excellent ROI. Photos of the current space would help contractors provide more accurate bids. Are you planning a full remodel or focusing on specific areas like cabinets, countertops, or appliances?";
+    } else if (lower.includes("bathroom")) {
+      return "Bathroom renovations can really transform your daily routine! If you have any photos of the current space, that would help contractors understand the scope. What's motivating this project - is it updating the style, fixing issues, or adding functionality?";
+    } else if (lower.includes("budget")) {
+      return "Instead of focusing on budget first, let's talk about what you want to achieve! This helps contractors provide better value. Kitchen remodels and bathroom updates vary widely based on scope and materials. What's driving this project for you?";
     } else {
-      return "I'd be happy to help with your project! Could you tell me more about what type of work you're considering?";
+      return "I'd be happy to help with your project! Feel free to share any photos if you have them - visuals really help contractors understand what they're bidding on. What type of work are you considering?";
     }
   };
 
@@ -176,17 +377,15 @@ export default function CIAChat({ onSendMessage }: CIAChatProps) {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
               className={`max-w-[70%] rounded-lg p-3 ${
-                message.role === 'user'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-800'
+                message.role === "user" ? "bg-blue-500 text-white" : "bg-gray-100 text-gray-800"
               }`}
             >
               <p className="whitespace-pre-wrap">{message.content}</p>
-              
+
               {/* Display images if any */}
               {message.images && message.images.length > 0 && (
                 <div className="mt-2 grid grid-cols-2 gap-2">
@@ -200,17 +399,15 @@ export default function CIAChat({ onSendMessage }: CIAChatProps) {
                   ))}
                 </div>
               )}
-              
+
               {/* Only show timestamp on client to avoid hydration error */}
               {mounted && (
-                <p className="text-xs mt-1 opacity-70">
-                  {message.timestamp.toLocaleTimeString()}
-                </p>
+                <p className="text-xs mt-1 opacity-70">{message.timestamp.toLocaleTimeString()}</p>
               )}
             </div>
           </div>
         ))}
-        
+
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-gray-100 rounded-lg p-3">
@@ -222,7 +419,7 @@ export default function CIAChat({ onSendMessage }: CIAChatProps) {
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -238,6 +435,7 @@ export default function CIAChat({ onSendMessage }: CIAChatProps) {
                   className="w-20 h-20 object-cover rounded-md"
                 />
                 <button
+                  type="button"
                   onClick={() => removeImage(index)}
                   className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                 >
@@ -260,15 +458,16 @@ export default function CIAChat({ onSendMessage }: CIAChatProps) {
             onChange={handleImageSelect}
             className="hidden"
           />
-          
+
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
             title="Upload images"
           >
             <ImageIcon size={24} />
           </button>
-          
+
           <textarea
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
@@ -277,8 +476,9 @@ export default function CIAChat({ onSendMessage }: CIAChatProps) {
             className="flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={1}
           />
-          
+
           <button
+            type="button"
             onClick={handleSendMessage}
             disabled={isLoading || (!inputMessage.trim() && selectedImages.length === 0)}
             className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -286,11 +486,19 @@ export default function CIAChat({ onSendMessage }: CIAChatProps) {
             <Send size={24} />
           </button>
         </div>
-        
+
         <p className="text-xs text-gray-500 mt-2">
           You can upload up to 5 images. Press Enter to send or Shift+Enter for new line.
         </p>
       </div>
+
+      {/* Account Signup Modal */}
+      <AccountSignupModal
+        isOpen={showSignupModal}
+        onClose={handleCloseSignupModal}
+        onSuccess={handleAccountCreated}
+        projectInfo={extractedProjectInfo}
+      />
     </div>
   );
 }

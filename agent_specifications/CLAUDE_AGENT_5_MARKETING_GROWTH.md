@@ -11,6 +11,9 @@ You are **Agent 5** - responsible for **scalable growth systems** including affi
 
 ## 🗂️ **FILE OWNERSHIP - WHAT YOU CONTROL** (Future Development)
 
+### **⚠️ REFACTORING UPDATE** (August 2, 2025)
+**main.py has been refactored!** When you build your endpoints, they'll go in modular router files:
+
 ### **🆕 YOUR CODE** (To Be Built)
 ```
 # AI AGENTS
@@ -19,22 +22,33 @@ ai-agents/agents/marketing/   # Marketing automation
 ai-agents/agents/social/      # Social & viral features
 ai-agents/agents/gamification/ # Rewards & engagement
 
+# 🆕 NEW: ROUTER FILES (Future - Your API Endpoints)
+ai-agents/routers/marketing_routes.py   # Your marketing and growth endpoints
+ai-agents/main.py                       # Will import your routers when built
+
 # FRONTEND
 web/src/components/referral/  # Referral system UI
 web/src/components/ambassador/ # Brand ambassador portal
 web/src/components/social/    # Social features
 web/src/components/growth/    # Growth optimization
 
-# API ENDPOINTS
-ai-agents/api/referral.py     # Referral system
-ai-agents/api/affiliate.py    # Affiliate program
-ai-agents/api/ambassador.py   # Ambassador program
-ai-agents/api/growth.py       # Growth analytics
+# API ENDPOINTS (Legacy structure - logic will be used by routers)
+ai-agents/api/referral.py     # Referral system (logic used by router)
+ai-agents/api/affiliate.py    # Affiliate program (logic used by router)
+ai-agents/api/ambassador.py   # Ambassador program (logic used by router)
+ai-agents/api/growth.py       # Growth analytics (logic used by router)
 
 # TESTS
 ai-agents/test_referral_*.py  # Referral tests
 ai-agents/test_growth_*.py    # Growth tests
 ```
+
+### **🔧 WHAT THIS MEANS FOR YOU**
+- **Work exactly as before** - Build your marketing agents and APIs normally
+- **Add endpoints normally** - Put new API logic in `api/` files or ask where to add
+- **Router files are internal** - System will automatically organize your endpoints
+- **No workflow changes** - You won't need to touch router files directly
+- **All API URLs identical** - Your marketing APIs will work unchanged
 
 ---
 
@@ -327,5 +341,18 @@ When your system works perfectly, InstaBids grows exponentially through satisfie
 ## 🚨 **DEVELOPMENT NOTE**
 
 **Status**: This domain is **future development**. Focus on understanding growth opportunities and planning while core product achieves product-market fit. Begin development when InstaBids has proven user satisfaction and stable core systems.
+
+## 🐳 **DOCKER MCP MONITORING**
+
+### **Essential Docker Tools for Agent 5:**
+- **`mcp__docker__check-instabids-health`** - Monitor overall system performance for growth tracking
+- **`mcp__docker__analyze-error-logs`** - Track user experience issues that affect growth
+- **`mcp__docker__check-api-endpoints`** - Verify marketing and analytics endpoints
+- **`mcp__docker__monitor-bid-cards`** - Track key business metrics and conversion funnels
+
+### **Growth-Focused Monitoring:**
+- **Track** user engagement and conversion metrics
+- **Monitor** email system performance (`instabids-mailhog-1`)
+- **Verify** analytics and growth measurement systems
 
 **Key Insight**: Growth without a great core product leads to expensive user acquisition and poor retention. Build growth systems only after the core InstaBids experience consistently delights users.

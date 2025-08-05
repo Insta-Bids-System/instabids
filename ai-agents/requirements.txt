@@ -69,6 +69,10 @@ redis>=5.0.1
 python-dateutil>=2.8.2
 pytz>=2023.3
 
+# Geocoding & Distance Calculation
+uszipcode==0.2.6  # Fixed version for SQLAlchemy compatibility
+haversine>=2.8.0
+
 # Data Validation
 jsonschema>=4.20.0
 

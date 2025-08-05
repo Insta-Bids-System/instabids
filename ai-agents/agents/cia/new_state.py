@@ -1,15 +1,14 @@
 """CIA (Customer Interface Agent) NEW State Definitions"""
-from typing import TypedDict, List, Optional, Literal, Any
-from datetime import datetime
+from typing import Literal, Optional, TypedDict
 
 
 class PhotoAnalysis(TypedDict):
     """Analysis results from uploaded photos"""
     url: str
     description: str
-    identified_issues: List[str]
+    identified_issues: list[str]
     estimated_scope: str
-    areas_of_concern: List[str]
+    areas_of_concern: list[str]
     confidence: float
 
 
@@ -17,45 +16,45 @@ class Message(TypedDict):
     """Chat message structure"""
     role: Literal["user", "assistant", "system"]
     content: str
-    images: Optional[List[str]]  # URLs to images
+    images: Optional[list[str]]  # URLs to images
     metadata: Optional[dict]
 
 
 class NewCollectedInfo(TypedDict):
     """NEW 12 Data Points Structure - InstaBids Focused"""
-    
+
     # CORE PROJECT INFO
     project_type: Optional[str]  # roof, lawn, kitchen, bathroom, etc.
     service_type: Optional[Literal[
         "installation",      # New roof, kitchen remodel, new appliances
         "repair",           # Fix existing wall, repair lawn, fix appliance
-        "ongoing_service",  # Pool cleaning, lawn care, housekeeping  
+        "ongoing_service",  # Pool cleaning, lawn care, housekeeping
         "handyman",         # Small jobs, labor only, help moving things
         "appliance_repair", # Washer, dryer, computer, specific object repair
         "labor_only"        # Just need someone with tools/skills for task
     ]]
     project_description: Optional[str]  # Detailed work needed
-    
+
     # CONTEXT & MOTIVATION
     budget_context: Optional[str]  # "got quotes", "exploring", "have range", "dream project"
     timeline_urgency: Optional[Literal["emergency", "urgent", "flexible", "planning"]]
     urgency_reason: Optional[str]  # WHY the timeline exists (HOA, damage, etc.)
     location_zip: Optional[str]    # Zip code minimum
-    
-    # SMART OPPORTUNITIES  
+
+    # SMART OPPORTUNITIES
     group_bidding_potential: Optional[bool]  # Could neighbors benefit?
     group_bidding_interest: Optional[str]    # User's interest level in group pricing
     property_context: Optional[str]          # Only if relevant to project
-    
+
     # SUPPORTING INFO
     material_preferences: Optional[str]      # Only if mentioned naturally
-    uploaded_photos: List[str]               # Critical for accurate quotes
-    photo_analyses: List[PhotoAnalysis]      # AI analysis of uploaded images
+    uploaded_photos: list[str]               # Critical for accurate quotes
+    photo_analyses: list[PhotoAnalysis]      # AI analysis of uploaded images
     special_requirements: Optional[str]      # Permits, HOA, access constraints
-    
+
     # INTERNAL SCORING
     intention_score: Optional[int]           # 1-10 motivation assessment
-    
+
     # LEGACY FIELDS (for compatibility)
     address: Optional[str]                   # Full address if provided
     property_type: Optional[str]             # House, condo, etc.
@@ -71,29 +70,29 @@ class ConversationState(TypedDict):
     user_id: str
     session_id: str
     project_id: Optional[str]
-    
+
     # Conversation
-    messages: List[Message]
+    messages: list[Message]
     current_phase: Literal["intro", "discovery", "details", "photos", "review", "complete"]
-    
+
     # NEW: Collected Data Structure
     collected_info: NewCollectedInfo
-    
+
     # Flow Control
-    missing_fields: List[str]
+    missing_fields: list[str]
     conversation_summary: str
     ready_for_jaa: bool
-    
+
     # InstaBids Specific
     instabids_value_mentioned: bool          # Did we mention our advantages?
     group_bidding_discussed: bool            # Did we explore group opportunities?
     competitor_context: Optional[str]        # Did they mention other platforms?
-    
+
     # Metadata
     created_at: str
     updated_at: str
     total_messages: int
-    
+
     # Control Flow
     should_end: bool
     needs_human_review: bool
@@ -103,7 +102,7 @@ class ConversationState(TypedDict):
 # UPDATED: Required fields - focusing on essentials only
 REQUIRED_FIELDS_MINIMAL = [
     "project_type",
-    "service_type", 
+    "service_type",
     "project_description",
     "location_zip"
 ]
@@ -112,7 +111,7 @@ REQUIRED_FIELDS_MINIMAL = [
 COMPLETE_FIELDS = [
     "project_type",
     "service_type",
-    "project_description", 
+    "project_description",
     "budget_context",
     "timeline_urgency",
     "location_zip",
@@ -157,7 +156,7 @@ GROUP_BIDDING_PROJECTS = [
 # Phase transitions (simplified)
 PHASE_TRANSITIONS = {
     "intro": "discovery",
-    "discovery": "details", 
+    "discovery": "details",
     "details": "photos",
     "photos": "review",
     "review": "complete"

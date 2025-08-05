@@ -1,0 +1,28 @@
+{
+  "consultations": [
+    {
+      "timestamp": "2025-08-02T14:47:57.581126",
+      "building_agent": "agent_1_frontend",
+      "question": "How do I optimize dashboard queries for real-time bid tracking?",
+      "advice": "General Database Advice for agent_1_frontend:\n\nBased on your question: \"How do I optimize dashboard queries for real-time bid tracking?...\"\n\nGeneral Recommendations:\n1. **Always backup before changes**\n2. **Test on development environment first**\n3. **Use proper indexing for performance**\n4. **Follow PostgreSQL best practices**\n5. **Monitor query performance**\n\nFor specific advice, provide more details about:\n- Which tables are involved\n- What specific operation you need\n- Performance requirements\n- Safety constraints\n\nInstaBids Database Info:\n- Total tables discovered: 6\n- Last scanned: 2025-08-02T14:47:57.063202\n",
+      "method": "fallback",
+      "model_used": "pattern_matching"
+    },
+    {
+      "timestamp": "2025-08-02T14:47:57.797546",
+      "building_agent": "agent_2_backend",
+      "question": "I need to add a contractor portfolio table with foreign keys to contractors",
+      "advice": "Database Schema Analysis:\n\n\nKnown Tables (6):\n- bid_cards\n- contractors\n- projects\n- homeowners\n- contractor_leads\n\n\nSchema Best Practices:\n1. **Normalize Data**: Avoid data duplication\n2. **Use Proper Data Types**: Choose appropriate column types\n3. **Add Constraints**: Use foreign keys, unique constraints\n4. **Index Strategy**: Index frequently queried columns\n5. **Document Changes**: Keep schema changes documented\n\nFor detailed schema information, run:\n```sql\nSELECT table_name, column_name, data_type \nFROM information_schema.columns \nWHERE table_schema = 'public'\nORDER BY table_name, ordinal_position;\n```\n",
+      "method": "fallback",
+      "model_used": "pattern_matching"
+    },
+    {
+      "timestamp": "2025-08-02T14:47:57.930961",
+      "building_agent": "agent_6_qa",
+      "question": "Analyze the relationship between bid_cards and contractors tables",
+      "advice": "Database Schema Analysis:\n\n\nKnown Tables (6):\n- bid_cards\n- contractors\n- projects\n- homeowners\n- contractor_leads\n\n\nSchema Best Practices:\n1. **Normalize Data**: Avoid data duplication\n2. **Use Proper Data Types**: Choose appropriate column types\n3. **Add Constraints**: Use foreign keys, unique constraints\n4. **Index Strategy**: Index frequently queried columns\n5. **Document Changes**: Keep schema changes documented\n\nFor detailed schema information, run:\n```sql\nSELECT table_name, column_name, data_type \nFROM information_schema.columns \nWHERE table_schema = 'public'\nORDER BY table_name, ordinal_position;\n```\n",
+      "method": "fallback",
+      "model_used": "pattern_matching"
+    }
+  ]
+}

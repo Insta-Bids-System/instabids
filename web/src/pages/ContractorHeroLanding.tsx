@@ -1,31 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Star, 
-  Clock, 
-  DollarSign, 
-  Users, 
-  MessageSquare, 
-  Camera, 
-  CheckCircle, 
-  TrendingUp,
-  Shield,
-  Zap,
+import { motion } from "framer-motion";
+import {
   ArrowRight,
-  PlayCircle,
-  Award,
+  Camera,
+  CheckCircle,
+  Clock,
+  DollarSign,
+  Handshake,
+  MessageSquare,
+  Shield,
   Target,
-  Handshake
-} from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+  TrendingUp,
+  Users,
+  Zap,
+} from "lucide-react";
+import type React from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 const ContractorHeroLanding: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [bidCard, setBidCard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  
-  const bidToken = searchParams.get('bid');
-  const source = searchParams.get('src') || 'web';
+
+  const bidToken = searchParams.get("bid");
+  const source = searchParams.get("src") || "web";
 
   useEffect(() => {
     const loadBidCardData = async () => {
@@ -39,8 +37,8 @@ const ContractorHeroLanding: React.FC = () => {
               ...realData,
               // Ensure we have photo URLs for display
               photo_urls: realData.photo_urls || [
-                "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
-              ]
+                "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80",
+              ],
             });
           } else {
             // Fallback to demo data if API fails
@@ -52,23 +50,23 @@ const ContractorHeroLanding: React.FC = () => {
               budget_display: "$15,000 - $25,000",
               location: {
                 city: "Melbourne",
-                state: "FL"
+                state: "FL",
               },
               contractor_count: 4,
               photo_urls: [
-                "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
+                "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80",
               ],
               project_details: {
                 scope_of_work: [
                   "Complete kitchen cabinet replacement with modern white shaker style",
                   "Install new granite countertops with undermount sink",
-                  "Update all appliances to stainless steel Energy Star models"
-                ]
-              }
+                  "Update all appliances to stainless steel Energy Star models",
+                ],
+              },
             });
           }
         } catch (error) {
-          console.error('Failed to load bid card data:', error);
+          console.error("Failed to load bid card data:", error);
           // Use demo data as fallback
           setBidCard({
             id: "demo-123",
@@ -78,19 +76,19 @@ const ContractorHeroLanding: React.FC = () => {
             budget_display: "$15,000 - $25,000",
             location: {
               city: "Melbourne",
-              state: "FL"
+              state: "FL",
             },
             contractor_count: 4,
             photo_urls: [
-              "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
+              "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80",
             ],
             project_details: {
               scope_of_work: [
                 "Complete kitchen cabinet replacement with modern white shaker style",
                 "Install new granite countertops with undermount sink",
-                "Update all appliances to stainless steel Energy Star models"
-              ]
-            }
+                "Update all appliances to stainless steel Energy Star models",
+              ],
+            },
           });
         }
       }
@@ -101,21 +99,21 @@ const ContractorHeroLanding: React.FC = () => {
   }, [bidToken]);
 
   const formatProjectType = (type: string) => {
-    return type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Home Project';
+    return type?.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()) || "Home Project";
   };
 
   const getProjectEmoji = (type: string) => {
     const emojiMap: { [key: string]: string } = {
-      kitchen_remodel: '🍳',
-      bathroom_renovation: '🛁',
-      roof_replacement: '🏠',
-      landscaping: '🌿',
-      flooring: '🪵',
-      painting: '🎨',
-      plumbing: '🔧',
-      electrical: '⚡'
+      kitchen_remodel: "🍳",
+      bathroom_renovation: "🛁",
+      roof_replacement: "🏠",
+      landscaping: "🌿",
+      flooring: "🪵",
+      painting: "🎨",
+      plumbing: "🔧",
+      electrical: "⚡",
     };
-    return emojiMap[type] || '🏗️';
+    return emojiMap[type] || "🏗️";
   };
 
   if (loading) {
@@ -135,7 +133,7 @@ const ContractorHeroLanding: React.FC = () => {
       {/* Animated Background Elements */}
       <div className="absolute inset-0">
         <motion.div
-          animate={{ 
+          animate={{
             scale: [1, 1.2, 1],
             opacity: [0.1, 0.2, 0.1],
           }}
@@ -143,7 +141,7 @@ const ContractorHeroLanding: React.FC = () => {
           className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500 rounded-full blur-3xl"
         />
         <motion.div
-          animate={{ 
+          animate={{
             scale: [1.2, 1, 1.2],
             opacity: [0.1, 0.15, 0.1],
           }}
@@ -168,7 +166,7 @@ const ContractorHeroLanding: React.FC = () => {
               </div>
               <h1 className="text-3xl font-bold text-white">InstaBids</h1>
             </div>
-            
+
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -187,7 +185,8 @@ const ContractorHeroLanding: React.FC = () => {
               transition={{ delay: 0.5, duration: 0.8 }}
               className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight"
             >
-              Skip The Leads.<br />
+              Skip The Leads.
+              <br />
               <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
                 Win The Job.
               </span>
@@ -199,7 +198,8 @@ const ContractorHeroLanding: React.FC = () => {
               transition={{ delay: 0.7, duration: 0.8 }}
               className="text-xl text-blue-100 mb-8 max-w-3xl mx-auto leading-relaxed"
             >
-              Connect directly with qualified homeowners ready to hire. No lead fees, no sales meetings, no advertising costs. 
+              Connect directly with qualified homeowners ready to hire. No lead fees, no sales
+              meetings, no advertising costs.
               <span className="text-yellow-300 font-semibold"> Only pay when you win the job.</span>
             </motion.p>
           </motion.div>
@@ -225,7 +225,7 @@ const ContractorHeroLanding: React.FC = () => {
 
                 <div className="grid md:grid-cols-2 gap-8 items-center">
                   {/* Project Image */}
-                  {bidCard.photo_urls && bidCard.photo_urls[0] && (
+                  {bidCard.photo_urls?.[0] && (
                     <div className="relative">
                       <motion.img
                         whileHover={{ scale: 1.05 }}
@@ -254,7 +254,7 @@ const ContractorHeroLanding: React.FC = () => {
                         </div>
                         <div className="text-white text-lg font-bold">{bidCard.budget_display}</div>
                       </div>
-                      
+
                       <div className="bg-white/5 rounded-xl p-4">
                         <div className="flex items-center gap-2 text-blue-400 mb-2">
                           <Clock className="w-5 h-5" />
@@ -295,7 +295,8 @@ const ContractorHeroLanding: React.FC = () => {
               </div>
               <h3 className="text-xl font-bold text-white mb-4">Zero Lead Fees</h3>
               <p className="text-blue-200 leading-relaxed">
-                No upfront costs, no monthly subscriptions. Only pay a small success fee after you're selected by the homeowner.
+                No upfront costs, no monthly subscriptions. Only pay a small success fee after
+                you're selected by the homeowner.
               </p>
             </div>
 
@@ -305,7 +306,8 @@ const ContractorHeroLanding: React.FC = () => {
               </div>
               <h3 className="text-xl font-bold text-white mb-4">Direct Communication</h3>
               <p className="text-blue-200 leading-relaxed">
-                Chat directly with homeowners. Get photos, measurements, and project details instantly through our AI-assisted platform.
+                Chat directly with homeowners. Get photos, measurements, and project details
+                instantly through our AI-assisted platform.
               </p>
             </div>
 
@@ -315,7 +317,8 @@ const ContractorHeroLanding: React.FC = () => {
               </div>
               <h3 className="text-xl font-bold text-white mb-4">Group Projects</h3>
               <p className="text-blue-200 leading-relaxed">
-                Win multiple jobs at once. Bid on grouped projects from the same homeowner or neighborhood for maximum efficiency.
+                Win multiple jobs at once. Bid on grouped projects from the same homeowner or
+                neighborhood for maximum efficiency.
               </p>
             </div>
           </motion.div>
@@ -331,7 +334,7 @@ const ContractorHeroLanding: React.FC = () => {
               <h3 className="text-3xl font-bold text-white mb-6">
                 Ready to Start Winning More Jobs?
               </h3>
-              
+
               <div className="grid md:grid-cols-2 gap-8 mb-8">
                 <div className="text-left">
                   <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -346,7 +349,7 @@ const ContractorHeroLanding: React.FC = () => {
                     <li>• Payment protection guarantee</li>
                   </ul>
                 </div>
-                
+
                 <div className="text-left">
                   <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-yellow-400" />
@@ -374,7 +377,7 @@ const ContractorHeroLanding: React.FC = () => {
                   <ArrowRight className="w-6 h-6" />
                 </div>
               </motion.a>
-              
+
               <p className="text-blue-200 text-sm mt-4">
                 Free to join • No setup fees • Only pay when you win
               </p>

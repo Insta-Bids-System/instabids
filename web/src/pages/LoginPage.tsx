@@ -1,35 +1,46 @@
-import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/contexts/AuthContext'
-import toast from 'react-hot-toast'
-import { Mail, Lock } from 'lucide-react'
+import { Lock, Mail } from "lucide-react";
+import type React from "react";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const { signIn, profile } = useAuth()
-  const navigate = useNavigate()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { signIn, profile, user } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect based on profile role after successful login
+  useEffect(() => {
+    console.log("LoginPage useEffect:", { user: !!user, profile, loading });
+    if (user && profile && !loading) {
+      console.log("Profile role:", profile.role);
+      if (profile.role === "contractor") {
+        console.log("Redirecting to contractor dashboard");
+        navigate("/contractor/dashboard");
+      } else if (profile.role === "homeowner") {
+        console.log("Redirecting to homeowner dashboard");
+        navigate("/dashboard");
+      }
+    }
+  }, [user, profile, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+    e.preventDefault();
+    setLoading(true);
 
     try {
-      await signIn(email, password)
-      toast.success('Welcome back!')
-      
-      // Wait a moment for profile to load, then redirect based on role
-      setTimeout(() => {
-        // The ProtectedRoute will handle the actual role-based redirect
-        navigate('/dashboard')
-      }, 100)
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to sign in')
-    } finally {
-      setLoading(false)
+      await signIn(email, password);
+      toast.success("Welcome back!");
+      // The useEffect above will handle the redirect once profile loads
+      setLoading(false);
+    } catch (error: unknown) {
+      toast.error(error.message || "Failed to sign in");
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -42,7 +53,7 @@ const LoginPage: React.FC = () => {
             Sign in to your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
+            Or{" "}
             <Link to="/signup" className="font-medium text-primary-600 hover:text-primary-500">
               create a new account
             </Link>
@@ -120,10 +131,10 @@ const LoginPage: React.FC = () => {
               disabled={loading}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? "Signing in..." : "Sign in"}
             </button>
           </div>
-          
+
           <div className="relative mt-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300" />
@@ -132,29 +143,54 @@ const LoginPage: React.FC = () => {
               <span className="px-2 bg-gray-50 text-gray-500">or</span>
             </div>
           </div>
-          
+
           <div>
             <button
               type="button"
               onClick={() => {
                 // Set demo credentials for homeowner (using real UUID)
-                localStorage.setItem('DEMO_USER', JSON.stringify({
-                  id: '550e8400-e29b-41d4-a716-446655440001',
-                  email: 'demo.homeowner@instabids.com',
-                  role: 'homeowner',
-                  full_name: 'Demo Homeowner'
-                }))
-                navigate('/dashboard')
+                localStorage.setItem(
+                  "DEMO_USER",
+                  JSON.stringify({
+                    id: "550e8400-e29b-41d4-a716-446655440001",
+                    email: "demo.homeowner@instabids.com",
+                    role: "homeowner",
+                    full_name: "Demo Homeowner",
+                  })
+                );
+                navigate("/dashboard");
               }}
               className="group relative w-full flex justify-center py-3 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               Demo Homeowner Access
             </button>
           </div>
+
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                // Set demo credentials for contractor (using real JM Holiday Lighting UUID)
+                localStorage.setItem(
+                  "DEMO_USER",
+                  JSON.stringify({
+                    id: "c24d60b5-5469-4207-a364-f20363422d8a",
+                    email: "info@jmholidaylighting.com",
+                    role: "contractor",
+                    full_name: "JM Holiday Lighting, Inc.",
+                  })
+                );
+                navigate("/contractor/dashboard");
+              }}
+              className="group relative w-full flex justify-center py-3 px-4 border border-orange-500 text-sm font-medium rounded-md text-orange-700 bg-orange-50 hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+            >
+              Demo Contractor Access (JM Holiday Lighting)
+            </button>
+          </div>
         </form>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default LoginPage
+export default LoginPage;

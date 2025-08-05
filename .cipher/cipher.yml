@@ -1,0 +1,40 @@
+# Cipher Configuration - Aggregator Mode
+# This enables Cipher to act as a central hub for all MCP tools
+
+# MCP Servers that Cipher will aggregate and expose to Claude Code
+mcpServers:
+  filesystem:
+    type: stdio
+    command: node
+    args: 
+      - C:/Users/Not John Or Justin/AppData/Roaming/npm/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js
+      - C:/Users/Not John Or Justin/Documents/instabids
+    env:
+      MCP_FILESYSTEM_ALLOW_WRITE: "true"
+  
+  supabase:
+    type: stdio
+    command: node
+    args:
+      - C:/Users/Not John Or Justin/Documents/instabids/mcp-servers/supabase-mcp.js
+    env:
+      SUPABASE_URL: https://xrhgrthdcaymxuqcgrmj.supabase.co
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhyaGdydGhkY2F5bXh1cWNncm1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2NTcyMDYsImV4cCI6MjA2OTIzMzIwNn0.BriGLA2FE_e_NJl8B-3ps1W6ZAuK6a5HpTwBGy-6rmE
+
+# Vector store configuration for semantic memory
+vectorStore:
+  provider: chromadb
+  
+# Embedding configuration for memory storage
+embedding:
+  provider: openai
+  model: text-embedding-3-small
+
+# Memory configuration
+memory:
+  # Store conversation context across sessions
+  persistentMemory: true
+  # Cross-project memory tracking
+  crossProjectMemory: true
+  # Semantic search capabilities
+  semanticSearch: true
