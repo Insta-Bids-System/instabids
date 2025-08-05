@@ -36,9 +36,7 @@ from api.image_generation import router as image_generation_router
 from api.iris_chat import router as iris_router
 
 # Import all router modules
-# from routers.admin_routes import router as admin_router  # Temporarily disabled - missing dependencies
-
-# Add enhanced admin router
+# from routers.admin_routes import router as admin_router  # Temporarily disabled - missing production_database_solution
 from routers.admin_routes_enhanced import router as admin_enhanced_router
 from routers.bid_card_api_simple import router as bid_card_api_simple_router
 from routers.bid_card_lifecycle_routes import router as bid_card_lifecycle_router
@@ -53,13 +51,14 @@ from routers.homeowner_routes import router as homeowner_router
 from routers.jaa_routes import router as jaa_router
 from routers.messaging_simple import router as messaging_api_router
 from routers.monitoring_routes import router as monitoring_router
+from routers.contractor_proposals_api import router as contractor_proposals_router
 
 # Add test WebSocket router
 from routers.test_ws_routes import router as test_ws_router
 from routers.websocket_routes import router as websocket_router
 
 # Add unified COIA router
-# from routers.unified_coia_api import router as unified_coia_router  # Temporarily disabled - missing psycopg dependency
+from routers.unified_coia_api import router as unified_coia_router  # Fixed - using psycopg2-binary now
 
 # Import image persistence service
 from services.image_persistence_service import image_service
@@ -165,7 +164,7 @@ app.add_middleware(
 )
 
 # Include all routers
-app.include_router(admin_router, prefix="/api/admin")           # Agent 2 - Admin Dashboard
+# app.include_router(admin_router, prefix="/api/admin")           # Agent 2 - Admin Dashboard (disabled - missing deps)
 app.include_router(cia_router, prefix="/api/cia")  # Agent 1 - Customer Interface
 app.include_router(jaa_router)             # Agent 2 - Job Analysis
 app.include_router(cda_router)             # Agent 2 - Contractor Discovery
@@ -183,9 +182,10 @@ app.include_router(bid_card_api_simple_router, prefix="/api/bid-cards")    # Age
 app.include_router(bid_card_simple_lifecycle_router)  # Agent 1 - Simplified Bid Card Lifecycle
 app.include_router(contractor_job_search_router)      # Agent 4 - Contractor Job Search with Radius
 app.include_router(messaging_api_router)    # Agent 1 - Messaging System
+app.include_router(contractor_proposals_router)  # Contractor Proposals API
 app.include_router(test_ws_router, prefix="/api/test")  # Test WebSocket endpoint
 app.include_router(admin_enhanced_router)  # Enhanced admin routes with full bid card data
-# app.include_router(unified_coia_router)    # Agent 4 - Unified COIA (Consolidated Agent) - Temporarily disabled
+app.include_router(unified_coia_router)    # Agent 4 - Unified COIA (Consolidated Agent) - FIXED
 
 # Radius search is now handled directly in the bid_card_api.py router
 

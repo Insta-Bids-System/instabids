@@ -12,7 +12,8 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 
 from .unified_state import UnifiedCoIAState, create_initial_state
-from .supabase_checkpointer import create_supabase_checkpointer
+from .supabase_checkpointer_simple import create_supabase_checkpointer
+from langgraph.checkpoint.memory import MemorySaver
 from .langgraph_nodes import (
     conversation_node,
     research_node,
@@ -122,10 +123,17 @@ class UnifiedCoIAGraph:
         if self.graph is None:
             await self.build_graph()
         
-        # Use provided checkpointer or create default Supabase one
+        # Use provided checkpointer or create fallback
         checkpointer = self.checkpointer
         if checkpointer is None:
-            checkpointer = await create_supabase_checkpointer()
+            try:
+                # Try to create Supabase checkpointer
+                checkpointer = await create_supabase_checkpointer()
+                logger.info("Using Supabase checkpointer for state persistence")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Supabase checkpointer: {e}")
+                logger.info("Falling back to in-memory checkpointer")
+                checkpointer = MemorySaver()
         
         # Compile the graph
         self.app = self.graph.compile(checkpointer=checkpointer)

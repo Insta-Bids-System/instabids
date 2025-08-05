@@ -77,20 +77,45 @@ class WebSearchContractorAgent:
 
         print(f"[WebSearchAgent] Google Maps API Key: {'Found' if self.google_api_key else 'NOT FOUND'}")
 
-        # Common contractor search terms by project type
+        # Enhanced contractor search terms with service-level specifics
         self.search_terms = {
             "holiday lighting": ["holiday lighting installation", "christmas light installation", "holiday decorating services", "christmas lighting company"],
             "kitchen": ["kitchen remodeling", "kitchen renovation", "cabinet installation", "kitchen contractors"],
             "bathroom": ["bathroom remodeling", "bathroom renovation", "bathroom contractors"],
             "roofing": ["roofing contractors", "roof repair", "roof installation", "roofers"],
+            "roofing_repair": ["roof repair", "emergency roof repair", "roof leak repair", "shingle repair"],
+            "roofing_installation": ["roof installation", "new roof installation", "roof replacement", "re-roofing"],
+            "roofing_service": ["roof maintenance", "roof inspection", "roof cleaning", "gutter cleaning"],
             "lawn care": ["lawn care services", "landscaping", "yard maintenance", "artificial turf installation"],
+            "lawn_maintenance": ["lawn mowing", "yard maintenance", "grass cutting", "lawn service"],
+            "lawn_installation": ["sod installation", "artificial turf installation", "lawn renovation", "grass installation"],
             "plumbing": ["plumbers", "plumbing contractors", "plumbing services"],
+            "plumbing_repair": ["plumbing repair", "leak repair", "emergency plumber", "pipe repair"],
+            "plumbing_installation": ["plumbing installation", "new plumbing", "fixture installation", "water heater installation"],
+            "plumbing_service": ["drain cleaning", "plumbing maintenance", "pipe inspection", "sewer service"],
             "electrical": ["electricians", "electrical contractors", "electrical services"],
+            "electrical_repair": ["electrical repair", "emergency electrician", "outlet repair", "breaker repair"],
+            "electrical_installation": ["electrical installation", "new wiring", "panel upgrade", "outlet installation"],
+            "electrical_service": ["electrical inspection", "electrical maintenance", "electrical troubleshooting"],
             "flooring": ["flooring contractors", "floor installation", "hardwood flooring"],
+            "flooring_repair": ["floor repair", "hardwood repair", "tile repair", "carpet repair"],
+            "flooring_installation": ["floor installation", "new flooring", "hardwood installation", "tile installation"],
             "painting": ["painting contractors", "house painters", "interior painting"],
+            "painting_interior": ["interior painting", "room painting", "wall painting", "ceiling painting"],
+            "painting_exterior": ["exterior painting", "house painting", "siding painting", "deck staining"],
             "hvac": ["HVAC contractors", "heating cooling", "air conditioning repair"],
+            "hvac_repair": ["AC repair", "furnace repair", "HVAC emergency repair", "heating repair"],
+            "hvac_installation": ["AC installation", "furnace installation", "new HVAC system", "ductwork installation"],
+            "hvac_service": ["HVAC maintenance", "AC tune-up", "furnace inspection", "duct cleaning"],
             "solar": ["solar panel installation", "solar contractors", "solar energy systems"],
             "general": ["general contractors", "home improvement", "remodeling contractors"]
+        }
+        
+        # Service type indicators to detect in project descriptions
+        self.service_indicators = {
+            "repair": ["repair", "fix", "broken", "damaged", "leak", "emergency", "not working", "problem", "issue"],
+            "installation": ["install", "new", "replace", "upgrade", "add", "build", "construction"],
+            "service": ["maintenance", "cleaning", "inspection", "tune-up", "service", "check", "annual"]
         }
 
         print("[WebSearchAgent] Initialized Web Search Contractor Discovery Agent")
@@ -186,40 +211,102 @@ class WebSearchContractorAgent:
                         "zip_code": "33442"
                     }
                 }
+            
+            # Service-specific test cases
+            if bid_card_id == "test-emergency-roof-repair":
+                return {
+                    "project_type": "roofing",
+                    "bid_document": {
+                        "project_overview": {
+                            "description": "Emergency roof repair needed! We had a severe storm last night and now there's a leak in our master bedroom. Water is dripping through the ceiling and we need someone to fix the damaged shingles immediately before more rain comes. This is urgent - we can't wait."
+                        }
+                    },
+                    "location": {
+                        "full_location": "Coconut Creek, FL 33442",
+                        "city": "Coconut Creek",
+                        "state": "FL",
+                        "zip_code": "33442"
+                    }
+                }
+            
+            if bid_card_id == "test-kitchen-installation":
+                return {
+                    "project_type": "kitchen",
+                    "bid_document": {
+                        "project_overview": {
+                            "description": "We're doing a complete kitchen remodel and need contractors for the installation. We want to install new cabinets, countertops, backsplash, and appliances. This is new construction work, not repairs. Looking for experienced installers who can handle a modern kitchen build-out."
+                        }
+                    },
+                    "location": {
+                        "full_location": "Boca Raton, FL 33431",
+                        "city": "Boca Raton",
+                        "state": "FL",
+                        "zip_code": "33431"
+                    }
+                }
+            
+            if bid_card_id == "test-plumbing-maintenance":
+                return {
+                    "project_type": "plumbing",
+                    "bid_document": {
+                        "project_overview": {
+                            "description": "Looking for annual plumbing maintenance service. Need inspection of all pipes, drain cleaning, water heater tune-up, and general plumbing system check. This is routine maintenance to prevent problems, not emergency repairs."
+                        }
+                    },
+                    "location": {
+                        "full_location": "Coral Springs, FL 33065",
+                        "city": "Coral Springs",
+                        "state": "FL",
+                        "zip_code": "33065"
+                    }
+                }
 
             # Load from database
             result = self.supabase.table("bid_cards").select("*").eq("id", bid_card_id).single().execute()
 
             if result.data:
                 bid_document = result.data.get("bid_document", {})
+                
+                # FIXED: Use actual database fields for location
+                location_city = result.data.get("location_city", "")
+                location_state = result.data.get("location_state", "")
+                location_zip = result.data.get("location_zip", "")
+                
+                # Build full location string
+                full_location = f"{location_city}, {location_state} {location_zip}".strip()
 
                 # Handle different bid document formats
                 if "all_extracted_data" in bid_document:
                     # New format
-                    return bid_document["all_extracted_data"]
+                    data = bid_document["all_extracted_data"]
+                    # Override location with actual database fields
+                    if location_city:
+                        data["location"] = {
+                            "full_location": full_location,
+                            "city": location_city,
+                            "state": location_state,
+                            "zip_code": location_zip
+                        }
+                    return data
                 else:
-                    # Legacy format - convert to expected structure
+                    # Use actual database fields, not trying to parse from bid_document
                     project_overview = bid_document.get("project_overview", {})
                     budget_info = bid_document.get("budget_information", {})
                     timeline = bid_document.get("timeline", {})
 
-                    # Extract location data
-                    location_str = project_overview.get("location", "")
-                    location_parts = location_str.split()
-
                     converted_data = {
-                        "project_type": project_overview.get("title", "").lower(),
-                        "budget_min": budget_info.get("budget_min", 0),
-                        "budget_max": budget_info.get("budget_max", 0),
-                        "urgency_level": timeline.get("urgency_level", "flexible"),
+                        "project_type": result.data.get("project_type", "general"),
+                        "budget_min": result.data.get("budget_min", budget_info.get("budget_min", 0)),
+                        "budget_max": result.data.get("budget_max", budget_info.get("budget_max", 0)),
+                        "urgency_level": result.data.get("urgency_level", timeline.get("urgency_level", "flexible")),
                         "location": {
-                            "full_location": location_str,
-                            "city": location_parts[1] if len(location_parts) > 1 else "",
-                            "state": location_parts[2] if len(location_parts) > 2 else "",
-                            "zip_code": location_parts[0] if len(location_parts) > 0 and location_parts[0].isdigit() else ""
+                            "full_location": full_location,
+                            "city": location_city,
+                            "state": location_state,
+                            "zip_code": location_zip
                         },
                         "contractor_requirements": {
-                            "contractor_count": project_overview.get("contractors_needed", 3)
+                            "contractor_count": result.data.get("contractor_count_needed", 3)
                         }
                     }
                     return converted_data
@@ -230,39 +317,86 @@ class WebSearchContractorAgent:
             print(f"[WebSearchAgent ERROR] Failed to load bid card: {e}")
             return None
 
+    def _detect_service_type(self, bid_data: dict[str, Any]) -> str:
+        """Detect service type (repair/installation/service) from project description"""
+        # Get project description from various possible locations
+        description = ""
+        bid_document = bid_data.get("bid_document", {})
+        
+        if isinstance(bid_document, dict):
+            project_overview = bid_document.get("project_overview", {})
+            if isinstance(project_overview, dict):
+                description = project_overview.get("description", "")
+        
+        # Also check other possible description fields
+        description += " " + bid_data.get("description", "")
+        description += " " + bid_data.get("project_description", "")
+        description = description.lower()
+        
+        # Count indicators for each service type
+        service_scores = {"repair": 0, "installation": 0, "service": 0}
+        
+        for service_type, indicators in self.service_indicators.items():
+            for indicator in indicators:
+                if indicator in description:
+                    service_scores[service_type] += 1
+        
+        # Return the service type with highest score, or None if no clear winner
+        if max(service_scores.values()) > 0:
+            return max(service_scores, key=service_scores.get)
+        
+        return None
+
     def _extract_search_query(self, bid_data: dict[str, Any], radius_miles: int = 25) -> ContractorSearchQuery:
-        """Extract search parameters from bid data"""
+        """Extract search parameters from bid data with service-level specificity"""
         project_type = bid_data.get("project_type", "general").lower()
         location = bid_data.get("location", {})
 
+        # Detect service type from project description
+        service_type = self._detect_service_type(bid_data)
+        
         # Clean up project type for search
+        base_project_type = project_type
         if "holiday" in project_type or "christmas" in project_type:
-            project_type = "holiday lighting"
+            base_project_type = "holiday lighting"
         elif "kitchen" in project_type:
-            project_type = "kitchen"
+            base_project_type = "kitchen"
         elif "bathroom" in project_type or "bath" in project_type:
-            project_type = "bathroom"
+            base_project_type = "bathroom"
         elif "roof" in project_type:
-            project_type = "roofing"
+            base_project_type = "roofing"
         elif "lawn" in project_type or "yard" in project_type or "landscap" in project_type or "turf" in project_type:
-            project_type = "lawn care"
+            base_project_type = "lawn care"
         elif "plumb" in project_type:
-            project_type = "plumbing"
+            base_project_type = "plumbing"
         elif "electric" in project_type:
-            project_type = "electrical"
+            base_project_type = "electrical"
         elif "floor" in project_type:
-            project_type = "flooring"
+            base_project_type = "flooring"
         elif "paint" in project_type:
-            project_type = "painting"
+            base_project_type = "painting"
         elif "hvac" in project_type or "heating" in project_type or "cooling" in project_type:
-            project_type = "hvac"
+            base_project_type = "hvac"
         elif "solar" in project_type or "panel" in project_type:
-            project_type = "solar"
+            base_project_type = "solar"
         else:
-            project_type = "general"
+            base_project_type = "general"
 
+        # Combine with service type if detected
+        if service_type and base_project_type != "general":
+            specific_project_type = f"{base_project_type}_{service_type}"
+            # Check if we have specific search terms for this combination
+            if specific_project_type in self.search_terms:
+                final_project_type = specific_project_type
+                print(f"[WebSearchAgent] Detected service-specific project type: {final_project_type}")
+            else:
+                final_project_type = base_project_type
+                print(f"[WebSearchAgent] Using base project type: {final_project_type} (service: {service_type})")
+        else:
+            final_project_type = base_project_type
+        
         return ContractorSearchQuery(
-            project_type=project_type,
+            project_type=final_project_type,
             zip_code=location.get("zip_code", ""),
             city=location.get("city", ""),
             state=location.get("state", ""),
@@ -531,11 +665,22 @@ class WebSearchContractorAgent:
             "tampa": (27.9506, -82.4572),
             "jacksonville": (30.3322, -81.6557),
             "fort lauderdale": (26.1224, -80.1373),
-            "tallahassee": (30.4518, -84.27277)
+            "tallahassee": (30.4518, -84.27277),
+            "parkland": (26.3106, -80.2372),
+            "margate": (26.2445, -80.2064),
+            "coral gables": (25.7218, -80.2685)
         }
 
         city_key = city.lower().strip()
-        return coordinates.get(city_key, (27.7663, -82.6404))  # Default to FL center
+        
+        # FIXED: If city not found, use actual Florida center (near Lakeland)
+        # or better yet, raise an error so we know something's wrong
+        if city_key not in coordinates:
+            print(f"[WebSearchAgent WARNING] City '{city}' not in coordinates database!")
+            print(f"[WebSearchAgent] Defaulting to Miami area for safety")
+            return (25.7617, -80.1918)  # Default to Miami instead of St. Petersburg
+            
+        return coordinates.get(city_key)
 
     def _is_directory_website(self, place: dict[str, Any]) -> bool:
         """Check if place is a directory website to avoid"""

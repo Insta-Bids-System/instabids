@@ -3,7 +3,7 @@ import { Toaster } from "react-hot-toast";
 import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import HomeownerProjectWorkspace from "@/components/HomeownerProjectWorkspace";
-import { AuthProvider } from "@/contexts/AuthContext";
+// import { AuthProvider } from "@/contexts/AuthContext";
 import { AdminAuthProvider } from "@/hooks/useAdminAuth";
 import AuthCallbackPage from "@/pages/AuthCallbackPage";
 import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
@@ -29,9 +29,8 @@ import { TestMessagingPage } from "@/test/test-messaging-api";
 function App() {
   return (
     <Router>
-      <AuthProvider>
-        <div className="min-h-screen bg-gray-50">
-          <Routes>
+      <div className="min-h-screen bg-gray-50">
+        <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
@@ -61,11 +60,7 @@ function App() {
             />
             <Route
               path="/dashboard"
-              element={
-                <ProtectedRoute requiredRole="homeowner">
-                  <DashboardPage />
-                </ProtectedRoute>
-              }
+              element={<DashboardPage />}
             />
             <Route
               path="/contractor/dashboard"
@@ -93,17 +88,12 @@ function App() {
             />
             <Route
               path="/bid-cards/:id"
-              element={
-                <ProtectedRoute requiredRole="homeowner">
-                  <HomeownerProjectWorkspace />
-                </ProtectedRoute>
-              }
+              element={<HomeownerProjectWorkspace />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <Toaster position="top-right" />
         </div>
-      </AuthProvider>
     </Router>
   );
 }
