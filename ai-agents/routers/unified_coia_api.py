@@ -17,7 +17,7 @@ from agents.coia.unified_graph import (
     invoke_coia_research,
     invoke_coia_intelligence
 )
-from agents.coia.supabase_checkpointer import create_supabase_checkpointer
+from agents.coia.supabase_checkpointer_simple import create_supabase_checkpointer
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +35,21 @@ async def get_unified_coia_app():
     if _unified_coia_app is None:
         logger.info("Initializing unified COIA system...")
         try:
+            # Try to create with Supabase checkpointer first
             checkpointer = await create_supabase_checkpointer()
             _unified_coia_app = await create_unified_coia_system(checkpointer)
-            logger.info("Unified COIA system initialized successfully")
+            logger.info("Unified COIA system initialized successfully with Supabase checkpointer")
         except Exception as e:
-            logger.error(f"Failed to initialize unified COIA system: {e}")
-            raise HTTPException(status_code=500, detail="Failed to initialize COIA system")
+            logger.warning(f"Failed to initialize with Supabase checkpointer: {e}")
+            try:
+                # Fallback to in-memory checkpointer
+                from langgraph.checkpoint.memory import MemorySaver
+                checkpointer = MemorySaver()
+                _unified_coia_app = await create_unified_coia_system(checkpointer)
+                logger.info("Unified COIA system initialized successfully with in-memory checkpointer")
+            except Exception as e2:
+                logger.error(f"Failed to initialize unified COIA system even with fallback: {e2}")
+                raise HTTPException(status_code=500, detail="Failed to initialize COIA system")
     
     return _unified_coia_app
 

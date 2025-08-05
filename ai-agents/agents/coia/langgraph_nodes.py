@@ -15,7 +15,7 @@ from .unified_state import UnifiedCoIAState, UnifiedCoIAConversationState, creat
 from .agent import CoIAAgent
 from .research_based_agent import ResearchBasedCoIAAgent
 from .openai_o3_agent import OpenAIO3CoIA
-from .supabase_checkpointer import SupabaseCheckpointer
+from .supabase_checkpointer_simple import SupabaseCheckpointer
 
 logger = logging.getLogger(__name__)
 

@@ -22,7 +22,8 @@ import {
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+// import { useAuth } from "@/contexts/AuthContext";
+import ContractorCommunicationHub from "@/components/homeowner/ContractorCommunicationHub";
 
 interface BidCardData {
   id: string;
@@ -75,7 +76,6 @@ interface HomeownerProjectWorkspaceProps {
 const HomeownerProjectWorkspace: React.FC<HomeownerProjectWorkspaceProps> = ({ bidCardId }) => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<
     "overview" | "chat" | "contractors" | "documents" | "analytics"
   >("overview");
@@ -86,10 +86,10 @@ const HomeownerProjectWorkspace: React.FC<HomeownerProjectWorkspaceProps> = ({ b
   const projectId = bidCardId || id;
 
   useEffect(() => {
-    if (projectId && user) {
+    if (projectId) {
       loadBidCard();
     }
-  }, [projectId, user]);
+  }, [projectId]);
 
   const loadBidCard = async () => {
     try {
@@ -565,72 +565,12 @@ const HomeownerProjectWorkspace: React.FC<HomeownerProjectWorkspaceProps> = ({ b
         {/* Other tabs would be implemented here */}
         {activeTab === "contractors" && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Contractor Bids & Proposals</h2>
-            {bidCard?.bid_document?.submitted_bids && bidCard.bid_document.submitted_bids.length > 0 ? (
-              <div className="space-y-6">
-                {bidCard.bid_document.submitted_bids.map((bid: any, index: number) => (
-                  <div key={bid.bid_id || index} className="border border-gray-200 rounded-lg p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{bid.contractor_name}</h3>
-                        <p className="text-sm text-gray-600">License: {bid.license_number}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-sm text-yellow-600">★ {bid.contractor_rating}</span>
-                          <span className="text-sm text-gray-500">({bid.completed_projects} projects)</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-green-600">
-                          ${bid.bid_amount?.toLocaleString()}
-                        </div>
-                        <div className="text-sm text-gray-600">{bid.timeline}</div>
-                      </div>
-                    </div>
-                    
-                    <p className="text-gray-700 mb-4">{bid.proposal_summary}</p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-2">Included Items:</h4>
-                        <ul className="text-sm text-gray-600 space-y-1">
-                          {bid.included_items?.map((item: string, i: number) => (
-                            <li key={i} className="flex items-start gap-2">
-                              <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-2">Payment Terms:</h4>
-                        <p className="text-sm text-gray-600">{bid.payment_terms}</p>
-                        <h4 className="font-medium text-gray-900 mb-2 mt-3">Warranty:</h4>
-                        <p className="text-sm text-gray-600">{bid.warranty}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-3 pt-4 border-t border-gray-200">
-                      <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4" />
-                        Message Contractor
-                      </button>
-                      <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                        Accept Bid
-                      </button>
-                      <button className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
-                        View Full Proposal
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {projectId ? (
+              <ContractorCommunicationHub bidCardId={projectId} homeownerId="test-homeowner-id" />
             ) : (
-              <div className="text-center py-12">
-                <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No Bids Yet</h3>
-                <p className="text-gray-600">
-                  Contractor bids will appear here once they start responding to your project.
-                </p>
+              <div className="text-center text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                <p>Unable to load contractor communications</p>
               </div>
             )}
           </div>

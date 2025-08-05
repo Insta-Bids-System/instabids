@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
 import EnhancedBidCard from "@/components/EnhancedBidCard";
 import InspirationDashboard from "@/components/inspiration/InspirationDashboard";
+import ContractorCommunicationHub from "@/components/homeowner/ContractorCommunicationHub";
 import { useAuth } from "@/contexts/AuthContext";
 import { type Project, supabase } from "@/lib/supabase";
 

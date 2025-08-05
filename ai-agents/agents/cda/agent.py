@@ -15,6 +15,7 @@ from supabase import create_client
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from agents.cda.intelligent_matcher import IntelligentContractorMatcher
+from agents.cda.service_specific_matcher import ServiceSpecificMatcher
 from agents.cda.tier1_matcher_v2 import Tier1Matcher
 from agents.cda.tier2_reengagement import Tier2Reengagement
 from agents.cda.web_search_agent import WebSearchContractorAgent
@@ -31,12 +32,19 @@ class ContractorDiscoveryAgent:
         self.supabase = create_client(self.supabase_url, self.supabase_key)
 
         # Initialize components
-        self.intelligent_matcher = IntelligentContractorMatcher(llm_provider="anthropic")  # Opus 4
+        try:
+            self.service_matcher = ServiceSpecificMatcher()
+            print("[CDA v2] Initialized with Claude Opus 4 service-specific matching")
+        except Exception as e:
+            print(f"[CDA v2] Service matcher unavailable: {e}")
+            self.service_matcher = None
+        
+        self.intelligent_matcher = None  # Legacy matcher disabled
         self.web_search = WebSearchContractorAgent(self.supabase)
         self.tier1_matcher = Tier1Matcher(self.supabase)
         self.tier2_reengagement = Tier2Reengagement(self.supabase)
 
-        print("[CDA v2] Initialized with Claude Opus 4 intelligence")
+        print("[CDA v2] Initialized with enhanced service-specific matching")
 
     def discover_contractors(self, bid_card_id: str, contractors_needed: int = 5, radius_miles: int = 15) -> dict[str, Any]:
         """
@@ -44,14 +52,14 @@ class ContractorDiscoveryAgent:
 
         Process:
         1. Load bid card data
-        2. Use Opus 4 to deeply analyze what customer wants
+        2. Calculate how many contractors to actually contact (5-to-1 ratio)
         3. Search for contractors (3-tier system with radius filtering)
-        4. Use Opus 4 to score each contractor
+        4. Score each contractor
         5. Select best matches with explanations
         
         Args:
             bid_card_id: ID of the bid card to process
-            contractors_needed: Number of contractors to select (default: 5)
+            contractors_needed: Number of BIDS needed (default: 5)
             radius_miles: Search radius in miles for Tier 1 & 2 (default: 15)
         """
         try:
@@ -63,15 +71,69 @@ class ContractorDiscoveryAgent:
                 return {"success": False, "error": "Bid card not found"}
 
             print(f"[CDA v2] Loaded bid card - Project: {bid_card.get('project_type', 'Unknown')}")
+            
+            # Step 2: Calculate how many contractors to actually contact
+            # Based on urgency level and the 5/10/15 rule
+            bids_needed = bid_card.get("contractor_count_needed", contractors_needed)
+            urgency = bid_card.get("urgency_level", "week")
+            
+            # Calculate contractors to contact based on response rates
+            # Tier 1: 90% response rate (internal contractors)
+            # Tier 2: 50% response rate (previous contacts) 
+            # Tier 3: 20% response rate (cold outreach)
+            # Average blended rate ~33% for mixed tiers
+            
+            # For now, use simple 5-to-1 ratio (20% response rate assumption)
+            contractors_to_find = bids_needed * 5
+            
+            print(f"[CDA v2] Need {bids_needed} bids, targeting {contractors_to_find} contractors")
+            print(f"[CDA v2] Urgency level: {urgency}")
 
-            # Step 2: Opus 4 analyzes what customer really wants
-            print("[CDA v2] Using Claude Opus 4 to analyze customer requirements...")
-            bid_analysis = self.intelligent_matcher.analyze_bid_requirements(bid_card)
-
-            print("[CDA v2] Opus 4 Analysis Complete:")
-            print(f"  - Size Preference: {bid_analysis.get('contractor_size_preference', 'Unknown')}")
-            print(f"  - Quality Focus: {bid_analysis.get('quality_vs_price_balance', 'Unknown')}")
-            print(f"  - Trust Factors: {bid_analysis.get('trust_factors', 'Unknown')}")
+            # Step 3: Intelligent project analysis using Claude Opus 4
+            print("[CDA v2] Analyzing project requirements with Claude Opus 4...")
+            
+            # Format location properly for the tier matchers
+            location = {
+                "city": bid_card.get("location_city", ""),
+                "state": bid_card.get("location_state", ""),
+                "zip_code": bid_card.get("location_zip", "")
+            }
+            
+            # Also update the bid_card with the formatted location for tier matchers
+            bid_card["location"] = location
+            
+            # Use service-specific matcher for intelligent analysis
+            if self.service_matcher:
+                project_analysis = self.service_matcher.analyze_project_requirements(bid_card)
+                print(f"[CDA v2] Intelligent Analysis Complete:")
+                print(f"  - Service Category: {project_analysis.get('service_category', 'Unknown')}")
+                print(f"  - Service Type: {project_analysis.get('service_type', 'Unknown')}")
+                print(f"  - Specialization Required: {project_analysis.get('specialization_required', [])}")
+                print(f"  - Scope Complexity: {project_analysis.get('scope_complexity', 'Unknown')}")
+            else:
+                # Fallback to simple analysis
+                project_analysis = {
+                    "service_category": bid_card.get("project_type", "Unknown"),
+                    "service_type": "general",
+                    "specialization_required": [],
+                    "urgency_indicators": [],
+                    "quality_preferences": "balanced",
+                    "scope_complexity": "moderate",
+                    "contractor_requirements": []
+                }
+                print("[CDA v2] Using fallback analysis (service matcher unavailable)")
+            
+            # Include original bid analysis structure for compatibility
+            bid_analysis = {
+                "contractor_size_preference": "any",
+                "quality_vs_price_balance": project_analysis.get("quality_preferences", "balanced"),
+                "trust_factors": ["reviews", "local"],
+                "project_type": bid_card.get("project_type", "Unknown"),
+                "location": location,
+                "bids_needed": bids_needed,
+                "contractors_to_find": contractors_to_find,
+                "service_analysis": project_analysis  # Include intelligent analysis
+            }
 
             # Step 3: Gather contractors from all sources
             all_contractors = []
@@ -95,11 +157,13 @@ class ContractorDiscoveryAgent:
                 print(f"[CDA v2] No previous contacts found within {radius_miles} miles")
 
             # Tier 3: Web search for new contractors with radius search
-            if len(all_contractors) < contractors_needed * 2:  # Get extra for better selection
+            if len(all_contractors) < contractors_to_find:  # Get the full amount we need
                 print(f"[CDA v2] Searching Tier 3: Web search for new contractors within {radius_miles} miles...")
+                # Search for remaining contractors needed
+                remaining_needed = contractors_to_find - len(all_contractors)
                 web_results = self.web_search.discover_contractors_for_bid(
                     bid_card_id,
-                    contractors_needed=contractors_needed * 2,
+                    contractors_needed=remaining_needed,
                     radius_miles=radius_miles
                 )
                 if web_results["success"] and web_results["contractors"]:
@@ -117,16 +181,53 @@ class ContractorDiscoveryAgent:
                     "bid_analysis": bid_analysis
                 }
 
-            # Step 4: Use Opus 4 to intelligently score and select contractors
-            print(f"[CDA v2] Using Claude Opus 4 to score {len(unique_contractors)} contractors...")
-            selection_result = self.intelligent_matcher.rank_and_select_contractors(
-                unique_contractors,
-                bid_card,
-                contractors_needed=contractors_needed
-            )
+            # Step 4: Intelligent scoring using Claude Opus 4 service-specific matching
+            print(f"[CDA v2] Scoring {len(unique_contractors)} contractors with intelligent service matching...")
+            
+            # Score each contractor using service-specific analysis
+            for contractor in unique_contractors:
+                if self.service_matcher:
+                    try:
+                        # Get intelligent scoring based on service requirements
+                        scoring_result = self.service_matcher.score_contractor_match(contractor, project_analysis)
+                        
+                        # Apply the intelligent scoring
+                        contractor["match_score"] = scoring_result.get("match_score", 50)
+                        contractor["recommendation"] = scoring_result.get("recommendation", "possible_match")
+                        contractor["reasoning"] = scoring_result.get("reasoning", "Intelligent analysis")
+                        contractor["key_strengths"] = scoring_result.get("key_strengths", [])
+                        contractor["concerns"] = scoring_result.get("concerns", [])
+                        contractor["specialization_match"] = scoring_result.get("specialization_match", "moderate")
+                        
+                        print(f"[CDA v2] Intelligent score for {contractor.get('company_name', 'Unknown')}: {contractor['match_score']}")
+                        
+                    except Exception as e:
+                        print(f"[CDA v2] Error in intelligent scoring for {contractor.get('company_name', 'Unknown')}: {e}")
+                        # Fallback to simple scoring
+                        self._apply_simple_scoring(contractor)
+                else:
+                    # Fallback to simple scoring when service matcher unavailable
+                    self._apply_simple_scoring(contractor)
+            
+            # Sort by score and select top matches
+            unique_contractors.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+            # Select the number we calculated we need to contact, not just the bids needed
+            selected = unique_contractors[:contractors_to_find]
+            
+            selection_result = {
+                "selected_contractors": selected,
+                "all_scores": [
+                    {
+                        "name": c.get("company_name"),
+                        "score": c.get("match_score"),
+                        "recommendation": c.get("recommendation")
+                    }
+                    for c in unique_contractors
+                ]
+            }
 
-            # Step 5: Get human-readable explanation
-            explanation = self.intelligent_matcher.explain_selection(selection_result)
+            # Step 5: Simple explanation without LLM
+            explanation = f"Selected {len(selected)} contractors to contact for {bids_needed} needed bids (using 5-to-1 ratio). Top matches have the best combination of customer ratings and established business presence."
 
             # Step 6: Store the selected contractors with match data
             stored_contractors = self._store_matched_contractors(
@@ -154,7 +255,8 @@ class ContractorDiscoveryAgent:
                 }
             }
 
-            print(f"[CDA v2] Discovery complete - Selected {len(selection_result['selected_contractors'])} contractors within {radius_miles} mile radius")
+            print(f"[CDA v2] Discovery complete - Selected {len(selection_result['selected_contractors'])} contractors to contact")
+            print(f"[CDA v2] Target: {bids_needed} bids from {contractors_to_find} contractors within {radius_miles} mile radius")
             print(f"[CDA v2] Explanation: {explanation}")
 
             return result
@@ -190,12 +292,64 @@ class ContractorDiscoveryAgent:
                         "notes": "Want it done right, not rushed"
                     }
                 },
-                "location": {
-                    "city": "Coconut Creek",
-                    "state": "FL",
-                    "zip_code": "33442"
-                },
+                "location_city": "Coconut Creek",
+                "location_state": "FL", 
+                "location_zip": "33442",
                 "contractor_count_needed": 5
+            }
+        elif bid_card_id == "test-emergency-roof-repair":
+            return {
+                "id": bid_card_id,
+                "project_type": "roofing",
+                "bid_document": {
+                    "project_overview": {
+                        "description": "I have a leak in my roof after the storm last week. Need emergency repair to fix the damaged shingles and prevent water damage. This is urgent."
+                    },
+                    "timeline": {
+                        "urgency_level": "emergency",
+                        "notes": "Need this fixed immediately before more damage occurs"
+                    }
+                },
+                "location_city": "Coconut Creek",
+                "location_state": "FL",
+                "location_zip": "33442", 
+                "contractor_count_needed": 5
+            }
+        elif bid_card_id == "test-kitchen-installation":
+            return {
+                "id": bid_card_id,
+                "project_type": "kitchen remodel",
+                "bid_document": {
+                    "project_overview": {
+                        "description": "Complete kitchen remodel with new cabinets, countertops, appliances, and flooring. Looking for full installation services from start to finish."
+                    },
+                    "timeline": {
+                        "urgency_level": "month",
+                        "notes": "Want professional installation team"
+                    }
+                },
+                "location_city": "Coconut Creek",
+                "location_state": "FL",
+                "location_zip": "33442",
+                "contractor_count_needed": 4
+            }
+        elif bid_card_id == "test-plumbing-maintenance":
+            return {
+                "id": bid_card_id,
+                "project_type": "plumbing",
+                "bid_document": {
+                    "project_overview": {
+                        "description": "Regular plumbing maintenance service needed. Check all fixtures, inspect pipes, and ongoing maintenance contract."
+                    },
+                    "timeline": {
+                        "urgency_level": "week", 
+                        "notes": "Looking for ongoing service relationship"
+                    }
+                },
+                "location_city": "Coconut Creek",
+                "location_state": "FL",
+                "location_zip": "33442",
+                "contractor_count_needed": 3
             }
 
         # Load from database
@@ -253,6 +407,24 @@ class ContractorDiscoveryAgent:
             # Continue anyway - main functionality still works
 
         return stored_ids
+
+    def _apply_simple_scoring(self, contractor: dict[str, Any]) -> None:
+        """Apply simple scoring as fallback when intelligent matching unavailable"""
+        score = 70  # Base score
+        if contractor.get("google_rating", 0) >= 4.5:
+            score += 10
+        if contractor.get("google_review_count", 0) >= 50:
+            score += 10
+        if contractor.get("website"):
+            score += 5
+        if contractor.get("email"):
+            score += 5
+        
+        contractor["match_score"] = min(score, 100)
+        contractor["recommendation"] = "good_match" if score >= 80 else "possible_match"
+        contractor["reasoning"] = f"Basic scoring based on rating ({contractor.get('google_rating', 'N/A')}), reviews ({contractor.get('google_review_count', 0)}), and online presence"
+        contractor["key_strengths"] = ["Local contractor", "Established business"]
+        contractor["concerns"] = ["Limited specialization analysis"]
 
 
 # Test the intelligent CDA
