@@ -91,6 +91,7 @@ class ResearchBasedCoIAAgent:
 
         # Look for business name patterns
         business_patterns = [
+            r"research company:\s+(.+)",  # "Research company: Turf Grass Artificial Solutions"
             r"i own\s+(.+)",
             r"my business is\s+(.+)",
             r"my company is\s+(.+)",
@@ -133,7 +134,7 @@ class ResearchBasedCoIAAgent:
                                      user_message: str) -> dict[str, Any]:
         """Research the business using web tools"""
 
-        print(f"🔍 Researching business: {business_info}")
+        print(f"RESEARCH: Researching business: {business_info}")
 
         # Store the business info
         state.business_research = business_info
@@ -190,6 +191,7 @@ class ResearchBasedCoIAAgent:
                 }
 
             except Exception as e:
+                print(f"RESEARCH ERROR: Error researching website {website}: {e}")
                 logger.error(f"Error researching website {website}: {e}")
                 response = f"I found your business but had trouble accessing your website at {website}. Could you confirm the correct website URL, or would you like to proceed without website research?"
 

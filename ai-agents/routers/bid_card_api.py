@@ -15,6 +15,7 @@ from supabase import Client
 # Import auth and database utilities from existing project structure
 from database_simple import db
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -336,85 +337,85 @@ async def search_bid_cards(
     try:
         # Debug logging to see what parameters we're getting
         logger.info(f"Search params received: zip_code='{zip_code}' (type: {type(zip_code)}), radius_miles='{radius_miles}' (type: {type(radius_miles)})")
-        
+
         # If radius search parameters are present, redirect to contractor-jobs API
         if zip_code and radius_miles:
             logger.info(f"Radius search detected: zip_code={zip_code}, radius_miles={radius_miles}")
             import httpx
-            
+
             # Convert bid-cards parameters to contractor-jobs parameters
             contractor_params = {
-                'zip_code': zip_code,
-                'radius_miles': radius_miles,
-                'page': page,
-                'page_size': page_size
+                "zip_code": zip_code,
+                "radius_miles": radius_miles,
+                "page": page,
+                "page_size": page_size
             }
-            
+
             # Add project type filters if present
             if project_types:
-                contractor_params['project_types'] = project_types
-            
+                contractor_params["project_types"] = project_types
+
             logger.info(f"Making request to contractor-jobs API with params: {contractor_params}")
-            
+
             # Make internal request to contractor-jobs API
             try:
                 async with httpx.AsyncClient() as client:
                     response = await client.get(
-                        f"http://localhost:8008/api/contractor-jobs/search",
+                        "http://localhost:8008/api/contractor-jobs/search",
                         params=contractor_params
                     )
-                    
+
                 logger.info(f"Contractor-jobs API responded with status: {response.status_code}")
-                
+
                 # Transform response to match bid-cards format
                 if response.status_code == 200:
                     data = response.json()
                     logger.info(f"Got {len(data.get('job_opportunities', []))} job opportunities from contractor-jobs API")
                     # Transform job_opportunities to bid_cards format
                     bid_cards = []
-                    for job in data.get('job_opportunities', []):
+                    for job in data.get("job_opportunities", []):
                         bid_card = {
-                            'id': job['id'],
-                            'bid_card_number': job.get('bid_card_number'),
-                            'title': job['title'],
-                            'description': job['description'],
-                            'project_type': job['project_type'],
-                            'status': job['status'],
-                            'budget_min': job['budget_range']['min'],
-                            'budget_max': job['budget_range']['max'],
-                            'location_city': job['location']['city'],
-                            'location_state': job['location']['state'],
-                            'location_zip': job['location']['zip_code'],
-                            'timeline_start': job['timeline']['start_date'],
-                            'timeline_end': job['timeline']['end_date'],
-                            'contractor_count_needed': job.get('contractor_count_needed', 1),
-                            'bid_count': job.get('bid_count', 0),
-                            'categories': job.get('categories', []),
-                            'group_bid_eligible': job.get('group_bid_eligible', False),
-                            'created_at': job.get('created_at'),
-                            'homeowner_verified': True,
-                            'response_time_hours': 24,
-                            'success_rate': 0.95,
-                            'is_featured': False,
-                            'is_urgent': False,
-                            'distance_miles': job.get('distance_miles')
+                            "id": job["id"],
+                            "bid_card_number": job.get("bid_card_number"),
+                            "title": job["title"],
+                            "description": job["description"],
+                            "project_type": job["project_type"],
+                            "status": job["status"],
+                            "budget_min": job["budget_range"]["min"],
+                            "budget_max": job["budget_range"]["max"],
+                            "location_city": job["location"]["city"],
+                            "location_state": job["location"]["state"],
+                            "location_zip": job["location"]["zip_code"],
+                            "timeline_start": job["timeline"]["start_date"],
+                            "timeline_end": job["timeline"]["end_date"],
+                            "contractor_count_needed": job.get("contractor_count_needed", 1),
+                            "bid_count": job.get("bid_count", 0),
+                            "categories": job.get("categories", []),
+                            "group_bid_eligible": job.get("group_bid_eligible", False),
+                            "created_at": job.get("created_at"),
+                            "homeowner_verified": True,
+                            "response_time_hours": 24,
+                            "success_rate": 0.95,
+                            "is_featured": False,
+                            "is_urgent": False,
+                            "distance_miles": job.get("distance_miles")
                         }
                         bid_cards.append(bid_card)
-                
-                return {
-                    'bid_cards': bid_cards,
-                    'total': data['total'],
-                    'page': data['page'],
-                    'page_size': data['page_size'],
-                    'has_more': data['has_more']
-                }
+
+                    return {
+                        "bid_cards": bid_cards,
+                        "total": data["total"],
+                        "page": data["page"],
+                        "page_size": data["page_size"],
+                        "has_more": data["has_more"]
+                    }
                 else:
                     # If contractor-jobs API fails, fall back to regular search
                     logger.error(f"Contractor-jobs API failed with status {response.status_code}")
             except Exception as e:
                 logger.error(f"Error calling contractor-jobs API: {e}")
                 # Fall back to regular search
-        
+
         # Regular search if not radius search
         query = db.table("bid_cards").select("*")
 
@@ -435,7 +436,7 @@ async def search_bid_cards(
             query = query.eq("location_city", city)
         if state:
             query = query.eq("location_state", state)
-        
+
         # For now, just do exact zip match
         # Radius search is handled by the redirect in main.py
         if zip_code:

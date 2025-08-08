@@ -1,6 +1,6 @@
 import type React from "react";
 import { useEffect, useState } from "react";
-import BidCardPreview from "../components/BidCardPreview";
+import BidCardPreview from "../components/bidcards/homeowner/BidCardPreview";
 import { supabase } from "../lib/supabase";
 
 interface BidCardData {

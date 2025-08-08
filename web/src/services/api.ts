@@ -140,24 +140,52 @@ class ApiService {
     });
   }
 
-  // Chat with contractor onboarding agent (COIA)
+  // Chat with contractor onboarding agent (COIA) - Authenticated version
   async sendContractorOnboardingMessage(
     message: string,
     sessionId: string,
-    currentStage?: string,
-    profileData?: any
-  ): Promise<ApiResponse<ChatResponse>> {
+    contractorLeadId?: string,
+    projectId?: string,
+    context?: any
+  ): Promise<ApiResponse<ChatResponse & { bidCards?: any[]; aiRecommendation?: string }>> {
     const payload = {
       message,
       session_id: sessionId,
-      current_stage: currentStage,
-      profile_data: profileData,
+      contractor_lead_id: contractorLeadId,
+      project_id: projectId,
+      context: context,
     };
 
-    return this.request<ChatResponse>("/chat/message", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    return this.request<ChatResponse & { bidCards?: any[]; aiRecommendation?: string }>(
+      "/api/coia/chat",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  }
+
+  // Chat with contractor onboarding agent (COIA) - Landing page version (unauthenticated)
+  async sendContractorLandingMessage(
+    message: string,
+    sessionId: string,
+    contractorLeadId?: string,
+    context?: any
+  ): Promise<ApiResponse<ChatResponse & { signup_data?: any; signup_link_generated?: boolean }>> {
+    const payload = {
+      message,
+      session_id: sessionId,
+      contractor_lead_id: contractorLeadId,
+      context: context,
+    };
+
+    return this.request<ChatResponse & { signup_data?: any; signup_link_generated?: boolean }>(
+      "/api/coia/landing",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
   }
 
   // Process conversation with JAA (Job Assessment Agent)

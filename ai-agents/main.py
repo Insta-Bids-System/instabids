@@ -8,12 +8,13 @@ modular routers for better maintainability and reduced merge conflicts.
 All API endpoints remain exactly the same - only the internal structure changed.
 """
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -32,33 +33,47 @@ from api.demo_boards import router as demo_boards_router
 # Add the image generation router
 from api.image_generation import router as image_generation_router
 
-# Add the Iris chat router
-from api.iris_chat import router as iris_router
+# Add the Iris chat router (GPT-5 version)
+from api.iris_chat_gpt5 import router as iris_router
+
+# Add the Leonardo.ai image generation routers
+from api.leonardo_image_generation import router as leonardo_router
+from api.leonardo_enhanced_generation import router as leonardo_enhanced_router
 
 # Import all router modules
 # from routers.admin_routes import router as admin_router  # Temporarily disabled - missing production_database_solution
 from routers.admin_routes_enhanced import router as admin_enhanced_router
 from routers.bid_card_api_simple import router as bid_card_api_simple_router
 from routers.bid_card_lifecycle_routes import router as bid_card_lifecycle_router
-from routers.contractor_job_search import router as contractor_job_search_router
 from routers.bid_card_simple_lifecycle import router as bid_card_simple_lifecycle_router
 from routers.cda_routes import router as cda_router
 from routers.cia_routes import router as cia_router
+from routers.contractor_job_search import router as contractor_job_search_router
+from routers.contractor_proposals_api import router as contractor_proposals_router
 from routers.contractor_routes import router as contractor_router
+from routers.contractor_signup_api import router as contractor_signup_router
 from routers.demo_routes import router as demo_router
 from routers.eaa_routes import router as eaa_router
 from routers.homeowner_routes import router as homeowner_router
+from routers.image_upload_api import router as image_upload_router
 from routers.jaa_routes import router as jaa_router
 from routers.messaging_simple import router as messaging_api_router
+from routers.intelligent_messaging_api import router as intelligent_messaging_router
 from routers.monitoring_routes import router as monitoring_router
-from routers.contractor_proposals_api import router as contractor_proposals_router
 
 # Add test WebSocket router
 from routers.test_ws_routes import router as test_ws_router
-from routers.websocket_routes import router as websocket_router
 
 # Add unified COIA router
-from routers.unified_coia_api import router as unified_coia_router  # Fixed - using psycopg2-binary now
+from routers.unified_coia_api import (
+    router as unified_coia_router,  # Fixed - using psycopg2-binary now
+)
+from routers.websocket_routes import router as websocket_router
+from routers.bid_card_event_tracker import router as bid_card_event_tracker_router
+from routers.admin_search_api import router as admin_search_router
+from routers.contractor_management_api import router as contractor_management_router
+from routers.contractor_profile_api import router as contractor_profile_router
+from routers.campaign_management_api import router as campaign_management_router
 
 # Import image persistence service
 from services.image_persistence_service import image_service
@@ -164,28 +179,41 @@ app.add_middleware(
 )
 
 # Include all routers
-# app.include_router(admin_router, prefix="/api/admin")           # Agent 2 - Admin Dashboard (disabled - missing deps)
+from routers.admin_routes import router as admin_router
+
+
+app.include_router(admin_router, prefix="/api/admin")           # Agent 2 - Admin Dashboard (FIXED)
 app.include_router(cia_router, prefix="/api/cia")  # Agent 1 - Customer Interface
 app.include_router(jaa_router)             # Agent 2 - Job Analysis
 app.include_router(cda_router)             # Agent 2 - Contractor Discovery
 app.include_router(eaa_router)             # Agent 2 - External Acquisition
 app.include_router(contractor_router)      # Agent 4 - Contractor Chat
+app.include_router(contractor_signup_router)  # Agent 4 - Contractor Signup
 app.include_router(homeowner_router)       # Agent 3 - Homeowner UI
 app.include_router(demo_router)            # Shared - Demo Pages
 app.include_router(demo_boards_router)     # Working Demo Boards API
 app.include_router(iris_router)            # Iris Chat Agent
-app.include_router(image_generation_router)  # Image Generation API
+app.include_router(leonardo_router)        # Leonardo.ai Image Generation API
+app.include_router(leonardo_enhanced_router)  # Leonardo.ai Enhanced Multi-Reference API
+app.include_router(image_generation_router)  # Legacy DALL-E Image Generation API
 app.include_router(websocket_router)       # Shared - WebSocket
 app.include_router(monitoring_router)      # Agent 6 - System Monitoring
 app.include_router(bid_card_lifecycle_router)  # Agent 2 - Bid Card Lifecycle Tracking
 app.include_router(bid_card_api_simple_router, prefix="/api/bid-cards")    # Agent 1 - Enhanced Bid Card API
 app.include_router(bid_card_simple_lifecycle_router)  # Agent 1 - Simplified Bid Card Lifecycle
 app.include_router(contractor_job_search_router)      # Agent 4 - Contractor Job Search with Radius
-app.include_router(messaging_api_router)    # Agent 1 - Messaging System
+app.include_router(messaging_api_router)    # Agent 1 - Messaging System  
+app.include_router(intelligent_messaging_router)  # Agent 3 - GPT-5 Intelligent Messaging (BUSINESS CRITICAL)
 app.include_router(contractor_proposals_router)  # Contractor Proposals API
+app.include_router(image_upload_router)  # Image Upload API
 app.include_router(test_ws_router, prefix="/api/test")  # Test WebSocket endpoint
 app.include_router(admin_enhanced_router)  # Enhanced admin routes with full bid card data
 app.include_router(unified_coia_router)    # Agent 4 - Unified COIA (Consolidated Agent) - FIXED
+app.include_router(bid_card_event_tracker_router)  # Bid Card Event Tracking System
+app.include_router(admin_search_router)  # Admin Search API - Enhanced search functionality
+app.include_router(contractor_management_router)  # Contractor Management API - 3-tier contractor system
+app.include_router(contractor_profile_router)  # Contractor Profile API - Unified 59-field profiles
+app.include_router(campaign_management_router)  # Campaign Management API - Real-time campaign oversight
 
 # Radius search is now handled directly in the bid_card_api.py router
 
@@ -255,19 +283,21 @@ async def get_real_images(board_id: str):
         logger.error(f"Error getting real images: {e}")
         return {"error": str(e)}
 
+# Database Owner Agent endpoints removed - were non-functional
+
 @app.get("/api/test-radius/{zip_code}")
 async def test_radius_search(zip_code: str, radius: int = 15):
     """Test endpoint to verify radius search functionality"""
     try:
         # Import radius search utilities
-        import sys
         import os
+        import sys
         sys.path.append(os.path.dirname(__file__))
-        from utils.radius_search_fixed import get_zip_codes_in_radius, calculate_distance_miles
-        
+        from utils.radius_search_fixed import calculate_distance_miles, get_zip_codes_in_radius
+
         # Get zip codes within radius
         zip_codes = get_zip_codes_in_radius(zip_code, radius)
-        
+
         # Calculate distances to some nearby zip codes for testing
         distances = []
         for test_zip in zip_codes[:10]:  # Test first 10
@@ -275,10 +305,10 @@ async def test_radius_search(zip_code: str, radius: int = 15):
                 distance = calculate_distance_miles(zip_code, test_zip)
                 if distance is not None:
                     distances.append({"zip_code": test_zip, "distance_miles": distance})
-        
+
         # Sort by distance
         distances.sort(key=lambda x: x["distance_miles"])
-        
+
         return {
             "success": True,
             "center_zip": zip_code,
@@ -288,7 +318,7 @@ async def test_radius_search(zip_code: str, radius: int = 15):
             "sample_distances": distances[:5],  # Show closest 5
             "message": f"Radius search is working! Found {len(zip_codes)} zip codes within {radius} miles of {zip_code}"
         }
-        
+
     except Exception as e:
         logger.error(f"Error testing radius search: {e}")
         return {

@@ -21,11 +21,34 @@ import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { StorageService } from "@/lib/storage";
 import { AudioProcessor, OpenAIRealtimeWebRTC } from "@/services/openai-realtime-webrtc";
+import ChatBidCardAttachment from "./ChatBidCardAttachment";
 
 interface UltraInteractiveCIAChatProps {
   onSendMessage?: (message: string, images?: string[]) => Promise<any>;
   initialMessage?: string;
   projectContext?: any;
+}
+
+interface BidCard {
+  id: string;
+  bid_card_number: string;
+  title: string;
+  description: string;
+  project_type: string;
+  location_city: string;
+  location_state: string;
+  budget_min: number;
+  budget_max: number;
+  timeline?: {
+    start_date: string;
+    duration?: string;
+  };
+  urgency_level: string;
+  bids_received_count: number;
+  contractor_count_needed: number;
+  group_buying_eligible?: boolean;
+  status: string;
+  created_at: string;
 }
 
 interface Message {
@@ -36,6 +59,8 @@ interface Message {
   images?: string[];
   phase?: string;
   isStreaming?: boolean;
+  bidCards?: BidCard[];
+  aiRecommendation?: string;
 }
 
 const UltraInteractiveCIAChat: React.FC<UltraInteractiveCIAChatProps> = ({
@@ -319,6 +344,8 @@ Start by asking what kind of home project they're planning and work through the 
               content: result.response,
               timestamp: new Date(),
               phase: result.phase,
+              bidCards: result.bidCards || undefined,
+              aiRecommendation: result.aiRecommendation || undefined,
             };
             setMessages((prev) => [...prev, assistantMessage]);
           }
@@ -391,6 +418,8 @@ Start by asking what kind of home project they're planning and work through the 
             content: result.response,
             timestamp: new Date(),
             phase: result.phase,
+            bidCards: result.bidCards || undefined,
+            aiRecommendation: result.aiRecommendation || undefined,
           };
           setMessages((prev) => [...prev, assistantMessage]);
         }
@@ -411,6 +440,8 @@ Start by asking what kind of home project they're planning and work through the 
               content: result.response,
               timestamp: new Date(),
               phase: result.phase,
+              bidCards: result.bidCards || undefined,
+              aiRecommendation: result.aiRecommendation || undefined,
             };
             setMessages((prev) => [...prev, assistantMessage]);
           }
@@ -649,6 +680,19 @@ Start by asking what kind of home project they're planning and work through the 
                         />
                       ))}
                     </div>
+                  )}
+
+                  {/* Bid Card Attachments */}
+                  {message.bidCards && message.bidCards.length > 0 && (
+                    <ChatBidCardAttachment
+                      bidCards={message.bidCards}
+                      aiRecommendation={message.aiRecommendation}
+                      onCardClick={(card) => {
+                        // Handle bid card click - navigate to submit proposal page
+                        const submitUrl = `/contractor/submit-proposal?bid=${card.bid_card_number}`;
+                        window.open(submitUrl, "_blank");
+                      }}
+                    />
                   )}
 
                   <p

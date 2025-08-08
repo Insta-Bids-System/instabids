@@ -2,14 +2,13 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import type {
   BidCard,
-  DiscoveryRun,
-  ContractorLead,
-  OutreachCampaign,
-  ContractorOutreachAttempt,
   BidCardView,
+  ContractorLead,
+  ContractorOutreachAttempt,
+  DiscoveryRun,
   EngagementEvent,
+  OutreachCampaign,
   SubmittedBid,
-  ApiResponse
 } from "../../types";
 
 interface DiscoveryCache {
@@ -158,7 +157,9 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
           }
         } else {
           const errorData = await response.json().catch(() => ({}));
-          setError(errorData.detail || `Failed to load bid card lifecycle data (${response.status})`);
+          setError(
+            errorData.detail || `Failed to load bid card lifecycle data (${response.status})`
+          );
         }
       } catch (err) {
         setError("Error loading lifecycle data");
@@ -223,7 +224,7 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
     if (!lifecycleData) return null;
 
     const { bid_card, metrics } = lifecycleData;
-    const location = bid_card.bid_document?.location;
+    const location = null;
 
     return (
       <div className="space-y-6">
@@ -256,10 +257,9 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
                 <div>
                   <span className="font-medium text-gray-700">Location:</span>
                   <div className="text-gray-900">
-                    {location && 'city' in location && 'state' in location
+                    {location && "city" in location && "state" in location
                       ? `${location.city}, ${location.state}`
-                      : `${bid_card.location_city || 'Unknown'}, ${bid_card.location_state || 'Unknown'}`
-                    }
+                      : `${bid_card.location_city || "Unknown"}, ${bid_card.location_state || "Unknown"}`}
                   </div>
                 </div>
                 <div>
@@ -267,8 +267,7 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
                   <div className="text-gray-900">
                     {bid_card.budget_min && bid_card.budget_max
                       ? `${formatCurrency(bid_card.budget_min)} - ${formatCurrency(bid_card.budget_max)}`
-                      : "Not specified"
-                    }
+                      : "Not specified"}
                   </div>
                 </div>
                 <div>
@@ -389,7 +388,10 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
                   <div className="text-sm text-gray-500 capitalize">{channel}</div>
                   {metrics.outreach.success_rates[channel as keyof SuccessRates] && (
                     <div className="text-xs text-green-600">
-                      {Math.round(metrics.outreach.success_rates[channel as keyof SuccessRates].percentage)}% success
+                      {Math.round(
+                        metrics.outreach.success_rates[channel as keyof SuccessRates].percentage
+                      )}
+                      % success
                     </div>
                   )}
                 </div>
@@ -397,6 +399,487 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
             </div>
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderCampaignOutreachTab = () => {
+    const campaigns = lifecycleData?.campaigns || [];
+
+    // Get all contractors from contractor_leads
+    const contractorLeads = lifecycleData?.discovery?.contractor_leads || [];
+
+    // Map contractors with their outreach status
+    const contractorsWithOutreach = contractorLeads.map((lead) => {
+      const outreachAttempts =
+        lifecycleData?.outreach?.outreach_attempts?.filter(
+          (attempt) => attempt.contractor_lead_id === lead.id
+        ) || [];
+
+      // Check outreach status for each channel
+      const emailAttempts = outreachAttempts.filter((a) => a.channel === "email");
+      const formAttempts = outreachAttempts.filter((a) => a.channel === "form");
+      const smsAttempts = outreachAttempts.filter((a) => a.channel === "sms");
+      const phoneAttempts = outreachAttempts.filter((a) => a.channel === "phone");
+
+      // Check for responses
+      const hasResponse = outreachAttempts.some((a) => a.response_received_at);
+      const hasBidSubmitted = outreachAttempts.some((a) => a.status === "bid_submitted");
+
+      return {
+        ...lead,
+        outreach: {
+          email: {
+            attempted: emailAttempts.length > 0,
+            success: emailAttempts.some((a) => a.status === "delivered" || a.status === "opened"),
+            count: emailAttempts.length,
+            lastAttempt: emailAttempts[emailAttempts.length - 1],
+          },
+          form: {
+            attempted: formAttempts.length > 0,
+            success: formAttempts.some((a) => a.status === "sent" || a.status === "delivered"),
+            count: formAttempts.length,
+            lastAttempt: formAttempts[formAttempts.length - 1],
+          },
+          sms: {
+            attempted: smsAttempts.length > 0,
+            success: smsAttempts.some((a) => a.status === "delivered"),
+            count: smsAttempts.length,
+            lastAttempt: smsAttempts[smsAttempts.length - 1],
+          },
+          phone: {
+            attempted: phoneAttempts.length > 0,
+            success: phoneAttempts.some((a) => a.status === "sent" || a.status === "delivered"),
+            count: phoneAttempts.length,
+            lastAttempt: phoneAttempts[phoneAttempts.length - 1],
+          },
+        },
+        hasResponse,
+        hasBidSubmitted,
+        tier: lead.status === "contacted" ? 1 : lead.status === "enriched" ? 2 : 3,
+        tier_name:
+          lead.status === "contacted"
+            ? "Internal"
+            : lead.status === "enriched"
+              ? "Prospects"
+              : "New/Cold",
+      };
+    });
+
+    // Get the active campaign (most recent)
+    const activeCampaign = campaigns.find((c) => c.status === "active") || campaigns[0];
+
+    return (
+      <div className="space-y-6">
+        {/* Campaign Overview */}
+        {activeCampaign && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Active Campaign</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Started: {new Date(activeCampaign.created_at).toLocaleString()}
+                </p>
+              </div>
+              <span
+                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                  activeCampaign.status === "completed"
+                    ? "bg-green-100 text-green-800"
+                    : activeCampaign.status === "active"
+                      ? "bg-blue-100 text-blue-800"
+                      : "bg-gray-100 text-gray-800"
+                }`}
+              >
+                {activeCampaign.status || "draft"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div>
+                <div className="text-sm text-gray-600">Target</div>
+                <div className="text-xl font-semibold text-gray-900">
+                  {activeCampaign.max_contractors || 0}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">Contacted</div>
+                <div className="text-xl font-semibold text-blue-600">
+                  {activeCampaign.contractors_targeted || 0}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">Responded</div>
+                <div className="text-xl font-semibold text-green-600">
+                  {activeCampaign.responses_received || 0}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">Response Rate</div>
+                <div className="text-xl font-semibold text-purple-600">
+                  {activeCampaign.contractors_targeted > 0
+                    ? Math.round(
+                        (activeCampaign.responses_received / activeCampaign.contractors_targeted) *
+                          100
+                      )
+                    : 0}
+                  %
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">Bids Received</div>
+                <div className="text-xl font-semibold text-indigo-600">
+                  {contractorsWithOutreach.filter((c) => c.hasBidSubmitted).length}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Contractor List with Live Outreach Tracking */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Contractor Outreach Status ({contractorsWithOutreach.length} contractors)
+          </h3>
+
+          {contractorsWithOutreach.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-gray-400 text-4xl mb-4">👥</div>
+              <p className="text-gray-600">
+                No contractors have been selected for this campaign yet.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {contractorsWithOutreach.map((contractor, index) => (
+                <div key={contractor.id || index} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900">
+                        {contractor.business_name || "Unknown Contractor"}
+                      </h4>
+                      <div className="flex items-center space-x-3 mt-1">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            contractor.tier === 1
+                              ? "bg-green-100 text-green-800 border-green-200"
+                              : contractor.tier === 2
+                                ? "bg-blue-100 text-blue-800 border-blue-200"
+                                : "bg-gray-100 text-gray-800 border-gray-200"
+                          } border`}
+                        >
+                          Tier {contractor.tier}: {contractor.tier_name}
+                        </span>
+                        {contractor.hasResponse && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            ✉️ Responded
+                          </span>
+                        )}
+                        {contractor.hasBidSubmitted && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            💰 Bid Submitted
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Score: {contractor.lead_score || 0}/100
+                    </div>
+                  </div>
+
+                  {/* Contact Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm mb-3">
+                    <div>
+                      <span className="font-medium text-gray-600">Email:</span>
+                      <div className="text-gray-900">{contractor.email || "No email"}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Phone:</span>
+                      <div className="text-gray-900">{contractor.phone || "No phone"}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Website:</span>
+                      <div className="text-gray-900">
+                        {contractor.website && contractor.website !== "No website" ? (
+                          <a
+                            href={contractor.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
+                            View Site
+                          </a>
+                        ) : (
+                          "No website"
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Outreach Channel Status */}
+                  <div className="border-t border-gray-200 pt-3">
+                    <div className="text-sm font-medium text-gray-700 mb-2">Outreach Channels:</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {/* Email Status */}
+                      <div
+                        className={`flex items-center space-x-2 p-2 rounded-lg border ${
+                          contractor.outreach.email.success
+                            ? "bg-green-50 border-green-200"
+                            : contractor.outreach.email.attempted
+                              ? "bg-yellow-50 border-yellow-200"
+                              : "bg-gray-50 border-gray-200"
+                        }`}
+                      >
+                        <span className="text-lg">📧</span>
+                        <div className="flex-1">
+                          <div className="text-xs font-medium text-gray-700">Email</div>
+                          <div className="text-xs text-gray-600">
+                            {contractor.outreach.email.success
+                              ? "✅ Sent"
+                              : contractor.outreach.email.attempted
+                                ? "⏳ Attempted"
+                                : "⭕ Not Sent"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Form Status */}
+                      <div
+                        className={`flex items-center space-x-2 p-2 rounded-lg border ${
+                          contractor.outreach.form.success
+                            ? "bg-green-50 border-green-200"
+                            : contractor.outreach.form.attempted
+                              ? "bg-yellow-50 border-yellow-200"
+                              : "bg-gray-50 border-gray-200"
+                        }`}
+                      >
+                        <span className="text-lg">📝</span>
+                        <div className="flex-1">
+                          <div className="text-xs font-medium text-gray-700">Form</div>
+                          <div className="text-xs text-gray-600">
+                            {contractor.outreach.form.success
+                              ? "✅ Filled"
+                              : contractor.outreach.form.attempted
+                                ? "⏳ Attempted"
+                                : "⭕ Not Filled"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* SMS Status */}
+                      <div
+                        className={`flex items-center space-x-2 p-2 rounded-lg border ${
+                          contractor.outreach.sms.success
+                            ? "bg-green-50 border-green-200"
+                            : contractor.outreach.sms.attempted
+                              ? "bg-yellow-50 border-yellow-200"
+                              : "bg-gray-50 border-gray-200"
+                        }`}
+                      >
+                        <span className="text-lg">💬</span>
+                        <div className="flex-1">
+                          <div className="text-xs font-medium text-gray-700">SMS</div>
+                          <div className="text-xs text-gray-600">
+                            {contractor.outreach.sms.success
+                              ? "✅ Sent"
+                              : contractor.outreach.sms.attempted
+                                ? "⏳ Attempted"
+                                : "⭕ Not Sent"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Phone Status */}
+                      <div
+                        className={`flex items-center space-x-2 p-2 rounded-lg border ${
+                          contractor.outreach.phone.success
+                            ? "bg-green-50 border-green-200"
+                            : contractor.outreach.phone.attempted
+                              ? "bg-yellow-50 border-yellow-200"
+                              : "bg-gray-50 border-gray-200"
+                        }`}
+                      >
+                        <span className="text-lg">📞</span>
+                        <div className="flex-1">
+                          <div className="text-xs font-medium text-gray-700">Phone</div>
+                          <div className="text-xs text-gray-600">
+                            {contractor.outreach.phone.success
+                              ? "✅ Called"
+                              : contractor.outreach.phone.attempted
+                                ? "⏳ Attempted"
+                                : "⭕ Not Called"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Campaign Check-ins (if available) */}
+        {activeCampaign?.check_ins && activeCampaign.check_ins.length > 0 && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Campaign Check-ins</h3>
+            <div className="space-y-3">
+              {activeCampaign.check_ins.map((checkIn: any, index: number) => (
+                <div
+                  key={checkIn.id || index}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                >
+                  <div className="flex items-center space-x-3">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                        checkIn.status === "completed"
+                          ? "bg-green-100 text-green-800"
+                          : checkIn.status === "pending"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {checkIn.check_in_percentage}%
+                    </span>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {new Date(checkIn.scheduled_time).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        Expected: {checkIn.bids_expected} bids | Received: {checkIn.bids_received}{" "}
+                        bids
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-sm">
+                    {checkIn.on_track ? (
+                      <span className="text-green-600">✅ On Track</span>
+                    ) : (
+                      <span className="text-red-600">⚠️ Needs Escalation</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderCampaignsTab = () => {
+    const campaigns = lifecycleData?.campaigns || [];
+
+    if (campaigns.length === 0) {
+      return (
+        <div className="bg-white rounded-lg p-8 text-center">
+          <div className="text-gray-400 text-6xl mb-4">🎯</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Campaigns</h3>
+          <p className="text-gray-600">
+            No outreach campaigns have been created for this bid card yet.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Outreach Campaigns</h3>
+          <div className="space-y-4">
+            {campaigns.map((campaign) => (
+              <div key={campaign.id} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h4 className="text-md font-medium text-gray-900">
+                      Campaign #{campaign.id.substring(0, 8)}
+                    </h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Created: {new Date(campaign.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <span
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      campaign.status === "completed"
+                        ? "bg-green-100 text-green-800"
+                        : campaign.status === "active"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    {campaign.status || "draft"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <div className="text-sm text-gray-600">Max Contractors</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {campaign.max_contractors || 0}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-600">Contractors Targeted</div>
+                    <div className="text-lg font-semibold text-blue-600">
+                      {campaign.contractors_targeted || 0}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-600">Responses Received</div>
+                    <div className="text-lg font-semibold text-green-600">
+                      {campaign.responses_received || 0}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-600">Response Rate</div>
+                    <div className="text-lg font-semibold text-purple-600">
+                      {campaign.contractors_targeted > 0
+                        ? Math.round(
+                            (campaign.responses_received / campaign.contractors_targeted) * 100
+                          )
+                        : 0}
+                      %
+                    </div>
+                  </div>
+                </div>
+
+                {/* Check-ins if available */}
+                {campaign.check_ins && campaign.check_ins.length > 0 && (
+                  <div className="border-t border-gray-200 pt-4">
+                    <h5 className="text-sm font-medium text-gray-700 mb-2">Campaign Check-ins</h5>
+                    <div className="space-y-2">
+                      {campaign.check_ins.map((checkIn: any, index: number) => (
+                        <div
+                          key={checkIn.id || index}
+                          className="flex items-center justify-between text-sm"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                checkIn.status === "completed"
+                                  ? "bg-green-100 text-green-800"
+                                  : checkIn.status === "pending"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {checkIn.check_in_percentage}%
+                            </span>
+                            <span className="text-gray-600">
+                              {new Date(checkIn.scheduled_time).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="text-gray-600">
+                            {checkIn.on_track ? "✅ On Track" : "⚠️ Needs Attention"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   };
@@ -450,12 +933,11 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
                   <div>
                     <span className="font-medium text-gray-700">Start Date:</span>
                     <div className="text-gray-900">
-                      {bid.start_date 
+                      {bid.start_date
                         ? new Date(bid.start_date).toLocaleDateString()
-                        : bid.start_date_available 
+                        : bid.start_date_available
                           ? new Date(bid.start_date_available).toLocaleDateString()
-                          : "Not specified"
-                      }
+                          : "Not specified"}
                     </div>
                   </div>
                   <div>
@@ -466,15 +948,13 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
 
                 <div className="mb-4">
                   <span className="font-medium text-gray-700">Bid Details:</span>
-                  <p className="text-gray-600 mt-1">
-                    {bid.bid_content || bid.proposal_details}
-                  </p>
+                  <p className="text-gray-600 mt-1">{bid.bid_content || bid.proposal_details}</p>
                 </div>
 
                 <div className="flex items-center text-sm text-gray-500">
-                  <span>📧 {bid.contractor_email || 'Email not provided'}</span>
+                  <span>📧 {bid.contractor_email || "Email not provided"}</span>
                   <span className="mx-2">•</span>
-                  <span>📞 {bid.contractor_phone || 'Phone not provided'}</span>
+                  <span>📞 {bid.contractor_phone || "Phone not provided"}</span>
                   <span className="mx-2">•</span>
                   <span>Via {bid.submission_method}</span>
                 </div>
@@ -492,45 +972,49 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
     // Get contractor data from contractor_leads table (primary source)
     // This is the authoritative source of all contractors that have been discovered for this bid card
     const contractorLeads = lifecycleData.discovery?.contractor_leads || [];
-    
+
     // Map contractor leads to display format with outreach data
-    const contractors = contractorLeads.map(lead => ({
+    const contractors = contractorLeads.map((lead) => ({
       id: lead.id,
       name: lead.business_name || lead.company_name || "Unknown Contractor",
       email: lead.email || "No email",
       phone: lead.phone || "No phone",
       website: lead.website || "No website",
       // Determine tier based on data quality and engagement
-      tier: lead.lead_status === "contacted" ? 1 : 
-            lead.lead_status === "enriched" ? 2 : 3,
-      tier_name: lead.lead_status === "contacted" ? "Internal" : 
-                  lead.lead_status === "enriched" ? "Prospects" : "New/Cold",
+      tier: lead.lead_status === "contacted" ? 1 : lead.lead_status === "enriched" ? 2 : 3,
+      tier_name:
+        lead.lead_status === "contacted"
+          ? "Internal"
+          : lead.lead_status === "enriched"
+            ? "Prospects"
+            : "New/Cold",
       lead_score: lead.lead_score || 0,
       lead_status: lead.lead_status || "new",
       // Get all outreach attempts for this contractor
       outreach_attempts: lifecycleData.outreach.outreach_attempts.filter(
-        attempt => attempt.contractor_lead_id === lead.id
+        (attempt) => attempt.contractor_lead_id === lead.id
       ),
-      discovery_run_id: lead.discovery_run_id
+      discovery_run_id: lead.discovery_run_id,
     }));
 
     // Fallback: if no contractor_leads data, try to get from campaigns (legacy)
-    const campaignContractors = lifecycleData.campaigns.flatMap(campaign => 
-      campaign.campaign_contractors?.map(cc => ({
-        id: cc.contractor_id,
-        name: cc.contractor_name || cc.business_name || "Unknown Contractor",
-        email: cc.email || "No email",
-        phone: cc.phone || "No phone",
-        website: "No website",
-        tier: cc.tier || 3,
-        tier_name: cc.tier === 1 ? "Internal" : cc.tier === 2 ? "Prospects" : "New/Cold",
-        lead_score: 0,
-        lead_status: "unknown",
-        outreach_attempts: lifecycleData.outreach.outreach_attempts.filter(
-          attempt => attempt.contractor_lead_id === cc.id
-        ),
-        discovery_run_id: null
-      })) || []
+    const campaignContractors = lifecycleData.campaigns.flatMap(
+      (campaign) =>
+        campaign.campaign_contractors?.map((cc) => ({
+          id: cc.contractor_id,
+          name: cc.contractor_name || cc.business_name || "Unknown Contractor",
+          email: cc.email || "No email",
+          phone: cc.phone || "No phone",
+          website: "No website",
+          tier: cc.tier || 3,
+          tier_name: cc.tier === 1 ? "Internal" : cc.tier === 2 ? "Prospects" : "New/Cold",
+          lead_score: 0,
+          lead_status: "unknown",
+          outreach_attempts: lifecycleData.outreach.outreach_attempts.filter(
+            (attempt) => attempt.contractor_lead_id === cc.id
+          ),
+          discovery_run_id: null,
+        })) || []
     );
 
     // Use contractor_leads if available, otherwise fall back to campaign_contractors
@@ -550,19 +1034,23 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
 
     const getTierColor = (tier: number) => {
       switch (tier) {
-        case 1: return "bg-green-100 text-green-800 border-green-200";
-        case 2: return "bg-blue-100 text-blue-800 border-blue-200";
-        case 3: return "bg-gray-100 text-gray-800 border-gray-200";
-        default: return "bg-gray-100 text-gray-800 border-gray-200";
+        case 1:
+          return "bg-green-100 text-green-800 border-green-200";
+        case 2:
+          return "bg-blue-100 text-blue-800 border-blue-200";
+        case 3:
+          return "bg-gray-100 text-gray-800 border-gray-200";
+        default:
+          return "bg-gray-100 text-gray-800 border-gray-200";
       }
     };
 
     const getOutreachStatus = (attempts: any[], channel: string) => {
-      const channelAttempts = attempts.filter(a => a.channel === channel);
+      const channelAttempts = attempts.filter((a) => a.channel === channel);
       if (channelAttempts.length === 0) return { attempted: false, success: false };
-      
-      const successful = channelAttempts.some(a => 
-        a.status === 'delivered' || a.status === 'sent' || a.status === 'opened'
+
+      const successful = channelAttempts.some(
+        (a) => a.status === "delivered" || a.status === "sent" || a.status === "opened"
       );
       return { attempted: true, success: successful };
     };
@@ -575,26 +1063,24 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {allContractors.filter(c => c.tier === 1).length}
+                {allContractors.filter((c) => c.tier === 1).length}
               </div>
               <div className="text-sm text-gray-500">Tier 1 (Internal)</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
-                {allContractors.filter(c => c.tier === 2).length}
+                {allContractors.filter((c) => c.tier === 2).length}
               </div>
               <div className="text-sm text-gray-500">Tier 2 (Prospects)</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-600">
-                {allContractors.filter(c => c.tier === 3).length}
+                {allContractors.filter((c) => c.tier === 3).length}
               </div>
               <div className="text-sm text-gray-500">Tier 3 (New/Cold)</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {allContractors.length}
-              </div>
+              <div className="text-2xl font-bold text-purple-600">{allContractors.length}</div>
               <div className="text-sm text-gray-500">Total Contacted</div>
             </div>
           </div>
@@ -602,17 +1088,22 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
 
         {/* Contractor List */}
         {allContractors.map((contractor, index) => {
-          const formStatus = getOutreachStatus(contractor.outreach_attempts, 'form');
-          const emailStatus = getOutreachStatus(contractor.outreach_attempts, 'email');
-          const phoneStatus = getOutreachStatus(contractor.outreach_attempts, 'phone');
-          
+          const formStatus = getOutreachStatus(contractor.outreach_attempts, "form");
+          const emailStatus = getOutreachStatus(contractor.outreach_attempts, "email");
+          const phoneStatus = getOutreachStatus(contractor.outreach_attempts, "phone");
+
           return (
-            <div key={contractor.id || index} className="bg-white rounded-lg border border-gray-200 p-6">
+            <div
+              key={contractor.id || index}
+              className="bg-white rounded-lg border border-gray-200 p-6"
+            >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-3">
                     <h4 className="text-lg font-medium text-gray-900">{contractor.name}</h4>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getTierColor(contractor.tier)}`}>
+                    <span
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getTierColor(contractor.tier)}`}
+                    >
                       Tier {contractor.tier}: {contractor.tier_name}
                     </span>
                   </div>
@@ -630,8 +1121,12 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
                       <span className="font-medium text-gray-700">Website:</span>
                       <div className="text-gray-900">
                         {contractor.website && contractor.website !== "No website" ? (
-                          <a href={contractor.website} target="_blank" rel="noopener noreferrer" 
-                             className="text-blue-600 hover:text-blue-800 underline">
+                          <a
+                            href={contractor.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
                             {contractor.website}
                           </a>
                         ) : (
@@ -640,7 +1135,7 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Lead Score and Status (if available from contractor_leads) */}
                   {contractor.lead_score > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
@@ -648,14 +1143,25 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
                         <span className="font-medium text-gray-700">Lead Score:</span>
                         <div className="flex items-center space-x-2">
                           <div className="text-gray-900">{contractor.lead_score}/100</div>
-                          <div className={`h-2 w-16 rounded-full ${
-                            contractor.lead_score >= 80 ? 'bg-green-200' : 
-                            contractor.lead_score >= 60 ? 'bg-yellow-200' : 'bg-red-200'
-                          }`}>
-                            <div className={`h-2 rounded-full ${
-                              contractor.lead_score >= 80 ? 'bg-green-500' : 
-                              contractor.lead_score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                            }`} style={{ width: `${contractor.lead_score}%` }}></div>
+                          <div
+                            className={`h-2 w-16 rounded-full ${
+                              contractor.lead_score >= 80
+                                ? "bg-green-200"
+                                : contractor.lead_score >= 60
+                                  ? "bg-yellow-200"
+                                  : "bg-red-200"
+                            }`}
+                          >
+                            <div
+                              className={`h-2 rounded-full ${
+                                contractor.lead_score >= 80
+                                  ? "bg-green-500"
+                                  : contractor.lead_score >= 60
+                                    ? "bg-yellow-500"
+                                    : "bg-red-500"
+                              }`}
+                              style={{ width: `${contractor.lead_score}%` }}
+                            ></div>
                           </div>
                         </div>
                       </div>
@@ -672,52 +1178,70 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
                     <div className="grid grid-cols-3 gap-4">
                       {/* Form Status */}
                       <div className="text-center">
-                        <div className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center ${
-                          formStatus.attempted 
-                            ? formStatus.success 
-                              ? 'bg-green-100 text-green-600' 
-                              : 'bg-yellow-100 text-yellow-600'
-                            : 'bg-gray-100 text-gray-400'
-                        }`}>
-                          {formStatus.attempted ? (formStatus.success ? '✓' : '?') : '○'}
+                        <div
+                          className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center ${
+                            formStatus.attempted
+                              ? formStatus.success
+                                ? "bg-green-100 text-green-600"
+                                : "bg-yellow-100 text-yellow-600"
+                              : "bg-gray-100 text-gray-400"
+                          }`}
+                        >
+                          {formStatus.attempted ? (formStatus.success ? "✓" : "?") : "○"}
                         </div>
                         <div className="text-xs font-medium text-gray-900">Form</div>
                         <div className="text-xs text-gray-500">
-                          {formStatus.attempted ? (formStatus.success ? 'Sent' : 'Attempted') : 'Not sent'}
+                          {formStatus.attempted
+                            ? formStatus.success
+                              ? "Sent"
+                              : "Attempted"
+                            : "Not sent"}
                         </div>
                       </div>
 
                       {/* Email Status */}
                       <div className="text-center">
-                        <div className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center ${
-                          emailStatus.attempted 
-                            ? emailStatus.success 
-                              ? 'bg-green-100 text-green-600' 
-                              : 'bg-yellow-100 text-yellow-600'
-                            : 'bg-gray-100 text-gray-400'
-                        }`}>
-                          {emailStatus.attempted ? (emailStatus.success ? '✓' : '?') : '○'}
+                        <div
+                          className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center ${
+                            emailStatus.attempted
+                              ? emailStatus.success
+                                ? "bg-green-100 text-green-600"
+                                : "bg-yellow-100 text-yellow-600"
+                              : "bg-gray-100 text-gray-400"
+                          }`}
+                        >
+                          {emailStatus.attempted ? (emailStatus.success ? "✓" : "?") : "○"}
                         </div>
                         <div className="text-xs font-medium text-gray-900">Email</div>
                         <div className="text-xs text-gray-500">
-                          {emailStatus.attempted ? (emailStatus.success ? 'Delivered' : 'Attempted') : 'Not sent'}
+                          {emailStatus.attempted
+                            ? emailStatus.success
+                              ? "Delivered"
+                              : "Attempted"
+                            : "Not sent"}
                         </div>
                       </div>
 
                       {/* Phone Status */}
                       <div className="text-center">
-                        <div className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center ${
-                          phoneStatus.attempted 
-                            ? phoneStatus.success 
-                              ? 'bg-green-100 text-green-600' 
-                              : 'bg-yellow-100 text-yellow-600'
-                            : 'bg-gray-100 text-gray-400'
-                        }`}>
-                          {phoneStatus.attempted ? (phoneStatus.success ? '✓' : '?') : '○'}
+                        <div
+                          className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center ${
+                            phoneStatus.attempted
+                              ? phoneStatus.success
+                                ? "bg-green-100 text-green-600"
+                                : "bg-yellow-100 text-yellow-600"
+                              : "bg-gray-100 text-gray-400"
+                          }`}
+                        >
+                          {phoneStatus.attempted ? (phoneStatus.success ? "✓" : "?") : "○"}
                         </div>
                         <div className="text-xs font-medium text-gray-900">Phone</div>
                         <div className="text-xs text-gray-500">
-                          {phoneStatus.attempted ? (phoneStatus.success ? 'Called' : 'Attempted') : 'Not called'}
+                          {phoneStatus.attempted
+                            ? phoneStatus.success
+                              ? "Called"
+                              : "Attempted"
+                            : "Not called"}
                         </div>
                       </div>
                     </div>
@@ -733,9 +1257,7 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
                             <span className="text-blue-700">
                               {attempt.channel}: {attempt.status}
                             </span>
-                            <span className="text-blue-600">
-                              {formatTimeAgo(attempt.sent_at)}
-                            </span>
+                            <span className="text-blue-600">{formatTimeAgo(attempt.sent_at)}</span>
                           </div>
                         ))}
                         {contractor.outreach_attempts.length > 3 && (
@@ -833,7 +1355,7 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
 
   const tabs = [
     { id: "overview", name: "Overview", icon: "📊" },
-    { id: "contractors", name: "Contractors Reached Out", icon: "👥" },
+    { id: "campaign-outreach", name: "Campaign & Outreach", icon: "🎯" },
     { id: "bids", name: "Submitted Bids", icon: "💰" },
     { id: "timeline", name: "Timeline", icon: "📅" },
   ];
@@ -844,7 +1366,7 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <h1 className="text-xl font-semibold text-gray-900">
-            Bid Card Lifecycle{lifecycleData ? `: ${lifecycleData.bid_card.bid_card_number}` : ''}
+            Bid Card Lifecycle{lifecycleData ? `: ${lifecycleData.bid_card.bid_card_number}` : ""}
           </h1>
           <button
             type="button"
@@ -900,7 +1422,7 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
           ) : lifecycleData ? (
             <>
               {activeTab === "overview" && renderOverviewTab()}
-              {activeTab === "contractors" && renderContractorsTab()}
+              {activeTab === "campaign-outreach" && renderCampaignOutreachTab()}
               {activeTab === "bids" && renderBidsTab()}
               {activeTab === "timeline" && renderTimelineTab()}
             </>

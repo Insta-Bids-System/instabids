@@ -1,19 +1,27 @@
 import { motion } from "framer-motion";
 import { Shield, Star, Target, TrendingUp, Zap } from "lucide-react";
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import ContractorOnboardingChat from "@/components/chat/ContractorOnboardingChat";
 import { useAuth } from "@/contexts/AuthContext";
 
 const ContractorLandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const [searchParams] = useSearchParams();
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [_conversationComplete, setConversationComplete] = useState(false);
   const [contractorData, setContractorData] = useState<any>(null);
+  const [preLoadedData, setPreLoadedData] = useState<any>(null);
   const [sessionId] = useState(
     `contractor_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   );
+
+  // Extract URL parameters from bid card email
+  const contractorName = searchParams.get("contractor");
+  const messageId = searchParams.get("msg_id");
+  const campaignId = searchParams.get("campaign");
+  const source = searchParams.get("source") || "direct";
 
   // If already logged in as contractor, redirect to dashboard
   React.useEffect(() => {
@@ -21,6 +29,33 @@ const ContractorLandingPage: React.FC = () => {
       navigate("/contractor/dashboard");
     }
   }, [user, profile, navigate]);
+
+  // Load pre-discovered contractor data when contractor name is present
+  useEffect(() => {
+    const loadContractorData = async () => {
+      if (contractorName) {
+        try {
+          console.log(`Loading contractor data for: ${contractorName}`);
+          const response = await fetch(`http://localhost:8008/api/contractors/profile-data-by-name/${encodeURIComponent(contractorName)}`);
+          
+          if (response.ok) {
+            const result = await response.json();
+            if (result.found) {
+              console.log('Pre-loaded contractor data:', result.data);
+              setPreLoadedData(result.data);
+              setContractorData(result.data); // Set initial contractor data
+            } else {
+              console.log(`No pre-discovered data found for contractor: ${contractorName}`);
+            }
+          }
+        } catch (error) {
+          console.error('Error loading contractor data:', error);
+        }
+      }
+    };
+
+    loadContractorData();
+  }, [contractorName]);
 
   const benefits = [
     {
@@ -62,6 +97,14 @@ const ContractorLandingPage: React.FC = () => {
           message: message,
           current_stage: "onboarding",
           profile_data: contractorData || {},
+          // Include bid card context for pre-loaded contractors
+          bid_card_context: {
+            contractor_name: contractorName,
+            message_id: messageId,
+            campaign_id: campaignId,
+            source: source,
+            pre_loaded_data: preLoadedData
+          }
         }),
       });
 

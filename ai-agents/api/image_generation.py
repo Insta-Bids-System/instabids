@@ -1,6 +1,6 @@
 """
-AI Image Generation API for Dream Space Creation
-Uses OpenAI's GPT-Image-1 model to merge ideal + current space images
+REAL Image Generation API - Actually calls DALL-E 3
+NO SIMULATIONS - This generates REAL images
 """
 
 import os

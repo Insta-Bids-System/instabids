@@ -41,7 +41,7 @@ export interface SubmittedBid {
   timeline_estimate: string;
   proposal_details: string;
   submitted_at: string;
-  submission_method: 'api' | 'portal' | 'email';
+  submission_method: "api" | "portal" | "email";
   materials_cost?: number;
   labor_cost?: number;
   includes_permits: boolean;
@@ -49,17 +49,17 @@ export interface SubmittedBid {
   start_date_available?: string;
 }
 
-export type BidCardStatus = 
-  | 'generated' 
-  | 'discovery_in_progress' 
-  | 'contractors_found' 
-  | 'outreach_initiated' 
-  | 'collecting_bids' 
-  | 'bids_complete' 
-  | 'contractor_selected' 
-  | 'project_completed';
+export type BidCardStatus =
+  | "generated"
+  | "discovery_in_progress"
+  | "contractors_found"
+  | "outreach_initiated"
+  | "collecting_bids"
+  | "bids_complete"
+  | "contractor_selected"
+  | "project_completed";
 
-export type UrgencyLevel = 'emergency' | 'urgent' | 'standard' | 'group' | 'flexible';
+export type UrgencyLevel = "emergency" | "urgent" | "standard" | "group" | "flexible";
 
 // ===== CAMPAIGN & OUTREACH TYPES =====
 
@@ -75,7 +75,7 @@ export interface OutreachCampaign {
   status: CampaignStatus;
 }
 
-export type CampaignStatus = 'planning' | 'active' | 'paused' | 'completed' | 'cancelled';
+export type CampaignStatus = "planning" | "active" | "paused" | "completed" | "cancelled";
 
 export interface CampaignCheckIn {
   id: string;
@@ -99,8 +99,15 @@ export interface ContractorOutreachAttempt {
   response_received_at?: string;
 }
 
-export type OutreachChannel = 'email' | 'form' | 'sms' | 'phone';
-export type OutreachStatus = 'pending' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'responded' | 'failed';
+export type OutreachChannel = "email" | "form" | "sms" | "phone";
+export type OutreachStatus =
+  | "pending"
+  | "sent"
+  | "delivered"
+  | "opened"
+  | "clicked"
+  | "responded"
+  | "failed";
 
 // ===== CONTRACTOR TYPES =====
 
@@ -122,7 +129,7 @@ export interface Contractor {
   years_in_business?: number;
 }
 
-export type ContractorTier = 'tier1' | 'tier2' | 'tier3';
+export type ContractorTier = "tier1" | "tier2" | "tier3";
 
 export interface ContractorLead {
   id: string;
@@ -138,7 +145,13 @@ export interface ContractorLead {
   status: LeadStatus;
 }
 
-export type LeadStatus = 'discovered' | 'validated' | 'contacted' | 'responded' | 'converted' | 'rejected';
+export type LeadStatus =
+  | "discovered"
+  | "validated"
+  | "contacted"
+  | "responded"
+  | "converted"
+  | "rejected";
 
 export interface DiscoveryRun {
   id: string;
@@ -159,7 +172,7 @@ export interface DiscoverySearchCriteria {
   required_specialties: string[];
 }
 
-export type DiscoveryStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type DiscoveryStatus = "pending" | "running" | "completed" | "failed";
 
 // ===== HOMEOWNER & PROJECT TYPES =====
 
@@ -184,7 +197,7 @@ export interface Address {
   country: string;
 }
 
-export type ContactMethod = 'email' | 'phone' | 'text' | 'app';
+export type ContactMethod = "email" | "phone" | "text" | "app";
 
 export interface Project {
   id: string;
@@ -201,7 +214,14 @@ export interface Project {
   cia_conversation_id?: string;
 }
 
-export type ProjectStatus = 'planning' | 'quotes_requested' | 'comparing_bids' | 'contractor_selected' | 'in_progress' | 'completed' | 'cancelled';
+export type ProjectStatus =
+  | "planning"
+  | "quotes_requested"
+  | "comparing_bids"
+  | "contractor_selected"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
 
 // ===== MESSAGING TYPES =====
 
@@ -220,9 +240,9 @@ export interface Message {
   project_id?: string;
 }
 
-export type SenderType = 'homeowner' | 'contractor' | 'system' | 'agent';
-export type RecipientType = 'homeowner' | 'contractor' | 'system';
-export type MessageType = 'text' | 'bid_submission' | 'project_update' | 'system_notification';
+export type SenderType = "homeowner" | "contractor" | "system" | "agent";
+export type RecipientType = "homeowner" | "contractor" | "system";
+export type MessageType = "text" | "bid_submission" | "project_update" | "system_notification";
 
 export interface MessageThread {
   id: string;
@@ -241,7 +261,7 @@ export interface ThreadParticipant {
   last_read_at?: string;
 }
 
-export type ThreadStatus = 'active' | 'archived' | 'closed';
+export type ThreadStatus = "active" | "archived" | "closed";
 
 // ===== ADMIN DASHBOARD TYPES =====
 
@@ -280,7 +300,7 @@ export interface AgentHealthStatus {
   performance_score: number;
 }
 
-export type AgentStatus = 'healthy' | 'warning' | 'error' | 'offline';
+export type AgentStatus = "healthy" | "warning" | "error" | "offline";
 
 // ===== ENGAGEMENT & ANALYTICS TYPES =====
 
@@ -295,7 +315,7 @@ export interface BidCardView {
   user_agent?: string;
 }
 
-export type ViewerType = 'contractor' | 'homeowner' | 'admin' | 'anonymous';
+export type ViewerType = "contractor" | "homeowner" | "admin" | "anonymous";
 
 export interface EngagementEvent {
   id: string;
@@ -306,14 +326,14 @@ export interface EngagementEvent {
   occurred_at: string;
 }
 
-export type EngagementEventType = 
-  | 'view' 
-  | 'download' 
-  | 'email_open' 
-  | 'email_click' 
-  | 'form_submit' 
-  | 'bid_submit' 
-  | 'message_send';
+export type EngagementEventType =
+  | "view"
+  | "download"
+  | "email_open"
+  | "email_click"
+  | "form_submit"
+  | "bid_submit"
+  | "message_send";
 
 // ===== FORM & UI TYPES =====
 
@@ -338,7 +358,7 @@ export interface PaginationParams {
   sort_order?: SortOrder;
 }
 
-export type SortOrder = 'asc' | 'desc';
+export type SortOrder = "asc" | "desc";
 
 export interface FilterOptions {
   status?: BidCardStatus[];
@@ -368,12 +388,12 @@ export interface Notification {
   expires_at?: string;
 }
 
-export type NotificationType = 
-  | 'bid_received' 
-  | 'campaign_complete' 
-  | 'contractor_response' 
-  | 'system_alert' 
-  | 'payment_reminder';
+export type NotificationType =
+  | "bid_received"
+  | "campaign_complete"
+  | "contractor_response"
+  | "system_alert"
+  | "payment_reminder";
 
 // ===== INSPIRATION & IRIS TYPES =====
 
@@ -419,7 +439,7 @@ export interface User {
   last_login_at?: string;
 }
 
-export type UserRole = 'homeowner' | 'contractor' | 'admin' | 'agent';
+export type UserRole = "homeowner" | "contractor" | "admin" | "agent";
 
 export interface UserProfile {
   first_name: string;
@@ -436,8 +456,8 @@ export interface UserPreferences {
   timezone: string;
 }
 
-export type EmailFrequency = 'immediate' | 'daily' | 'weekly' | 'never';
-export type CommunicationStyle = 'professional' | 'casual' | 'detailed' | 'concise';
+export type EmailFrequency = "immediate" | "daily" | "weekly" | "never";
+export type CommunicationStyle = "professional" | "casual" | "detailed" | "concise";
 
 // ===== AGENT CONVERSATION TYPES =====
 
@@ -453,7 +473,7 @@ export interface AgentConversation {
   metadata?: Record<string, unknown>;
 }
 
-export type AgentType = 'CIA' | 'JAA' | 'CDA' | 'EAA' | 'WFA' | 'HMA' | 'CMA' | 'COIA';
+export type AgentType = "CIA" | "JAA" | "CDA" | "EAA" | "WFA" | "HMA" | "CMA" | "COIA";
 
 export interface ConversationState {
   current_step: string;
@@ -462,15 +482,4 @@ export interface ConversationState {
   confidence_score: number;
 }
 
-// ===== EXPORT ALL TYPES =====
-export type {
-  // Re-export all types for easy importing
-  BidCard, BidDocument, SubmittedBid, BidCardStatus, UrgencyLevel,
-  OutreachCampaign, CampaignStatus, CampaignCheckIn, ContractorOutreachAttempt,
-  Contractor, ContractorLead, DiscoveryRun, DiscoverySearchCriteria,
-  Homeowner, Project, Address, Message, MessageThread,
-  AdminDashboardData, SystemMetrics, ContractorStats, AgentHealthStatus,
-  BidCardView, EngagementEvent, FormValidationError, ApiResponse,
-  Notification, InspirationBoard, GeneratedDreamSpace,
-  User, UserProfile, AgentConversation, ConversationState
-};
+// Types are already exported above as interfaces - no need for duplicate export

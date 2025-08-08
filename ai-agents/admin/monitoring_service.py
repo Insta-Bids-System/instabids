@@ -12,7 +12,11 @@ from datetime import datetime
 
 from fastapi import HTTPException
 
-from production_database_solution import get_production_db
+# from production_database_solution import get_production_db
+import database_simple
+
+
+get_production_db = database_simple.get_client
 
 from .auth_service import admin_auth_service
 from .database_watcher import database_watcher

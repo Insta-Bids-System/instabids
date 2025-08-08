@@ -58,7 +58,8 @@
   },
   "lint-staged": {
     "web/**/*.{js,jsx,ts,tsx}": [
-      "cd web && npx biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
+      "cd web && npx biome check --write --no-errors-on-unmatched --files-ignore-unknown=true",
+      "cd web && npm run test:run -- --run --passWithNoTests"
     ],
     "ai-agents/**/*.py": [
       "cd ai-agents && ruff check --fix --select I,W291,W292,W293,F401 --exit-zero"
@@ -72,6 +73,8 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.53.0"
+    "@supabase/supabase-js": "^2.53.0",
+    "dotenv": "^17.2.1",
+    "sqlite3": "^5.1.7"
   }
 }

@@ -5,11 +5,9 @@ This version works without authentication
 
 from datetime import datetime
 from typing import Any, Optional
-import uuid
 
-from fastapi import APIRouter, HTTPException, Query, File, UploadFile, Form
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
-import json
 
 from database_simple import db
 
@@ -67,7 +65,7 @@ async def search_bid_cards(
     """
     try:
         print(f"Search params: city={city}, state={state}, zip={zip_code}, radius={radius_miles}")
-        
+
         supabase_client = db.client
         query = supabase_client.table("bid_cards").select("*")
 
@@ -82,73 +80,73 @@ async def search_bid_cards(
             # Redirect to contractor-jobs API for radius search
             print(f"Radius search detected: redirecting to contractor-jobs API with zip_code={zip_code}, radius_miles={radius_miles}")
             import httpx
-            
+
             try:
                 # Prepare parameters for contractor-jobs API
                 contractor_params = {
-                    'zip_code': zip_code,
-                    'radius_miles': radius_miles,
-                    'page': page,
-                    'page_size': page_size
+                    "zip_code": zip_code,
+                    "radius_miles": radius_miles,
+                    "page": page,
+                    "page_size": page_size
                 }
-                
+
                 print(f"Making request to contractor-jobs API with params: {contractor_params}")
-                
+
                 async with httpx.AsyncClient() as client:
                     response = await client.get(
                         "http://localhost:8008/api/contractor-jobs/search",
                         params=contractor_params
                     )
-                
+
                 print(f"Contractor-jobs API responded with status: {response.status_code}")
-                
+
                 if response.status_code == 200:
                     data = response.json()
                     print(f"Got {len(data.get('job_opportunities', []))} job opportunities from contractor-jobs API")
-                    
+
                     # Transform job_opportunities to bid_cards format
                     bid_cards = []
-                    for job in data.get('job_opportunities', []):
+                    for job in data.get("job_opportunities", []):
                         bid_card = {
-                            'id': job['id'],
-                            'bid_card_number': job.get('bid_card_number'),
-                            'title': job['title'],
-                            'description': job['description'],
-                            'project_type': job['project_type'],
-                            'status': job['status'],
-                            'budget_range': {
-                                'min': job['budget_range']['min'],
-                                'max': job['budget_range']['max']
+                            "id": job["id"],
+                            "bid_card_number": job.get("bid_card_number"),
+                            "title": job["title"],
+                            "description": job["description"],
+                            "project_type": job["project_type"],
+                            "status": job["status"],
+                            "budget_range": {
+                                "min": job["budget_range"]["min"],
+                                "max": job["budget_range"]["max"]
                             },
-                            'timeline': {
-                                'start_date': job['timeline']['start_date'],
-                                'end_date': job['timeline']['end_date']
+                            "timeline": {
+                                "start_date": job["timeline"]["start_date"],
+                                "end_date": job["timeline"]["end_date"]
                             },
-                            'location': {
-                                'city': job['location']['city'],
-                                'state': job['location']['state'],
-                                'zip_code': job['location']['zip_code']
+                            "location": {
+                                "city": job["location"]["city"],
+                                "state": job["location"]["state"],
+                                "zip_code": job["location"]["zip_code"]
                             },
-                            'categories': job.get('categories', []),
-                            'bid_count': job.get('bid_count', 0),
-                            'contractor_count_needed': job.get('contractor_count_needed', 1),
-                            'group_bid_eligible': job.get('group_bid_eligible', False),
-                            'created_at': job.get('created_at'),
-                            'homeowner_verified': True,
-                            'response_time_hours': 24,
-                            'success_rate': 0.95,
-                            'is_featured': False,
-                            'is_urgent': False,
-                            'distance_miles': job.get('distance_miles')
+                            "categories": job.get("categories", []),
+                            "bid_count": job.get("bid_count", 0),
+                            "contractor_count_needed": job.get("contractor_count_needed", 1),
+                            "group_bid_eligible": job.get("group_bid_eligible", False),
+                            "created_at": job.get("created_at"),
+                            "homeowner_verified": True,
+                            "response_time_hours": 24,
+                            "success_rate": 0.95,
+                            "is_featured": False,
+                            "is_urgent": False,
+                            "distance_miles": job.get("distance_miles")
                         }
                         bid_cards.append(bid_card)
-                    
+
                     return {
-                        'bid_cards': bid_cards,
-                        'total': data['total'],
-                        'page': data['page'],
-                        'page_size': data['page_size'],
-                        'has_more': data['has_more']
+                        "bid_cards": bid_cards,
+                        "total": data["total"],
+                        "page": data["page"],
+                        "page_size": data["page_size"],
+                        "has_more": data["has_more"]
                     }
                 else:
                     print(f"Contractor-jobs API failed with status {response.status_code}")
@@ -207,7 +205,7 @@ async def search_bid_cards(
                 "is_featured": False,
                 "group_bid_eligible": card.get("group_bid_eligible", False)
             }
-            
+
             # Add distance information if radius search was used
             if zip_code and radius_miles:
                 from ..utils.simple_radius_search import calculate_distance_miles
@@ -219,9 +217,9 @@ async def search_bid_cards(
                             bid_card["distance_miles"] = distance
                 except Exception as e:
                     print(f"Error calculating distance for card {card['id']}: {e}")
-            
+
             bid_cards.append(bid_card)
-        
+
         # Sort by distance if distance information is available
         if zip_code and radius_miles and bid_cards:
             bid_cards = sorted(bid_cards, key=lambda x: x.get("distance_miles", 999))
@@ -339,16 +337,16 @@ async def get_homeowner_bid_cards(user_id: str):
     try:
         # Use the same database connection pattern as the search endpoint
         supabase_client = db.client
-        
+
         # Get all bid cards - for now, get all since we don't have homeowner filtering yet
         response = supabase_client.table("bid_cards").select("*").order("created_at", desc=True).execute()
-        
+
         if not response or not response.data:
             print(f"No bid cards found for homeowner {user_id}")
             return []
-        
+
         print(f"Raw database response: {len(response.data)} bid cards found")
-        
+
         # Transform bid cards for homeowner dashboard - similar to search endpoint
         bid_cards = []
         for card in response.data:
@@ -356,7 +354,7 @@ async def get_homeowner_bid_cards(user_id: str):
             bid_document = card.get("bid_document") or {}
             submitted_bids = bid_document.get("submitted_bids") or []
             all_extracted_data = bid_document.get("all_extracted_data") or {}
-            
+
             # Create basic bid card structure first
             bid_card = {
                 "id": card.get("id", ""),
@@ -384,10 +382,10 @@ async def get_homeowner_bid_cards(user_id: str):
                 "images": all_extracted_data.get("images", [])
             }
             bid_cards.append(bid_card)
-        
+
         print(f"Transformed {len(bid_cards)} bid cards for homeowner {user_id}")
         return bid_cards
-        
+
     except Exception as e:
         print(f"Error getting homeowner bid cards: {e}")
         import traceback
@@ -399,21 +397,21 @@ async def submit_contractor_bid(bid_data: BidSubmissionRequest):
     """Submit a contractor bio with support for attachments"""
     try:
         supabase_client = db.client
-        
+
         # Validate bid card exists and is accepting bids
         bid_card_response = supabase_client.table("bid_cards").select("*").eq("id", bid_data.bid_card_id).execute()
         if not bid_card_response.data:
             raise HTTPException(status_code=404, detail="Bid card not found")
-        
+
         bid_card = bid_card_response.data[0]
         if bid_card.get("status") not in ["active", "collecting_bids"]:
             raise HTTPException(status_code=400, detail="Bid card is not accepting bids")
-        
+
         # Check if contractor has already submitted a bid
         existing_bid_response = supabase_client.table("contractor_bids").select("id").eq("bid_card_id", bid_data.bid_card_id).eq("contractor_id", bid_data.contractor_id).execute()
         if existing_bid_response.data:
             raise HTTPException(status_code=400, detail="Contractor has already submitted a bid for this project")
-        
+
         # Prepare bid data
         bid_insert_data = {
             "bid_card_id": bid_data.bid_card_id,
@@ -431,30 +429,30 @@ async def submit_contractor_bid(bid_data: BidSubmissionRequest):
                 "milestones": [milestone.dict() for milestone in bid_data.milestones] if bid_data.milestones else []
             }
         }
-        
+
         # Insert the bid
         bid_response = supabase_client.table("contractor_bids").insert(bid_insert_data).execute()
         if not bid_response.data:
             raise HTTPException(status_code=500, detail="Failed to submit bid")
-        
+
         bid_id = bid_response.data[0]["id"]
-        
+
         # Update bid card counts
         current_bid_count = bid_card.get("bids_received_count", 0)
         new_bid_count = current_bid_count + 1
         contractor_count_needed = bid_card.get("contractor_count_needed", 1)
-        
+
         update_data = {
             "bids_received_count": new_bid_count,
             "bids_target_met": new_bid_count >= contractor_count_needed
         }
-        
+
         # Update status if target met
         if new_bid_count >= contractor_count_needed:
             update_data["status"] = "bids_complete"
-        
+
         supabase_client.table("bid_cards").update(update_data).eq("id", bid_data.bid_card_id).execute()
-        
+
         return {
             "success": True,
             "bid_id": bid_id,
@@ -462,7 +460,7 @@ async def submit_contractor_bid(bid_data: BidSubmissionRequest):
             "bids_received": new_bid_count,
             "target_met": new_bid_count >= contractor_count_needed
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -480,32 +478,32 @@ async def submit_contractor_bid_with_files(
     try:
         # Parse the bid data from JSON string
         bid_request = BidSubmissionRequest.model_validate_json(bid_data)
-        
+
         # Submit the bid first (reuse the existing logic)
         bid_result = await submit_contractor_bid(bid_request)
         bid_id = bid_result["bid_id"]
-        
+
         # Handle file uploads if any
         uploaded_attachments = []
         if files:
             supabase_client = db.client
-            
+
             for file in files:
                 if file.filename:
                     # For now, simulate file storage - in production this would upload to Supabase Storage
                     # This is placeholder logic - real implementation would upload to Supabase bucket
                     file_url = f"https://placeholder-storage.com/bid-attachments/{bid_id}/{file.filename}"
-                    
+
                     # Store attachment metadata in database
                     attachment_data = {
                         "contractor_bid_id": bid_id,
                         "name": file.filename,
-                        "type": file.content_type.split('/')[0] if file.content_type else 'document',
+                        "type": file.content_type.split("/")[0] if file.content_type else "document",
                         "url": file_url,
                         "size": file.size if file.size else 0,
                         "mime_type": file.content_type
                     }
-                    
+
                     attachment_response = supabase_client.table("contractor_proposal_attachments").insert(attachment_data).execute()
                     if attachment_response.data:
                         uploaded_attachments.append({
@@ -514,14 +512,14 @@ async def submit_contractor_bid_with_files(
                             "url": file_url,
                             "type": attachment_data["type"]
                         })
-        
+
         # Return success with attachment info
         result = bid_result.copy()
         result["attachments"] = uploaded_attachments
         result["message"] = f"Bid submitted successfully with {len(uploaded_attachments)} attachments"
-        
+
         return result
-        
+
     except Exception as e:
         print(f"Error submitting bid with files: {e}")
         import traceback
@@ -533,15 +531,15 @@ async def get_bid_card_bids(bid_card_id: str):
     """Get all bids for a specific bid card"""
     try:
         supabase_client = db.client
-        
+
         # Get all bids for this bid card
         bids_response = supabase_client.table("contractor_bids").select("*").eq("bid_card_id", bid_card_id).execute()
-        
+
         bids = []
         for bid in bids_response.data:
             # Get attachments for this bid
             attachments_response = supabase_client.table("contractor_proposal_attachments").select("*").eq("contractor_bid_id", bid["id"]).execute()
-            
+
             bid_data = {
                 "id": bid["id"],
                 "contractor_id": bid["contractor_id"],
@@ -569,13 +567,13 @@ async def get_bid_card_bids(bid_card_id: str):
                 ]
             }
             bids.append(bid_data)
-        
+
         return {
             "bid_card_id": bid_card_id,
             "bids": bids,
             "total_bids": len(bids)
         }
-        
+
     except Exception as e:
         print(f"Error getting bid card bids: {e}")
         raise HTTPException(status_code=500, detail=str(e))

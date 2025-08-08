@@ -359,13 +359,20 @@ async def get_messages(conversation_id: str):
 
         messages = messages_result.data or []
 
-        # For each message, get its attachments
+        # For each message, check for attachments in the column or separate table
         for message in messages:
-            attachments_result = db.table("message_attachments").select("*").eq(
-                "message_id", message["id"]
-            ).order("created_at", desc=False).execute()
-
-            message["attachments"] = attachments_result.data or []
+            # First check if attachments are stored in the column
+            if message.get("attachments"):
+                # Attachments already in the message data - ensure it's a list
+                if not isinstance(message["attachments"], list):
+                    message["attachments"] = []
+            else:
+                # Fall back to checking the separate message_attachments table
+                attachments_result = db.table("message_attachments").select("*").eq(
+                    "message_id", message["id"]
+                ).order("created_at", desc=False).execute()
+                
+                message["attachments"] = attachments_result.data or []
 
         return {
             "success": True,

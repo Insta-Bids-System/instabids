@@ -77,6 +77,7 @@ class MessageResponse(BaseModel):
     message_type: str
     is_read: bool
     created_at: str
+    attachments: Optional[list[dict[str, Any]]] = None
 
 
 class ConversationResponse(BaseModel):
@@ -245,7 +246,8 @@ async def get_messages(
             filter_reasons=msg["filter_reasons"],
             message_type=msg["message_type"],
             is_read=msg["is_read"],
-            created_at=msg["created_at"]
+            created_at=msg["created_at"],
+            attachments=msg.get("attachments", [])
         ) for msg in messages.data]
 
     except Exception as e:

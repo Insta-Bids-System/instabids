@@ -6,6 +6,7 @@ This module provides a compatibility layer for routers expecting database_simple
 # Import the actual database module
 from database import SupabaseDB
 
+
 # Create a singleton instance
 db = SupabaseDB()
 
@@ -15,4 +16,4 @@ def get_client():
     return db.client
 
 # Export for compatibility
-__all__ = ['db', 'SupabaseDB', 'get_client']
+__all__ = ["SupabaseDB", "db", "get_client"]

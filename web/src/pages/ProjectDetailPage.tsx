@@ -62,13 +62,6 @@ const ProjectDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedBid, setSelectedBid] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (id) {
-      fetchProjectDetails();
-      fetchBidCards();
-    }
-  }, [id, fetchBidCards, fetchProjectDetails]);
-
   const fetchProjectDetails = async () => {
     try {
       const { data, error } = await supabase
@@ -120,6 +113,13 @@ const ProjectDetailPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (id) {
+      fetchProjectDetails();
+      fetchBidCards();
+    }
+  }, [id]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

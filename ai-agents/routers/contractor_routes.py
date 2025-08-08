@@ -21,11 +21,19 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # Pydantic models
+class BidCardContext(BaseModel):
+    contractor_name: Optional[str] = None
+    message_id: Optional[str] = None
+    campaign_id: Optional[str] = None
+    source: Optional[str] = None
+    pre_loaded_data: Optional[dict[str, Any]] = None
+
 class ContractorChatMessage(BaseModel):
     message: str
     session_id: str
     current_stage: Optional[str] = None
     profile_data: Optional[dict[str, Any]] = None
+    bid_card_context: Optional[BidCardContext] = None
 
 class ContractorChatResponse(BaseModel):
     response: str
@@ -87,14 +95,21 @@ async def contractor_chat(chat_data: ContractorChatMessage):
         )
 
     try:
-        # Process message with CoIA agent
+        # Process message with CoIA agent - include bid card context for pre-loaded contractors
+        context = {
+            "current_stage": chat_data.current_stage,
+            "profile_data": chat_data.profile_data or {}
+        }
+        
+        # Add bid card context if available
+        if chat_data.bid_card_context:
+            context["bid_card_context"] = chat_data.bid_card_context.dict()
+            logger.info(f"Processing contractor chat with bid card context: {chat_data.bid_card_context.contractor_name}")
+        
         result = await coia_agent.process_message(
             session_id=chat_data.session_id,
             user_message=chat_data.message,
-            context={
-                "current_stage": chat_data.current_stage,
-                "profile_data": chat_data.profile_data or {}
-            }
+            context=context
         )
 
         return ContractorChatResponse(**result)
@@ -316,7 +331,7 @@ async def get_contractor_profile(contractor_id: str):
                 "specialties": ["Holiday lighting installation", "Christmas lighting installation"],
                 "service_areas": [
                     "Pompano Beach",
-                    "Fort Lauderdale", 
+                    "Fort Lauderdale",
                     "Boca Raton",
                     "Delray Beach",
                     "Boynton Beach",
@@ -327,11 +342,11 @@ async def get_contractor_profile(contractor_id: str):
                 },
                 "research_source": "coia_intelligent_research",
             }
-        
+
         # For other contractors, try to get from database
         supabase_client = db.client
         result = supabase_client.table("contractors").select("*").eq("id", contractor_id).single().execute()
-        
+
         if result.data:
             contractor = result.data
             return {
@@ -356,7 +371,7 @@ async def get_contractor_profile(contractor_id: str):
                 "social_media": {},
                 "research_source": "fallback",
             }
-            
+
     except Exception as e:
         logger.error(f"Error getting contractor profile: {e}")
         # Return fallback data on error
@@ -364,7 +379,7 @@ async def get_contractor_profile(contractor_id: str):
             "company_name": f"Contractor {contractor_id[:8]}",
             "phone": "Not available",
             "website": "",
-            "address": "Not available", 
+            "address": "Not available",
             "specialties": ["General contractor"],
             "service_areas": ["Local area"],
             "social_media": {},
@@ -378,7 +393,7 @@ async def get_contractor_projects(contractor_id: str):
         # Get contractor's submitted bids (from my-bids endpoint logic)
         projects = []
         bidCards = []
-        
+
         # For now, return empty arrays as the contractor portal will handle this
         return {
             "projects": projects,
@@ -386,7 +401,7 @@ async def get_contractor_projects(contractor_id: str):
             "total_projects": len(projects),
             "total_bid_cards": len(bidCards)
         }
-        
+
     except Exception as e:
         logger.error(f"Error getting contractor projects: {e}")
         return {

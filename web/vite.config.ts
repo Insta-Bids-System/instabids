@@ -17,6 +17,18 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       open: true,
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8008',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/ws': {
+          target: 'ws://localhost:8008',
+          ws: true,
+          changeOrigin: true,
+        },
+      },
     },
     envDir: '..',
   }

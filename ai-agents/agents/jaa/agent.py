@@ -20,8 +20,8 @@ from supabase import create_client
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from typing_extensions import TypedDict
 
-from database_simple import SupabaseDB
 from bid_card_utils import create_bid_card_with_defaults
+from database_simple import SupabaseDB
 
 
 class IntelligentJAAState(TypedDict):
@@ -142,7 +142,7 @@ class JobAssessmentAgent:
 
             # Step 3: Save to database using new utility
             print("[INTELLIGENT JAA] Creating bid card with fixed database schema...")
-            
+
             # Prepare project data for the new utility
             project_data = {
                 "project_type": final_state["bid_card_data"].get("project_type", "general_renovation"),
@@ -161,14 +161,14 @@ class JobAssessmentAgent:
                 "timeline_start": final_state["bid_card_data"].get("timeline_start"),
                 "timeline_end": final_state["bid_card_data"].get("timeline_end")
             }
-            
+
             # Create bid card using the new utility
             create_result = create_bid_card_with_defaults(project_data)
-            
+
             if create_result["success"]:
                 bid_card_data = create_result["bid_card"]
                 bid_card_number = create_result["bid_card_number"]
-                
+
                 # Update the bid_document with AI analysis
                 bid_document = {
                     "bid_card_number": bid_card_number,
@@ -179,16 +179,16 @@ class JobAssessmentAgent:
                     "extraction_method": "IntelligentJAA_ClaudeOpus4",
                     "instabids_version": "3.0"
                 }
-                
+
                 # Update the bid_document field
                 update_result = self.supabase.table("bid_cards").update({
                     "bid_document": bid_document
                 }).eq("id", bid_card_data["id"]).execute()
-                
+
                 print(f"[INTELLIGENT JAA] SUCCESS: Created bid card {bid_card_number}")
                 print(f"[INTELLIGENT JAA] Project: {final_state['bid_card_data'].get('project_type')}")
                 print(f"[INTELLIGENT JAA] Budget: ${final_state['bid_card_data'].get('budget_min')}-${final_state['bid_card_data'].get('budget_max')}")
-                
+
                 return {
                     "success": True,
                     "bid_card_number": bid_card_number,

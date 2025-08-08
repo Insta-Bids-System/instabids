@@ -3,12 +3,13 @@ Contractor Proposals API Router
 Manages contractor bid submissions and proposal retrieval for homeowners
 """
 
-from datetime import datetime
-from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel
 import uuid
-import json
+from datetime import datetime
+from typing import Any, Optional
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel
+
 
 try:
     from database_simple import db
@@ -27,7 +28,7 @@ class ContractorProposal(BaseModel):
     bid_amount: float
     timeline_days: int
     proposal_text: str
-    attachments: Optional[List[Dict[str, Any]]] = None
+    attachments: Optional[list[dict[str, Any]]] = None
 
 
 @router.post("/submit")
@@ -38,13 +39,13 @@ async def submit_proposal(proposal: ContractorProposal):
         existing = db.client.table("contractor_proposals").select("*").eq(
             "bid_card_id", proposal.bid_card_id
         ).eq("contractor_id", proposal.contractor_id).execute()
-        
+
         if existing.data:
             return {
                 "success": False,
                 "message": "You have already submitted a proposal for this project"
             }
-        
+
         # Create proposal record
         proposal_data = {
             "id": str(uuid.uuid4()),
@@ -60,19 +61,79 @@ async def submit_proposal(proposal: ContractorProposal):
             "created_at": datetime.utcnow().isoformat(),
             "updated_at": datetime.utcnow().isoformat()
         }
-        
+
         result = db.client.table("contractor_proposals").insert(proposal_data).execute()
-        
+
         if result.data:
+            # AUTO-CREATE CONVERSATION WITH ALIAS ASSIGNMENT
+            try:
+                # For now, use a test homeowner_id since bid_cards doesn't have homeowner_id column
+                # In production, this should come from the authenticated user or a proper relationship
+                homeowner_id = "11111111-1111-1111-1111-111111111111"  # Test homeowner ID
+
+                if homeowner_id:
+
+                    # Check if conversation already exists for this contractor and bid card
+                    existing_conv = db.client.table("conversations").select("*").eq(
+                        "bid_card_id", proposal.bid_card_id
+                    ).eq("contractor_id", proposal.contractor_id).execute()
+
+                    if not existing_conv.data:
+                        # Count existing conversations for this bid card to determine next alias
+                        conv_count_result = db.client.table("conversations").select("contractor_alias").eq(
+                            "bid_card_id", proposal.bid_card_id
+                        ).execute()
+
+                        # Assign next available alias (A, B, C, D, etc.)
+                        alias_letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+                        used_aliases = [conv.get("contractor_alias", "").replace("Contractor ", "")
+                                      for conv in (conv_count_result.data or [])
+                                      if conv.get("contractor_alias", "").startswith("Contractor ")]
+
+                        # Find next available alias
+                        next_alias = None
+                        for letter in alias_letters:
+                            if letter not in used_aliases:
+                                next_alias = letter
+                                break
+
+                        if next_alias:
+                            # Create new conversation with alias
+                            conversation_data = {
+                                "id": str(uuid.uuid4()),
+                                "bid_card_id": proposal.bid_card_id,
+                                "homeowner_id": homeowner_id,
+                                "contractor_id": proposal.contractor_id,
+                                "contractor_alias": f"Contractor {next_alias}",
+                                "status": "active",
+                                "homeowner_unread_count": 0,
+                                "contractor_unread_count": 0
+                            }
+
+                            conv_result = db.client.table("conversations").insert(conversation_data).execute()
+                            if conv_result.data:
+                                print(f"✅ Auto-created conversation with alias 'Contractor {next_alias}' for bid submission")
+                            else:
+                                print(f"⚠️ Failed to create conversation for contractor {proposal.contractor_id}")
+                        else:
+                            print(f"⚠️ No available aliases for bid card {proposal.bid_card_id} (too many contractors)")
+                    else:
+                        print(f"ℹ️ Conversation already exists for contractor {proposal.contractor_id}")
+                else:
+                    print(f"⚠️ Could not find homeowner_id for bid card {proposal.bid_card_id}")
+
+            except Exception as conv_error:
+                print(f"⚠️ Error creating conversation: {conv_error}")
+                # Don't fail the whole proposal submission if conversation creation fails
             # Update bid card's bid count
             bid_card_result = db.client.table("bid_cards").select("*").eq(
                 "id", proposal.bid_card_id
             ).execute()
-            
+
             bid_card = {"data": bid_card_result.data[0] if bid_card_result.data else None}
-            
-            if bid_card.data:
-                current_bids = bid_card.data.get("bid_document", {}).get("submitted_bids", [])
+
+            if bid_card["data"]:
+                current_bids = bid_card["data"].get("bid_document", {}).get("submitted_bids", [])
                 current_bids.append({
                     "contractor_id": proposal.contractor_id,
                     "contractor_name": proposal.contractor_name,
@@ -80,27 +141,44 @@ async def submit_proposal(proposal: ContractorProposal):
                     "timeline_days": proposal.timeline_days,
                     "created_at": datetime.utcnow().isoformat()
                 })
-                
+
                 update_data = {
                     "bid_document": {
-                        **bid_card.data.get("bid_document", {}),
+                        **bid_card["data"].get("bid_document", {}),
                         "submitted_bids": current_bids,
                         "bids_received_count": len(current_bids)
                     },
                     "bid_count": len(current_bids),
                     "updated_at": datetime.utcnow().isoformat()
                 }
-                
+
                 # Check if target met
-                target = bid_card.data.get("contractor_count_needed", 4)
+                target = bid_card["data"].get("contractor_count_needed", 4)
                 if len(current_bids) >= target:
                     update_data["status"] = "bids_complete"
                     update_data["bid_document"]["bids_target_met"] = True
-                
+
                 db.client.table("bid_cards").update(update_data).eq(
                     "id", proposal.bid_card_id
                 ).execute()
-            
+
+            # Track the bid submission event
+            from routers.bid_card_event_tracker import EventTracker
+            await EventTracker.track_event(
+                bid_card_id=proposal.bid_card_id,
+                event_type="bid_submitted",
+                description=f"Bid submitted by {proposal.contractor_name}",
+                details={
+                    "contractor_id": proposal.contractor_id,
+                    "contractor_name": proposal.contractor_name,
+                    "bid_amount": proposal.bid_amount,
+                    "timeline_days": proposal.timeline_days,
+                    "submission_method": "api"
+                },
+                created_by=proposal.contractor_id,
+                created_by_type="contractor"
+            )
+
             return {
                 "success": True,
                 "message": "Proposal submitted successfully",
@@ -111,12 +189,12 @@ async def submit_proposal(proposal: ContractorProposal):
                 "success": False,
                 "message": "Failed to submit proposal"
             }
-            
+
     except Exception as e:
         print(f"Error submitting proposal: {e}")
         return {
             "success": False,
-            "message": f"Error submitting proposal: {str(e)}"
+            "message": f"Error submitting proposal: {e!s}"
         }
 
 
@@ -127,9 +205,9 @@ async def get_bid_card_proposals(bid_card_id: str):
         result = db.client.table("contractor_proposals").select("*").eq(
             "bid_card_id", bid_card_id
         ).order("created_at", desc=True).execute()
-        
+
         return result.data or []
-        
+
     except Exception as e:
         print(f"Error fetching proposals: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -144,9 +222,9 @@ async def get_contractor_proposals(contractor_id: str):
         ).eq(
             "contractor_id", contractor_id
         ).order("created_at", desc=True).execute()
-        
+
         return result.data or []
-        
+
     except Exception as e:
         print(f"Error fetching contractor proposals: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -171,20 +249,20 @@ async def upload_proposal_attachment(
             "image/png",
             "image/jpg"
         ]
-        
+
         if file.content_type not in allowed_types:
             return {
                 "success": False,
                 "message": f"File type {file.content_type} not allowed"
             }
-        
+
         # Read file data
         file_data = await file.read()
-        
+
         # Generate unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_name = f"proposals/{proposal_id}/{timestamp}_{file.filename}"
-        
+
         # Upload to Supabase Storage
         db.client.storage.from_("project-images").upload(
             unique_name,
@@ -195,15 +273,15 @@ async def upload_proposal_attachment(
                 "upsert": "false"
             }
         )
-        
+
         # Get public URL
         public_url = db.client.storage.from_("project-images").get_public_url(unique_name)
-        
+
         # Update proposal with attachment
         proposal = db.client.table("contractor_proposals").select("*").eq(
             "id", proposal_id
         ).eq("contractor_id", contractor_id).single().execute()
-        
+
         if proposal.data:
             attachments = proposal.data.get("attachments", [])
             attachments.append({
@@ -213,12 +291,12 @@ async def upload_proposal_attachment(
                 "size": len(file_data),
                 "uploaded_at": datetime.utcnow().isoformat()
             })
-            
+
             db.client.table("contractor_proposals").update({
                 "attachments": attachments,
                 "updated_at": datetime.utcnow().isoformat()
             }).eq("id", proposal_id).execute()
-            
+
             return {
                 "success": True,
                 "message": "Attachment uploaded successfully",
@@ -229,12 +307,12 @@ async def upload_proposal_attachment(
                 "success": False,
                 "message": "Proposal not found"
             }
-            
+
     except Exception as e:
         print(f"Error uploading attachment: {e}")
         return {
             "success": False,
-            "message": f"Error uploading attachment: {str(e)}"
+            "message": f"Error uploading attachment: {e!s}"
         }
 
 
@@ -244,21 +322,21 @@ async def update_proposal_status(proposal_id: str, status: str, homeowner_id: st
     try:
         if status not in ["accepted", "rejected"]:
             raise HTTPException(status_code=400, detail="Invalid status")
-        
+
         # Verify homeowner owns the bid card
         proposal = db.client.table("contractor_proposals").select(
             "*, bid_cards!inner(id)"
         ).eq("id", proposal_id).single().execute()
-        
+
         if not proposal.data:
             raise HTTPException(status_code=404, detail="Proposal not found")
-        
+
         # Update proposal status
         result = db.client.table("contractor_proposals").update({
             "status": status,
             "updated_at": datetime.utcnow().isoformat()
         }).eq("id", proposal_id).execute()
-        
+
         if result.data:
             # If accepting, update bid card status
             if status == "accepted":
@@ -266,7 +344,7 @@ async def update_proposal_status(proposal_id: str, status: str, homeowner_id: st
                     "status": "awarded",
                     "updated_at": datetime.utcnow().isoformat()
                 }).eq("id", proposal.data["bid_card_id"]).execute()
-            
+
             return {
                 "success": True,
                 "message": f"Proposal {status} successfully"
@@ -276,7 +354,7 @@ async def update_proposal_status(proposal_id: str, status: str, homeowner_id: st
                 "success": False,
                 "message": "Failed to update proposal status"
             }
-            
+
     except Exception as e:
         print(f"Error updating proposal status: {e}")
         raise HTTPException(status_code=500, detail=str(e))

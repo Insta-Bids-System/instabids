@@ -10,7 +10,11 @@ from datetime import datetime
 
 from supabase import Client
 
-from production_database_solution import get_production_db
+# from production_database_solution import get_production_db
+import database_simple
+
+
+get_production_db = database_simple.get_client
 
 from .websocket_manager import MessageType, admin_websocket_manager
 
@@ -23,7 +27,7 @@ class DatabaseWatcher:
 
     def __init__(self):
         self.db = get_production_db()
-        self.client: Client = self.db.get_client()
+        self.client: Client = self.db
         self.subscriptions = {}
         self.change_handlers: dict[str, Callable] = {}
         self.monitoring_enabled = True

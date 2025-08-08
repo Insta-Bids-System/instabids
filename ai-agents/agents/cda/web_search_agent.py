@@ -11,6 +11,9 @@ import requests
 from supabase import Client
 
 
+# Import the specialty mapper
+
+
 @dataclass
 class ContractorSearchQuery:
     """Search query parameters for contractor discovery"""
@@ -44,6 +47,7 @@ class PotentialContractor:
     google_types: Optional[list[str]] = None
     google_business_status: Optional[str] = None
     specialties: Optional[list[str]] = None
+    contractor_size: Optional[str] = None  # solo_handyman, owner_operator, small_business, regional_company
     years_in_business: Optional[int] = None
     license_number: Optional[str] = None
     insurance_verified: bool = False
@@ -110,7 +114,7 @@ class WebSearchContractorAgent:
             "solar": ["solar panel installation", "solar contractors", "solar energy systems"],
             "general": ["general contractors", "home improvement", "remodeling contractors"]
         }
-        
+
         # Service type indicators to detect in project descriptions
         self.service_indicators = {
             "repair": ["repair", "fix", "broken", "damaged", "leak", "emergency", "not working", "problem", "issue"],
@@ -211,7 +215,7 @@ class WebSearchContractorAgent:
                         "zip_code": "33442"
                     }
                 }
-            
+
             # Service-specific test cases
             if bid_card_id == "test-emergency-roof-repair":
                 return {
@@ -228,7 +232,7 @@ class WebSearchContractorAgent:
                         "zip_code": "33442"
                     }
                 }
-            
+
             if bid_card_id == "test-kitchen-installation":
                 return {
                     "project_type": "kitchen",
@@ -244,7 +248,7 @@ class WebSearchContractorAgent:
                         "zip_code": "33431"
                     }
                 }
-            
+
             if bid_card_id == "test-plumbing-maintenance":
                 return {
                     "project_type": "plumbing",
@@ -261,17 +265,33 @@ class WebSearchContractorAgent:
                     }
                 }
 
+            if bid_card_id == "test-pool-maintenance":
+                return {
+                    "project_type": "pool maintenance",
+                    "bid_document": {
+                        "project_overview": {
+                            "description": "Need regular pool cleaning and maintenance service. Chemical balancing, filter cleaning, and weekly service."
+                        }
+                    },
+                    "location": {
+                        "full_location": "Fort Lauderdale, FL 33301",
+                        "city": "Fort Lauderdale",
+                        "state": "FL",
+                        "zip_code": "33301"
+                    }
+                }
+
             # Load from database
             result = self.supabase.table("bid_cards").select("*").eq("id", bid_card_id).single().execute()
 
             if result.data:
                 bid_document = result.data.get("bid_document", {})
-                
+
                 # FIXED: Use actual database fields for location
                 location_city = result.data.get("location_city", "")
                 location_state = result.data.get("location_state", "")
                 location_zip = result.data.get("location_zip", "")
-                
+
                 # Build full location string
                 full_location = f"{location_city}, {location_state} {location_zip}".strip()
 
@@ -322,29 +342,29 @@ class WebSearchContractorAgent:
         # Get project description from various possible locations
         description = ""
         bid_document = bid_data.get("bid_document", {})
-        
+
         if isinstance(bid_document, dict):
             project_overview = bid_document.get("project_overview", {})
             if isinstance(project_overview, dict):
                 description = project_overview.get("description", "")
-        
+
         # Also check other possible description fields
         description += " " + bid_data.get("description", "")
         description += " " + bid_data.get("project_description", "")
         description = description.lower()
-        
+
         # Count indicators for each service type
         service_scores = {"repair": 0, "installation": 0, "service": 0}
-        
+
         for service_type, indicators in self.service_indicators.items():
             for indicator in indicators:
                 if indicator in description:
                     service_scores[service_type] += 1
-        
+
         # Return the service type with highest score, or None if no clear winner
         if max(service_scores.values()) > 0:
             return max(service_scores, key=service_scores.get)
-        
+
         return None
 
     def _extract_search_query(self, bid_data: dict[str, Any], radius_miles: int = 25) -> ContractorSearchQuery:
@@ -354,7 +374,7 @@ class WebSearchContractorAgent:
 
         # Detect service type from project description
         service_type = self._detect_service_type(bid_data)
-        
+
         # Clean up project type for search
         base_project_type = project_type
         if "holiday" in project_type or "christmas" in project_type:
@@ -394,7 +414,7 @@ class WebSearchContractorAgent:
                 print(f"[WebSearchAgent] Using base project type: {final_project_type} (service: {service_type})")
         else:
             final_project_type = base_project_type
-        
+
         return ContractorSearchQuery(
             project_type=final_project_type,
             zip_code=location.get("zip_code", ""),
@@ -521,12 +541,17 @@ class WebSearchContractorAgent:
                         address_components = place.get("addressComponents", [])
                         city, state, zip_code = self._extract_address_components(address_components)
 
+                        # Extract Google types and basic info
+                        google_types = place.get("types", [])
+                        company_name = place.get("displayName", {}).get("text", "Unknown")
+                        review_count = place.get("userRatingCount", 0)
+
                         contractor = PotentialContractor(
                             discovery_source="google_maps_new",
                             source_query=text_query,
                             project_zip_code=query.zip_code,
                             project_type=query.project_type,
-                            company_name=place.get("displayName", {}).get("text", "Unknown"),
+                            company_name=company_name,
                             phone=place.get("nationalPhoneNumber"),
                             website=place.get("websiteUri"),
                             address=place.get("formattedAddress", ""),
@@ -535,9 +560,12 @@ class WebSearchContractorAgent:
                             zip_code=zip_code,
                             google_place_id=place.get("id"),
                             google_rating=place.get("rating"),
-                            google_review_count=place.get("userRatingCount", 0),
-                            google_types=place.get("types", []),
+                            google_review_count=review_count,
+                            google_types=google_types,
                             google_business_status=place.get("businessStatus", ""),
+                            # specialties and contractor_size will be populated by enrichment agent
+                            specialties=None,  # Will be determined by enrichment agent
+                            contractor_size=None,  # Will be determined by enrichment agent
                             search_rank=len(contractors) + 1,
                             match_score=self._calculate_match_score_new(place, query)
                         )
@@ -672,14 +700,14 @@ class WebSearchContractorAgent:
         }
 
         city_key = city.lower().strip()
-        
+
         # FIXED: If city not found, use actual Florida center (near Lakeland)
         # or better yet, raise an error so we know something's wrong
         if city_key not in coordinates:
             print(f"[WebSearchAgent WARNING] City '{city}' not in coordinates database!")
-            print(f"[WebSearchAgent] Defaulting to Miami area for safety")
+            print("[WebSearchAgent] Defaulting to Miami area for safety")
             return (25.7617, -80.1918)  # Default to Miami instead of St. Petersburg
-            
+
         return coordinates.get(city_key)
 
     def _is_directory_website(self, place: dict[str, Any]) -> bool:

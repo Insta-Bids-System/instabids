@@ -247,16 +247,55 @@ export default function CIAChat({ onSendMessage, onAccountCreated, sessionId }: 
         imageDataUrls.push(dataUrl);
       }
 
+      // CONTRACTOR DETECTION LOGIC - Check if this is a contractor message
+      const isContractorMessage = /\b(contractor|contracting|hvac|plumbing|electrical|painting|roofing|construction|carpentry|flooring|landscaping|pool|solar)\b/i.test(inputMessage) ||
+        /\b(company|business|years? (?:in business|experience)|license|insurance|contractor account|create account|sign up|signup)\b/i.test(inputMessage) ||
+        /\b(i'm .+ from|we're|my company|my business)\b/i.test(inputMessage);
+
       // Call the message handler - use default mock if not provided
       let response: string;
 
       if (onSendMessage) {
-        console.log("Sending message to API...", {
+        console.log("🚨 UPDATED CODE LOADED - Sending message to API...", {
           messageLength: inputMessage.length,
           imageCount: imageDataUrls.length,
           uploadedUrls: uploadedImageUrls.length,
+          isContractorMessage: isContractorMessage,
+          detectionTest: "CONTRACTOR DETECTION IS ACTIVE"
         });
-        response = await onSendMessage(inputMessage, imageDataUrls);
+
+        if (isContractorMessage) {
+          console.log("🔧 Detected contractor message in CIAChat, using COIA landing page API");
+          // Call COIA landing page API directly
+          try {
+            const apiResponse = await fetch("http://localhost:8008/api/coia/landing", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                message: inputMessage,
+                session_id: sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                contractor_lead_id: sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                context: { interface: "landing_page" }
+              })
+            });
+            
+            if (!apiResponse.ok) {
+              throw new Error(`HTTP error! status: ${apiResponse.status}`);
+            }
+            
+            const data = await apiResponse.json();
+            console.log("✅ COIA API Response:", data);
+            response = data.response || "Thank you for your interest! I'm connecting you with our contractor onboarding system.";
+          } catch (error) {
+            console.error("❌ COIA API Error:", error);
+            response = "I understand you're a contractor! Let me connect you with our contractor onboarding system. There seems to be a connection issue - please try again.";
+          }
+        } else {
+          console.log("🏠 Using CIA homeowner API");
+          response = await onSendMessage(inputMessage, imageDataUrls);
+        }
       } else {
         // Enhanced fallback mock response with photo awareness
         console.log("No API handler provided, using mock response");

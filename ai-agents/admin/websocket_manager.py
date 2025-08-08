@@ -135,7 +135,7 @@ class AdminWebSocketManager:
                     "admin_user_id": admin_user_id,
                     "active_connections": len(self.active_connections)
                 }
-            })
+            }, exclude_client=client_id)
 
             logger.info(f"Admin {admin_user_id} disconnected ({client_id})")
             return True

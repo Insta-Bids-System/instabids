@@ -3,15 +3,16 @@ Tier 1: Internal Contractor Matching - UPDATED FOR REAL DATABASE
 Now uses contractor_leads table instead of contractors table
 ENHANCED: Added radius-based geographical search using uszipcode + haversine
 """
-from typing import Any
-import sys
 import os
+import sys
+from typing import Any
 
 from supabase import Client
 
+
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from utils.radius_search_fixed import get_zip_codes_in_radius, calculate_distance_miles
+from utils.radius_search_fixed import calculate_distance_miles, get_zip_codes_in_radius
 
 
 class Tier1Matcher:
@@ -50,7 +51,7 @@ class Tier1Matcher:
             print(f"[Tier1] Contractor size preference: {contractor_size_pref}")
 
             if not zip_code:
-                print(f"[Tier1 ERROR] No zip code provided in bid data")
+                print("[Tier1 ERROR] No zip code provided in bid data")
                 return {
                     "success": False,
                     "contractors": [],
@@ -190,7 +191,7 @@ class Tier1Matcher:
         try:
             # Get contractor's zip code
             contractor_zip = None
-            
+
             # Try different zip code fields the contractor might have
             if contractor.get("zip_code"):
                 contractor_zip = str(contractor["zip_code"]).strip()
@@ -200,33 +201,33 @@ class Tier1Matcher:
                 contractor_zip = str(contractor["postal_code"]).strip()
             elif contractor.get("location_zip"):
                 contractor_zip = str(contractor["location_zip"]).strip()
-                
+
             if not contractor_zip:
                 print(f"[Tier1] No zip code found for contractor {contractor.get('id', 'unknown')}")
                 return False
-                
+
             # Calculate distance between project and contractor
             distance = calculate_distance_miles(project_zip, contractor_zip)
-            
+
             if distance is None:
                 print(f"[Tier1] Could not calculate distance between {project_zip} and {contractor_zip}")
                 return False
-                
+
             # Add distance to contractor data for sorting
             contractor["distance_miles"] = distance
-            
+
             # Check if within radius
             within_radius = distance <= radius_miles
-            
+
             if within_radius:
                 print(f"[Tier1] Contractor {contractor.get('company_name', 'Unknown')} is {distance} miles away (within {radius_miles} mile radius)")
-            
+
             return within_radius
-            
+
         except Exception as e:
             print(f"[Tier1] Error checking radius location match: {e}")
             return False
-            
+
     def _check_location_match(self, contractor: dict[str, Any], location: dict[str, Any]) -> bool:
         """Legacy location matching method - kept for backward compatibility"""
         # For now, match by state and city
@@ -366,7 +367,7 @@ class Tier1Matcher:
         distance = contractor.get("distance_miles")
         city = contractor.get("city", "")
         state = contractor.get("state", "")
-        
+
         if distance is not None:
             if city and state:
                 reasons.append(f"Based in {city}, {state} ({distance} miles away)")

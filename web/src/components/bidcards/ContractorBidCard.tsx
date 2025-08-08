@@ -148,13 +148,13 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
         materials_included: values.materials_included,
         warranty_details: values.warranty_details,
         milestones: milestones,
-        attachments: attachments.map(att => ({
+        attachments: attachments.map((att) => ({
           name: att.name,
           type: att.type,
           size: att.size,
           url: att.url,
-          file: att.file // Include file for actual upload to backend
-        }))
+          file: att.file, // Include file for actual upload to backend
+        })),
       };
 
       await submitBid(bidRequest);
@@ -163,8 +163,8 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
       form.resetFields();
       setMilestones([]);
       // Clean up attachment URLs and reset state
-      attachments.forEach(att => {
-        if (att.url && att.url.startsWith('blob:')) {
+      attachments.forEach((att) => {
+        if (att.url && att.url.startsWith("blob:")) {
           URL.revokeObjectURL(att.url);
         }
       });
@@ -274,14 +274,18 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
       const attachment = {
         uid: file.uid,
         name: file.name,
-        status: 'done',
+        status: "done",
         url: fakeUrl,
-        type: file.type.includes('image') ? 'image' : file.type.includes('pdf') ? 'pdf' : 'document',
+        type: file.type.includes("image")
+          ? "image"
+          : file.type.includes("pdf")
+            ? "pdf"
+            : "document",
         size: file.size,
-        file: file // Keep reference for actual upload later
+        file: file, // Keep reference for actual upload later
       };
-      
-      setAttachments(prev => [...prev, attachment]);
+
+      setAttachments((prev) => [...prev, attachment]);
       message.success(`${file.name} uploaded successfully`);
       setUploadLoading(false);
       return false; // Prevent default upload
@@ -293,9 +297,9 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
   };
 
   const handleRemoveAttachment = (file: any) => {
-    setAttachments(prev => prev.filter(att => att.uid !== file.uid));
+    setAttachments((prev) => prev.filter((att) => att.uid !== file.uid));
     // Clean up object URL to prevent memory leaks
-    if (file.url && file.url.startsWith('blob:')) {
+    if (file.url && file.url.startsWith("blob:")) {
       URL.revokeObjectURL(file.url);
     }
   };
@@ -368,7 +372,7 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
       </Form.Item>
 
       <Divider>Supporting Documents (Optional)</Divider>
-      
+
       <Form.Item
         label={
           <Space>
@@ -387,7 +391,7 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
           loading={uploadLoading}
         >
           <p className="ant-upload-drag-icon">
-            <UploadOutlined style={{ fontSize: 48, color: '#1890ff' }} />
+            <UploadOutlined style={{ fontSize: 48, color: "#1890ff" }} />
           </p>
           <p className="ant-upload-text">Click or drag files to this area to upload</p>
           <p className="ant-upload-hint">

@@ -47,7 +47,7 @@ const IrisChat: React.FC<IrisChatProps> = ({ board, onClose }) => {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [uploadingImages, setUploadingImages] = useState<File[]>([]);
-  const [imageCategory, _setImageCategory] = useState<"ideal" | "current">("ideal");
+  const [imageCategory, setImageCategory] = useState<"ideal" | "current">("ideal");
   const [idealImageId, setIdealImageId] = useState<string | null>(null);
   const [currentImageId, setCurrentImageId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -787,7 +787,7 @@ Your dream space would combine the best of both worlds - taking the spacious lay
         </div>
         <button
           type="button"
-          onClick={match.match(/onClick={[^}]+}/)[0]}
+          onClick={onClose}
           className="text-gray-400 hover:text-gray-600 transition-colors"
         >
           <X className="w-5 h-5" />
@@ -815,7 +815,7 @@ Your dream space would combine the best of both worlds - taking the spacious lay
                     <button
                       key={idx}
                       type="button"
-                      onClick={match.match(/onClick={[^}]+}/)[0]}
+                      onClick={() => _handleSuggestionClick(suggestion)}
                       className="block w-full text-left text-xs px-2 py-1 rounded bg-white bg-opacity-20 hover:bg-opacity-30 transition-colors"
                     >
                       {suggestion}
@@ -860,7 +860,7 @@ Your dream space would combine the best of both worlds - taking the spacious lay
           <div className="flex gap-2 mt-1">
             <button
               type="button"
-              onClick={match.match(/onClick={[^}]+}/)[0]}
+              onClick={() => setImageCategory("ideal")}
               className={`text-xs px-2 py-1 rounded transition-colors ${
                 imageCategory === "ideal"
                   ? "bg-blue-100 text-blue-700 border border-blue-300"
@@ -871,7 +871,7 @@ Your dream space would combine the best of both worlds - taking the spacious lay
             </button>
             <button
               type="button"
-              onClick={match.match(/onClick={[^}]+}/)[0]}
+              onClick={() => setImageCategory("current")}
               className={`text-xs px-2 py-1 rounded transition-colors ${
                 imageCategory === "current"
                   ? "bg-green-100 text-green-700 border border-green-300"
@@ -887,7 +887,7 @@ Your dream space would combine the best of both worlds - taking the spacious lay
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={match.match(/onClick={[^}]+}/)[0]}
+            onClick={() => fileInputRef.current?.click()}
             disabled={isTyping || uploadingImages.length > 0}
             className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900 px-2 py-1 rounded hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -918,7 +918,7 @@ Your dream space would combine the best of both worlds - taking the spacious lay
           <div className="flex gap-2 mt-1">
             <button
               type="button"
-              onClick={match.match(/onClick={[^}]+}/)[0]}
+              onClick={() => _handleVisionComposition()}
               disabled={isTyping}
               className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 px-2 py-1 rounded hover:bg-purple-50 transition-colors border border-purple-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -937,7 +937,7 @@ Your dream space would combine the best of both worlds - taking the spacious lay
           <div className="flex gap-2 mt-1">
             <button
               type="button"
-              onClick={match.match(/onClick={[^}]+}/)[0]}
+              onClick={() => _handleGenerateImage()}
               disabled={isGenerating || !idealImageId || !currentImageId}
               className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors border ${
                 idealImageId && currentImageId
@@ -956,7 +956,7 @@ Your dream space would combine the best of both worlds - taking the spacious lay
             {lastGenerationId && (
               <button
                 type="button"
-                onClick={match.match(/onClick={[^}]+}/)[0]}
+                onClick={() => handleRegenerateWithFeedback("Regenerate with feedback")}
                 disabled={isGenerating}
                 className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors border border-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -996,7 +996,7 @@ Your dream space would combine the best of both worlds - taking the spacious lay
           />
           <button
             type="button"
-            onClick={match.match(/onClick={[^}]+}/)[0]}
+            onClick={handleSend}
             disabled={!input.trim()}
             className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >

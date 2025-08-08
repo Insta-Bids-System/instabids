@@ -14,7 +14,6 @@ from supabase import create_client
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from agents.cda.intelligent_matcher import IntelligentContractorMatcher
 from agents.cda.service_specific_matcher import ServiceSpecificMatcher
 from agents.cda.tier1_matcher_v2 import Tier1Matcher
 from agents.cda.tier2_reengagement import Tier2Reengagement
@@ -38,7 +37,7 @@ class ContractorDiscoveryAgent:
         except Exception as e:
             print(f"[CDA v2] Service matcher unavailable: {e}")
             self.service_matcher = None
-        
+
         self.intelligent_matcher = None  # Legacy matcher disabled
         self.web_search = WebSearchContractorAgent(self.supabase)
         self.tier1_matcher = Tier1Matcher(self.supabase)
@@ -71,41 +70,41 @@ class ContractorDiscoveryAgent:
                 return {"success": False, "error": "Bid card not found"}
 
             print(f"[CDA v2] Loaded bid card - Project: {bid_card.get('project_type', 'Unknown')}")
-            
+
             # Step 2: Calculate how many contractors to actually contact
             # Based on urgency level and the 5/10/15 rule
             bids_needed = bid_card.get("contractor_count_needed", contractors_needed)
             urgency = bid_card.get("urgency_level", "week")
-            
+
             # Calculate contractors to contact based on response rates
             # Tier 1: 90% response rate (internal contractors)
-            # Tier 2: 50% response rate (previous contacts) 
+            # Tier 2: 50% response rate (previous contacts)
             # Tier 3: 20% response rate (cold outreach)
             # Average blended rate ~33% for mixed tiers
-            
+
             # For now, use simple 5-to-1 ratio (20% response rate assumption)
             contractors_to_find = bids_needed * 5
-            
+
             print(f"[CDA v2] Need {bids_needed} bids, targeting {contractors_to_find} contractors")
             print(f"[CDA v2] Urgency level: {urgency}")
 
             # Step 3: Intelligent project analysis using Claude Opus 4
             print("[CDA v2] Analyzing project requirements with Claude Opus 4...")
-            
+
             # Format location properly for the tier matchers
             location = {
                 "city": bid_card.get("location_city", ""),
                 "state": bid_card.get("location_state", ""),
                 "zip_code": bid_card.get("location_zip", "")
             }
-            
+
             # Also update the bid_card with the formatted location for tier matchers
             bid_card["location"] = location
-            
+
             # Use service-specific matcher for intelligent analysis
             if self.service_matcher:
                 project_analysis = self.service_matcher.analyze_project_requirements(bid_card)
-                print(f"[CDA v2] Intelligent Analysis Complete:")
+                print("[CDA v2] Intelligent Analysis Complete:")
                 print(f"  - Service Category: {project_analysis.get('service_category', 'Unknown')}")
                 print(f"  - Service Type: {project_analysis.get('service_type', 'Unknown')}")
                 print(f"  - Specialization Required: {project_analysis.get('specialization_required', [])}")
@@ -122,7 +121,7 @@ class ContractorDiscoveryAgent:
                     "contractor_requirements": []
                 }
                 print("[CDA v2] Using fallback analysis (service matcher unavailable)")
-            
+
             # Include original bid analysis structure for compatibility
             bid_analysis = {
                 "contractor_size_preference": "any",
@@ -183,14 +182,14 @@ class ContractorDiscoveryAgent:
 
             # Step 4: Intelligent scoring using Claude Opus 4 service-specific matching
             print(f"[CDA v2] Scoring {len(unique_contractors)} contractors with intelligent service matching...")
-            
+
             # Score each contractor using service-specific analysis
             for contractor in unique_contractors:
                 if self.service_matcher:
                     try:
                         # Get intelligent scoring based on service requirements
                         scoring_result = self.service_matcher.score_contractor_match(contractor, project_analysis)
-                        
+
                         # Apply the intelligent scoring
                         contractor["match_score"] = scoring_result.get("match_score", 50)
                         contractor["recommendation"] = scoring_result.get("recommendation", "possible_match")
@@ -198,9 +197,9 @@ class ContractorDiscoveryAgent:
                         contractor["key_strengths"] = scoring_result.get("key_strengths", [])
                         contractor["concerns"] = scoring_result.get("concerns", [])
                         contractor["specialization_match"] = scoring_result.get("specialization_match", "moderate")
-                        
+
                         print(f"[CDA v2] Intelligent score for {contractor.get('company_name', 'Unknown')}: {contractor['match_score']}")
-                        
+
                     except Exception as e:
                         print(f"[CDA v2] Error in intelligent scoring for {contractor.get('company_name', 'Unknown')}: {e}")
                         # Fallback to simple scoring
@@ -208,12 +207,12 @@ class ContractorDiscoveryAgent:
                 else:
                     # Fallback to simple scoring when service matcher unavailable
                     self._apply_simple_scoring(contractor)
-            
+
             # Sort by score and select top matches
             unique_contractors.sort(key=lambda x: x.get("match_score", 0), reverse=True)
             # Select the number we calculated we need to contact, not just the bids needed
             selected = unique_contractors[:contractors_to_find]
-            
+
             selection_result = {
                 "selected_contractors": selected,
                 "all_scores": [
@@ -251,7 +250,7 @@ class ContractorDiscoveryAgent:
                 "tier_results": {
                     "tier1_internal": len(tier1_results.get("contractors", [])) if tier1_results.get("success") else 0,
                     "tier2_previous": len(tier2_results) if tier2_results else 0,
-                    "tier3_web": len(web_results.get("contractors", [])) if 'web_results' in locals() and web_results.get("success") else 0
+                    "tier3_web": len(web_results.get("contractors", [])) if "web_results" in locals() and web_results.get("success") else 0
                 }
             }
 
@@ -293,7 +292,7 @@ class ContractorDiscoveryAgent:
                     }
                 },
                 "location_city": "Coconut Creek",
-                "location_state": "FL", 
+                "location_state": "FL",
                 "location_zip": "33442",
                 "contractor_count_needed": 5
             }
@@ -312,8 +311,31 @@ class ContractorDiscoveryAgent:
                 },
                 "location_city": "Coconut Creek",
                 "location_state": "FL",
-                "location_zip": "33442", 
+                "location_zip": "33442",
                 "contractor_count_needed": 5
+            }
+        elif bid_card_id == "test-pool-maintenance":
+            return {
+                "id": bid_card_id,
+                "project_type": "pool maintenance",
+                "bid_document": {
+                    "project_overview": {
+                        "description": "Need regular pool cleaning and maintenance service. Chemical balancing, filter cleaning, and weekly service."
+                    },
+                    "budget_information": {
+                        "budget_min": 150,
+                        "budget_max": 300,
+                        "notes": "Monthly service budget"
+                    },
+                    "timeline": {
+                        "urgency_level": "standard",
+                        "notes": "Start within a week"
+                    }
+                },
+                "location_city": "Fort Lauderdale",
+                "location_state": "FL",
+                "location_zip": "33301",
+                "contractor_count_needed": 4
             }
         elif bid_card_id == "test-kitchen-installation":
             return {
@@ -342,7 +364,7 @@ class ContractorDiscoveryAgent:
                         "description": "Regular plumbing maintenance service needed. Check all fixtures, inspect pipes, and ongoing maintenance contract."
                     },
                     "timeline": {
-                        "urgency_level": "week", 
+                        "urgency_level": "week",
                         "notes": "Looking for ongoing service relationship"
                     }
                 },
@@ -419,7 +441,7 @@ class ContractorDiscoveryAgent:
             score += 5
         if contractor.get("email"):
             score += 5
-        
+
         contractor["match_score"] = min(score, 100)
         contractor["recommendation"] = "good_match" if score >= 80 else "possible_match"
         contractor["reasoning"] = f"Basic scoring based on rating ({contractor.get('google_rating', 'N/A')}), reviews ({contractor.get('google_review_count', 0)}), and online presence"

@@ -15,8 +15,7 @@ async def get_enhanced_bid_cards(limit: int = 50):
         # Get base bid cards
         bid_cards_result = db.client.table("bid_cards").select(
             "*, "
-            "homeowner_name, homeowner_email, homeowner_phone, "
-            "urgency_level, complexity_score, timeline_weeks"
+            "homeowner_name"
         ).order("created_at", desc=True).limit(limit).execute()
 
         if not bid_cards_result.data:
@@ -29,7 +28,7 @@ async def get_enhanced_bid_cards(limit: int = 50):
 
             # Get campaign data
             campaign_result = db.client.table("outreach_campaigns").select(
-                "max_contractors, contractors_targeted, contractors_responded, status"
+                "max_contractors, contractors_targeted, responses_received, status"
             ).eq("bid_card_id", bid_card_id).execute()
 
             campaign_data = campaign_result.data[0] if campaign_result.data else {}
@@ -57,7 +56,7 @@ async def get_enhanced_bid_cards(limit: int = 50):
 
             # Calculate next check-in based on campaign progress
             if campaign_data:
-                progress = (campaign_data.get("contractors_responded", 0) /
+                progress = (campaign_data.get("responses_received", 0) /
                            max(campaign_data.get("max_contractors", 1), 1))
                 if progress < 0.25:
                     next_checkin = datetime.now() + timedelta(hours=6)

@@ -19,6 +19,11 @@ interface BidCard {
   location: string;
   urgency_level?: string;
   last_activity: string;
+  // Homeowner information
+  homeowner_id?: string;
+  homeowner_name?: string;
+  homeowner_email?: string;
+  homeowner_phone?: string;
 }
 
 const BidCardMonitor: React.FC = () => {
@@ -50,7 +55,7 @@ const BidCardMonitor: React.FC = () => {
   useEffect(() => {
     const loadBidCards = async () => {
       try {
-        const response = await fetch("http://localhost:8008/api/admin/bid-cards", {
+        const response = await fetch("http://localhost:8008/api/admin/bid-cards-enhanced", {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("admin_session_id")}`,
           },
@@ -111,37 +116,39 @@ const BidCardMonitor: React.FC = () => {
     if (activeTab !== "all") {
       if (activeTab === "needs_action") {
         // Show cards that need manual intervention
-        filtered = filtered.filter(card => 
-          card.status === "generated" || 
-          (card.status === "collecting_bids" && isCardBehindSchedule(card))
+        filtered = filtered.filter(
+          (card) =>
+            card.status === "generated" ||
+            (card.status === "collecting_bids" && isCardBehindSchedule(card))
         );
       } else if (activeTab === "outreach_active") {
         // Show cards with active contractor outreach
-        filtered = filtered.filter(card => 
-          card.status === "collecting_bids" || card.status === "active"
+        filtered = filtered.filter(
+          (card) => card.status === "collecting_bids" || card.status === "active"
         );
       } else if (activeTab === "timeline_issues") {
         // Show cards behind schedule
-        filtered = filtered.filter(card => isCardBehindSchedule(card));
+        filtered = filtered.filter((card) => isCardBehindSchedule(card));
       } else {
         // Filter by specific status
-        filtered = filtered.filter(card => card.status === activeTab);
+        filtered = filtered.filter((card) => card.status === activeTab);
       }
     }
 
     // Filter by search term
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(card =>
-        card.bid_card_number.toLowerCase().includes(search) ||
-        card.project_type.toLowerCase().includes(search) ||
-        card.id.toLowerCase().includes(search)
+      filtered = filtered.filter(
+        (card) =>
+          card.bid_card_number.toLowerCase().includes(search) ||
+          card.project_type.toLowerCase().includes(search) ||
+          card.id.toLowerCase().includes(search)
       );
     }
 
     // Filter by timeline performance
     if (timelineFilter !== "all") {
-      filtered = filtered.filter(card => {
+      filtered = filtered.filter((card) => {
         const performance = getTimelinePerformance(card);
         return performance === timelineFilter;
       });
@@ -149,7 +156,7 @@ const BidCardMonitor: React.FC = () => {
 
     // Filter by outreach status
     if (outreachFilter !== "all") {
-      filtered = filtered.filter(card => {
+      filtered = filtered.filter((card) => {
         const hasOutreach = hasActiveOutreach(card);
         if (outreachFilter === "with_outreach") return hasOutreach;
         if (outreachFilter === "no_outreach") return !hasOutreach;
@@ -220,19 +227,25 @@ const BidCardMonitor: React.FC = () => {
     return {
       absolute: time.toLocaleString(),
       running: runningTime,
-      relative: diffInMinutes < 1 ? "Just now" : formatTimeAgo(timestamp)
+      relative: diffInMinutes < 1 ? "Just now" : formatTimeAgo(timestamp),
     };
   };
 
   const getUrgencyLabel = (urgency: string | null) => {
     if (!urgency) return "Standard";
     switch (urgency.toLowerCase()) {
-      case "emergency": return "Emergency";
-      case "urgent": return "Urgent"; 
-      case "week": return "This Week";
-      case "month": return "This Month";
-      case "flexible": return "Flexible";
-      default: return urgency.charAt(0).toUpperCase() + urgency.slice(1);
+      case "emergency":
+        return "Emergency";
+      case "urgent":
+        return "Urgent";
+      case "week":
+        return "This Week";
+      case "month":
+        return "This Month";
+      case "flexible":
+        return "Flexible";
+      default:
+        return urgency.charAt(0).toUpperCase() + urgency.slice(1);
     }
   };
 
@@ -240,13 +253,13 @@ const BidCardMonitor: React.FC = () => {
     // Handle both old and new field names
     const needed = card.contractor_count_needed || card.target_bids || 4;
     const urgency = card.urgency_level || "week";
-    
+
     // InstaBids contractor outreach timing system (separate from project urgency)
     // This is how fast InstaBids collects bids, not when customer wants work done
     let timeframe = "TBD";
     let strategy = "Standard Outreach";
     let method = "Multi-tier Outreach";
-    
+
     switch (urgency.toLowerCase()) {
       case "emergency":
         // < 1 hour: Emergency lockout/plumbing situations
@@ -284,14 +297,14 @@ const BidCardMonitor: React.FC = () => {
         strategy = `${needed} bids within 3 days`;
         method = "Standard multi-tier approach";
     }
-    
+
     return { timeframe, strategy, method };
   };
 
   const getBidDeadline = (card: BidCard) => {
     const createdAt = new Date(card.created_at);
     const urgency = card.urgency_level || "week";
-    
+
     // InstaBids contractor outreach deadlines (business speed, not project timeline)
     let deadlineHours = 0;
     switch (urgency.toLowerCase()) {
@@ -313,8 +326,8 @@ const BidCardMonitor: React.FC = () => {
       default:
         deadlineHours = 72; // Default to 3-day standard collection
     }
-    
-    const deadline = new Date(createdAt.getTime() + (deadlineHours * 60 * 60 * 1000));
+
+    const deadline = new Date(createdAt.getTime() + deadlineHours * 60 * 60 * 1000);
     return deadline;
   };
 
@@ -322,19 +335,19 @@ const BidCardMonitor: React.FC = () => {
     const deadline = getBidDeadline(card);
     const now = currentTime;
     const timeLeft = deadline.getTime() - now.getTime();
-    
+
     if (timeLeft <= 0) {
       return { text: "DEADLINE PASSED", isOverdue: true, percentage: 100 };
     }
-    
+
     const totalTime = deadline.getTime() - new Date(card.created_at).getTime();
     const elapsed = now.getTime() - new Date(card.created_at).getTime();
     const percentage = Math.min((elapsed / totalTime) * 100, 100);
-    
+
     const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
     const minutesLeft = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
     const daysLeft = Math.floor(hoursLeft / 24);
-    
+
     let text = "";
     if (daysLeft > 0) {
       text = `${daysLeft}d ${hoursLeft % 24}h left`;
@@ -343,21 +356,21 @@ const BidCardMonitor: React.FC = () => {
     } else {
       text = `${minutesLeft}m left`;
     }
-    
+
     return { text, isOverdue: false, percentage };
   };
 
   const getProgressBarColor = (card: BidCard) => {
     const { isOverdue, percentage } = formatCountdown(card);
-    
+
     if (card.status === "bids_complete") {
       return "bg-green-500";
     }
-    
+
     if (isOverdue) {
       return "bg-red-600";
     }
-    
+
     if (percentage > 85) {
       return "bg-red-500"; // Urgent - less than 15% time left
     } else if (percentage > 60) {
@@ -370,18 +383,20 @@ const BidCardMonitor: React.FC = () => {
   // Helper functions for filtering
   const isCardBehindSchedule = (card: BidCard): boolean => {
     const { percentage } = formatCountdown(card);
-    const progressPercentage = ((card.bids_received || 0) / (card.contractor_count_needed || 1)) * 100;
-    
+    const progressPercentage =
+      ((card.bids_received || 0) / (card.contractor_count_needed || 1)) * 100;
+
     // Behind if time progress is ahead of bid progress by more than 25%
     return percentage > progressPercentage + 25 && card.status !== "bids_complete";
   };
 
   const getTimelinePerformance = (card: BidCard): string => {
     if (card.status === "bids_complete") return "completed";
-    
+
     const { percentage, isOverdue } = formatCountdown(card);
-    const progressPercentage = ((card.bids_received || 0) / (card.contractor_count_needed || 1)) * 100;
-    
+    const progressPercentage =
+      ((card.bids_received || 0) / (card.contractor_count_needed || 1)) * 100;
+
     if (isOverdue) return "behind";
     if (progressPercentage >= percentage + 10) return "ahead";
     if (progressPercentage >= percentage - 15) return "on_time";
@@ -398,16 +413,19 @@ const BidCardMonitor: React.FC = () => {
   const getStatusCounts = () => {
     const counts = {
       all: bidCards.length,
-      generated: bidCards.filter(c => c.status === "generated").length,
-      collecting_bids: bidCards.filter(c => c.status === "collecting_bids").length,
-      active: bidCards.filter(c => c.status === "active").length,
-      bids_complete: bidCards.filter(c => c.status === "bids_complete").length,
-      expired: bidCards.filter(c => c.status === "expired").length,
-      needs_action: bidCards.filter(c => 
-        c.status === "generated" || (c.status === "collecting_bids" && isCardBehindSchedule(c))
+      generated: bidCards.filter((c) => c.status === "generated").length,
+      collecting_bids: bidCards.filter((c) => c.status === "collecting_bids").length,
+      active: bidCards.filter((c) => c.status === "active").length,
+      bids_complete: bidCards.filter((c) => c.status === "bids_complete").length,
+      expired: bidCards.filter((c) => c.status === "expired").length,
+      needs_action: bidCards.filter(
+        (c) =>
+          c.status === "generated" || (c.status === "collecting_bids" && isCardBehindSchedule(c))
       ).length,
-      outreach_active: bidCards.filter(c => c.status === "collecting_bids" || c.status === "active").length,
-      timeline_issues: bidCards.filter(c => isCardBehindSchedule(c)).length,
+      outreach_active: bidCards.filter(
+        (c) => c.status === "collecting_bids" || c.status === "active"
+      ).length,
+      timeline_issues: bidCards.filter((c) => isCardBehindSchedule(c)).length,
     };
     return counts;
   };
@@ -415,11 +433,11 @@ const BidCardMonitor: React.FC = () => {
   // Get critical alerts for cards that need immediate attention
   const getCriticalAlerts = () => {
     const alerts = [];
-    
-    bidCards.forEach(card => {
+
+    bidCards.forEach((card) => {
       const { isOverdue, percentage } = formatCountdown(card);
       const performance = getTimelinePerformance(card);
-      
+
       // Critical: Deadline passed
       if (isOverdue && card.status !== "bids_complete") {
         alerts.push({
@@ -428,35 +446,40 @@ const BidCardMonitor: React.FC = () => {
           severity: "critical",
           message: `${card.project_type} (${card.bid_card_number}) deadline has passed`,
           card: card,
-          action: "Extend deadline or contact contractors directly"
+          action: "Extend deadline or contact contractors directly",
         });
       }
-      
+
       // High: Less than 2 hours remaining and no bids
-      else if (percentage > 95 && (card.bids_received || 0) === 0 && card.status === "collecting_bids") {
+      else if (
+        percentage > 95 &&
+        (card.bids_received || 0) === 0 &&
+        card.status === "collecting_bids"
+      ) {
         alerts.push({
           id: card.id,
           type: "urgent_no_bids",
           severity: "high",
           message: `${card.project_type} (${card.bid_card_number}) has less than 2 hours left with no bids`,
           card: card,
-          action: "Expand contractor outreach or adjust requirements"
+          action: "Expand contractor outreach or adjust requirements",
         });
       }
-      
+
       // High: Severely behind schedule
       else if (performance === "behind" && percentage > 75) {
-        const progressPercentage = ((card.bids_received || 0) / (card.contractor_count_needed || 1)) * 100;
+        const progressPercentage =
+          ((card.bids_received || 0) / (card.contractor_count_needed || 1)) * 100;
         alerts.push({
           id: card.id,
           type: "behind_schedule",
           severity: "high",
           message: `${card.project_type} (${card.bid_card_number}) is ${Math.round(percentage)}% through timeline with only ${Math.round(progressPercentage)}% of bids`,
           card: card,
-          action: "Escalate outreach or adjust timeline"
+          action: "Escalate outreach or adjust timeline",
         });
       }
-      
+
       // Medium: Generated cards sitting idle for more than 1 hour
       else if (card.status === "generated" && percentage > 10) {
         alerts.push({
@@ -465,17 +488,17 @@ const BidCardMonitor: React.FC = () => {
           severity: "medium",
           message: `${card.project_type} (${card.bid_card_number}) has been generated but not started for ${formatCountdown(card).text}`,
           card: card,
-          action: "Start campaign or review requirements"
+          action: "Start campaign or review requirements",
         });
       }
     });
-    
+
     // Sort by severity: critical, high, medium
     alerts.sort((a, b) => {
       const severityOrder = { critical: 0, high: 1, medium: 2 };
       return severityOrder[a.severity] - severityOrder[b.severity];
     });
-    
+
     return alerts;
   };
 
@@ -499,7 +522,9 @@ const BidCardMonitor: React.FC = () => {
           <h3 className="text-lg font-medium text-gray-900">🔄 Live Bid Card Tracking</h3>
           <div className="flex items-center text-sm text-gray-500">
             <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></div>
-            <span>Real-time updates ({filteredCards.length} of {bidCards.length})</span>
+            <span>
+              Real-time updates ({filteredCards.length} of {bidCards.length})
+            </span>
           </div>
         </div>
 
@@ -507,56 +532,72 @@ const BidCardMonitor: React.FC = () => {
         {(() => {
           const alerts = getCriticalAlerts();
           if (alerts.length === 0) return null;
-          
+
           return (
             <div className="mb-4 space-y-2">
-              {alerts.slice(0, 3).map((alert) => ( // Show max 3 alerts
-                <div
-                  key={alert.id}
-                  className={`p-4 rounded-lg border-l-4 ${
-                    alert.severity === "critical"
-                      ? "bg-red-50 border-red-400 text-red-800"
-                      : alert.severity === "high"
-                      ? "bg-orange-50 border-orange-400 text-orange-800"
-                      : "bg-yellow-50 border-yellow-400 text-yellow-800"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <div className={`text-lg ${
-                          alert.severity === "critical"
-                            ? "text-red-600"
-                            : alert.severity === "high"
-                            ? "text-orange-600"
-                            : "text-yellow-600"
-                        }`}>
-                          {alert.severity === "critical" ? "🚨" : alert.severity === "high" ? "⚠️" : "⏰"}
+              {alerts.slice(0, 3).map(
+                (
+                  alert // Show max 3 alerts
+                ) => (
+                  <div
+                    key={alert.id}
+                    className={`p-4 rounded-lg border-l-4 ${
+                      alert.severity === "critical"
+                        ? "bg-red-50 border-red-400 text-red-800"
+                        : alert.severity === "high"
+                          ? "bg-orange-50 border-orange-400 text-orange-800"
+                          : "bg-yellow-50 border-yellow-400 text-yellow-800"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className={`text-lg ${
+                              alert.severity === "critical"
+                                ? "text-red-600"
+                                : alert.severity === "high"
+                                  ? "text-orange-600"
+                                  : "text-yellow-600"
+                            }`}
+                          >
+                            {alert.severity === "critical"
+                              ? "🚨"
+                              : alert.severity === "high"
+                                ? "⚠️"
+                                : "⏰"}
+                          </div>
+                          <div className="text-sm font-medium uppercase tracking-wide">
+                            {alert.severity === "critical"
+                              ? "Critical"
+                              : alert.severity === "high"
+                                ? "High Priority"
+                                : "Attention Needed"}
+                          </div>
                         </div>
-                        <div className="text-sm font-medium uppercase tracking-wide">
-                          {alert.severity === "critical" ? "Critical" : alert.severity === "high" ? "High Priority" : "Attention Needed"}
+                        <div className="mt-1 text-sm font-medium">{alert.message}</div>
+                        <div className="mt-1 text-xs opacity-75">
+                          Recommended action: {alert.action}
                         </div>
                       </div>
-                      <div className="mt-1 text-sm font-medium">{alert.message}</div>
-                      <div className="mt-1 text-xs opacity-75">Recommended action: {alert.action}</div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => setSelectedCard(alert.card.id)}
-                        className={`px-3 py-1 text-xs rounded font-medium ${
-                          alert.severity === "critical"
-                            ? "bg-red-100 text-red-700 hover:bg-red-200"
-                            : alert.severity === "high"
-                            ? "bg-orange-100 text-orange-700 hover:bg-orange-200"
-                            : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
-                        }`}
-                      >
-                        View Details
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setSelectedCard(alert.card.id)}
+                          className={`px-3 py-1 text-xs rounded font-medium ${
+                            alert.severity === "critical"
+                              ? "bg-red-100 text-red-700 hover:bg-red-200"
+                              : alert.severity === "high"
+                                ? "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                                : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                          }`}
+                        >
+                          View Details
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              )}
               {alerts.length > 3 && (
                 <div className="text-center">
                   <button
@@ -576,13 +617,25 @@ const BidCardMonitor: React.FC = () => {
           {[
             { key: "all", label: "All", count: getStatusCounts().all },
             { key: "needs_action", label: "⚠️ Needs Action", count: getStatusCounts().needs_action },
-            { key: "outreach_active", label: "📞 Active Outreach", count: getStatusCounts().outreach_active },
-            { key: "timeline_issues", label: "🕒 Behind Schedule", count: getStatusCounts().timeline_issues },
+            {
+              key: "outreach_active",
+              label: "📞 Active Outreach",
+              count: getStatusCounts().outreach_active,
+            },
+            {
+              key: "timeline_issues",
+              label: "🕒 Behind Schedule",
+              count: getStatusCounts().timeline_issues,
+            },
             { key: "generated", label: "📋 Generated", count: getStatusCounts().generated },
-            { key: "collecting_bids", label: "⚙️ Collecting", count: getStatusCounts().collecting_bids },
+            {
+              key: "collecting_bids",
+              label: "⚙️ Collecting",
+              count: getStatusCounts().collecting_bids,
+            },
             { key: "active", label: "✅ Active", count: getStatusCounts().active },
             { key: "bids_complete", label: "🎯 Complete", count: getStatusCounts().bids_complete },
-          ].map(tab => (
+          ].map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
@@ -635,7 +688,10 @@ const BidCardMonitor: React.FC = () => {
           </select>
 
           {/* Clear Filters */}
-          {(activeTab !== "all" || searchTerm || timelineFilter !== "all" || outreachFilter !== "all") && (
+          {(activeTab !== "all" ||
+            searchTerm ||
+            timelineFilter !== "all" ||
+            outreachFilter !== "all") && (
             <button
               onClick={() => {
                 setActiveTab("all");
@@ -703,7 +759,22 @@ const BidCardMonitor: React.FC = () => {
                       <span>🕒 Running: {formatFullTimestamp(card.created_at).running}</span>
                       <span>📅 Created: {formatFullTimestamp(card.created_at).absolute}</span>
                     </div>
-                    
+
+                    {/* Homeowner Information */}
+                    {(card.homeowner_name || card.homeowner_id) && (
+                      <div className="mt-2 flex items-center space-x-4 text-sm text-gray-600">
+                        {card.homeowner_name && (
+                          <span>👤 Homeowner: {card.homeowner_name}</span>
+                        )}
+                        {card.homeowner_id && (
+                          <span className="text-xs text-gray-500">ID: {card.homeowner_id.slice(0, 8)}...</span>
+                        )}
+                        {card.homeowner_email && (
+                          <span>📧 {card.homeowner_email}</span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Contractor Strategy Display */}
                     <div className="mt-2 flex items-center space-x-4 text-sm text-gray-600">
                       <span>🎯 Strategy: {getContractorStrategy(card).strategy}</span>
@@ -714,15 +785,17 @@ const BidCardMonitor: React.FC = () => {
                     {/* Countdown Timer */}
                     <div className="mt-2 flex items-center space-x-4 text-sm">
                       <span className="text-gray-600">⏰ Deadline:</span>
-                      <span className={`font-medium ${
-                        formatCountdown(card).isOverdue 
-                          ? "text-red-600" 
-                          : formatCountdown(card).percentage > 85 
-                            ? "text-red-500"
-                            : formatCountdown(card).percentage > 60
-                              ? "text-yellow-600"
-                              : "text-blue-600"
-                      }`}>
+                      <span
+                        className={`font-medium ${
+                          formatCountdown(card).isOverdue
+                            ? "text-red-600"
+                            : formatCountdown(card).percentage > 85
+                              ? "text-red-500"
+                              : formatCountdown(card).percentage > 60
+                                ? "text-yellow-600"
+                                : "text-blue-600"
+                        }`}
+                      >
                         {formatCountdown(card).text}
                       </span>
                       <span className="text-gray-500 text-xs">
@@ -734,7 +807,8 @@ const BidCardMonitor: React.FC = () => {
                     <div className="mt-3">
                       <div className="flex items-center justify-between text-sm mb-1">
                         <span className="text-gray-600">
-                          Bids Progress: {card.bids_received || card.progress || 0}/{card.contractor_count_needed || card.target_bids || 4}
+                          Bids Progress: {card.bids_received || card.progress || 0}/
+                          {card.contractor_count_needed || card.target_bids || 4}
                         </span>
                         <div className="flex items-center space-x-2">
                           <span className="font-medium text-gray-900">
@@ -745,15 +819,17 @@ const BidCardMonitor: React.FC = () => {
                               return Math.round((bids / target) * 100);
                             })()}%
                           </span>
-                          <span className={`text-xs px-2 py-1 rounded ${
-                            formatCountdown(card).isOverdue 
-                              ? "bg-red-100 text-red-700" 
-                              : formatCountdown(card).percentage > 85 
-                                ? "bg-red-50 text-red-600"
-                                : formatCountdown(card).percentage > 60
-                                  ? "bg-yellow-50 text-yellow-600"
-                                  : "bg-blue-50 text-blue-600"
-                          }`}>
+                          <span
+                            className={`text-xs px-2 py-1 rounded ${
+                              formatCountdown(card).isOverdue
+                                ? "bg-red-100 text-red-700"
+                                : formatCountdown(card).percentage > 85
+                                  ? "bg-red-50 text-red-600"
+                                  : formatCountdown(card).percentage > 60
+                                    ? "bg-yellow-50 text-yellow-600"
+                                    : "bg-blue-50 text-blue-600"
+                            }`}
+                          >
                             {Math.round(100 - formatCountdown(card).percentage)}% time left
                           </span>
                         </div>
@@ -762,20 +838,24 @@ const BidCardMonitor: React.FC = () => {
                         {/* Bid progress bar */}
                         <div
                           className={`h-3 rounded-full transition-all duration-500 ${getProgressBarColor(card)}`}
-                          style={{ 
-                            width: `${Math.min((() => {
-                              const bids = card.bids_received || card.progress || 0;
-                              const target = card.contractor_count_needed || card.target_bids || 4;
-                              return (bids / target) * 100;
-                            })(), 100)}%` 
+                          style={{
+                            width: `${Math.min(
+                              (() => {
+                                const bids = card.bids_received || card.progress || 0;
+                                const target =
+                                  card.contractor_count_needed || card.target_bids || 4;
+                                return (bids / target) * 100;
+                              })(),
+                              100
+                            )}%`,
                           }}
                         ></div>
                         {/* Time progress indicator */}
-                        <div 
+                        <div
                           className="absolute top-0 h-3 bg-white bg-opacity-30 rounded-full"
-                          style={{ 
+                          style={{
                             left: `${Math.min(formatCountdown(card).percentage, 100)}%`,
-                            width: '2px'
+                            width: "2px",
                           }}
                         ></div>
                       </div>

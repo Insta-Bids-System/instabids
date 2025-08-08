@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import LoadingSpinner from "../ui/LoadingSpinner";
+import BidSubmissionsDetail from "./BidSubmissionsDetail";
 
 interface BidCard {
   id?: string;
@@ -32,6 +34,7 @@ const BidCardTable: React.FC = () => {
   const [bidCards, setBidCards] = useState<BidCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedBidCard, setSelectedBidCard] = useState<{ id: string; number: string } | null>(null);
 
   useEffect(() => {
     fetchBidCards();
@@ -64,7 +67,7 @@ const BidCardTable: React.FC = () => {
       const { min, max } = bidCard.budget_range;
       return `$${min.toLocaleString()} - $${max.toLocaleString()}`;
     }
-    
+
     // Handle individual min/max format
     const min = bidCard.budget_min;
     const max = bidCard.budget_max;
@@ -75,16 +78,21 @@ const BidCardTable: React.FC = () => {
   };
 
   const formatProjectType = (type: string): string => {
-    return type.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+    return type.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
   const getStatusColor = (status: string): string => {
     switch (status) {
-      case "generated": return "bg-blue-100 text-blue-800";
-      case "collecting_bids": return "bg-yellow-100 text-yellow-800";
-      case "bids_complete": return "bg-green-100 text-green-800";
-      case "cancelled": return "bg-red-100 text-red-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "generated":
+        return "bg-blue-100 text-blue-800";
+      case "collecting_bids":
+        return "bg-yellow-100 text-yellow-800";
+      case "bids_complete":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -92,11 +100,16 @@ const BidCardTable: React.FC = () => {
     const urgency = bidCard.urgency_level;
     if (!urgency) return "text-gray-600";
     switch (urgency) {
-      case "emergency": return "text-red-600 font-bold";
-      case "urgent": return "text-orange-600 font-semibold";
-      case "week": return "text-yellow-600";
-      case "month": return "text-green-600";
-      default: return "text-gray-600";
+      case "emergency":
+        return "text-red-600 font-bold";
+      case "urgent":
+        return "text-orange-600 font-semibold";
+      case "week":
+        return "text-yellow-600";
+      case "month":
+        return "text-green-600";
+      default:
+        return "text-gray-600";
     }
   };
 
@@ -140,15 +153,12 @@ const BidCardTable: React.FC = () => {
   }
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-lg font-medium text-gray-900">
-          Bid Cards ({bidCards.length})
-        </h2>
-        <p className="text-sm text-gray-600">
-          All bid cards in the system, showing latest first
-        </p>
-      </div>
+    <>
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-medium text-gray-900">Bid Cards ({bidCards.length})</h2>
+          <p className="text-sm text-gray-600">All bid cards in the system, showing latest first. Click on bid counts to view submissions.</p>
+        </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -170,6 +180,9 @@ const BidCardTable: React.FC = () => {
                 Location
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Bids
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Urgency
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -181,9 +194,7 @@ const BidCardTable: React.FC = () => {
             {bidCards.map((bidCard) => (
               <tr key={bidCard.bid_card_number} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">
-                    {bidCard.bid_card_number}
-                  </div>
+                  <div className="text-sm font-medium text-gray-900">{bidCard.bid_card_number}</div>
                   <div className="text-sm text-gray-500">
                     Needs {bidCard.contractor_count_needed || bidCard.bid_count || 0} contractors
                   </div>
@@ -194,7 +205,9 @@ const BidCardTable: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bidCard.status)}`}>
+                  <span
+                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(bidCard.status)}`}
+                  >
                     {bidCard.status.replace(/_/g, " ").toUpperCase()}
                   </span>
                 </td>
@@ -202,12 +215,28 @@ const BidCardTable: React.FC = () => {
                   {formatBudget(bidCard)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {bidCard.location 
+                  {bidCard.location
                     ? `${bidCard.location.city}, ${bidCard.location.state}`
-                    : bidCard.location_city && bidCard.location_state 
-                    ? `${bidCard.location_city}, ${bidCard.location_state}`
-                    : "Location not set"
-                  }
+                    : bidCard.location_city && bidCard.location_state
+                      ? `${bidCard.location_city}, ${bidCard.location_state}`
+                      : "Location not set"}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <button
+                    onClick={() => setSelectedBidCard({
+                      id: bidCard.id || '',
+                      number: bidCard.bid_card_number || 'Unknown'
+                    })}
+                    className="text-left hover:bg-blue-50 p-1 rounded transition-colors"
+                    disabled={!bidCard.bid_count || bidCard.bid_count === 0}
+                  >
+                    <div className={`text-sm font-medium ${bidCard.bid_count && bidCard.bid_count > 0 ? 'text-blue-600 hover:text-blue-800' : 'text-gray-900'}`}>
+                      {bidCard.bid_count || 0} / {bidCard.contractor_count_needed || 0}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {bidCard.status === 'bids_complete' ? '✅ Complete' : '⏳ Collecting'}
+                    </div>
+                  </button>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`text-sm ${getUrgencyColor(bidCard)}`}>
@@ -226,6 +255,20 @@ const BidCardTable: React.FC = () => {
         </table>
       </div>
     </div>
+
+    {/* Bid Submissions Modal */}
+    {selectedBidCard && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <BidSubmissionsDetail
+            bidCardId={selectedBidCard.id}
+            bidCardNumber={selectedBidCard.number}
+            onClose={() => setSelectedBidCard(null)}
+          />
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

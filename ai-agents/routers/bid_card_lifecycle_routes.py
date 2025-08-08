@@ -235,7 +235,7 @@ async def get_discovery_data(bid_card_id: str, database) -> dict[str, Any]:
         for run in discovery_runs.data:
             leads_result = database.client.table("contractor_leads").select("*").eq("discovery_run_id", run["id"]).execute()
             contractor_leads.extend(leads_result.data or [])
-    
+
     # ALSO get contractor leads from outreach attempts (for bid cards without discovery runs)
     if not contractor_leads:  # Only if no leads found from discovery runs
         outreach_attempts = database.client.table("contractor_outreach_attempts").select("contractor_lead_id").eq("bid_card_id", bid_card_id).execute()
@@ -352,7 +352,7 @@ async def get_engagement_data(bid_card_id: str, database) -> dict[str, Any]:
 
 async def get_bids_data(bid_card: dict[str, Any]) -> list[dict[str, Any]]:
     """Extract submitted bids from bid_document JSONB field"""
-    
+
     try:
         bid_document = bid_card.get("bid_document", {})
         submitted_bids = bid_document.get("submitted_bids", [])
@@ -370,7 +370,7 @@ async def get_bids_data(bid_card: dict[str, Any]) -> list[dict[str, Any]]:
                         bid["days_since_submission"] = 0
                 else:
                     bid["days_since_submission"] = 0
-                    
+
                 bid["is_recent"] = bid["days_since_submission"] <= 1
                 bid["bid_rank"] = None  # Will be calculated after sorting
             except Exception:

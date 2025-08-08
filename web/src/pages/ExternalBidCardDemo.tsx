@@ -1,5 +1,5 @@
 import type React from "react";
-import ExternalBidCard from "../components/ExternalBidCard";
+import ExternalBidCard from "../components/bidcards/external/ExternalBidCard";
 
 const ExternalBidCardDemo: React.FC = () => {
   // Sample bid card data with photos

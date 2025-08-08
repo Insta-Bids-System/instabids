@@ -3,17 +3,14 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
-import EnhancedBidCard from "@/components/EnhancedBidCard";
-import InspirationDashboard from "@/components/inspiration/InspirationDashboard";
+import EnhancedBidCard from "@/components/bidcards/homeowner/EnhancedBidCard";
 import ContractorCommunicationHub from "@/components/homeowner/ContractorCommunicationHub";
-// import { useAuth } from "@/contexts/AuthContext";
+import InspirationDashboard from "@/components/inspiration/InspirationDashboard";
+import { useAuth } from "@/contexts/AuthContext";
 import { type Project, supabase } from "@/lib/supabase";
 
 const DashboardPage: React.FC = () => {
-  // const { user, profile, signOut } = useAuth();
-  const user = { id: "test-homeowner-id" };
-  const profile = { full_name: "Test User", role: "homeowner" };
-  const signOut = () => {};
+  const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [bidCards, setBidCards] = useState<any[]>([]);

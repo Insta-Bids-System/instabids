@@ -1,0 +1,113 @@
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Store this fact about the InstaBids deepagents system: The supabase-expert sub-agent is successfully integrated with deepagents framework, uses OpenAI o3 model exclusively, and persists memory to the deepagents_memory table in Supabase. The system is now fully operational with real LLM calls and database persistence.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: I am the Supabase Expert agent for InstaBids. I have complete knowledge of the database with 60 tables. Key facts I know: 
+1. The bid_cards table has a JSONB column called bid_document that stores actual contractor bids
+2. There are 15 tables in the bid card ecosystem managing the complete lifecycle
+3. The deepagents_memory table stores my persistent knowledge
+4. The system uses 8 AI agents (CIA, JAA, CDA, EAA, WFA, HMA, CMA, COIA)
+5. Contractor tiers: Tier 1 (90% response), Tier 2 (50% response), Tier 3 (20-33% response)
+6. The messaging system has 15+ regex filters and contractor aliasing
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: SYSTEM UPDATE: Successfully built complete Multi-Agent Orchestrator using deepagents framework by hwchase17. Key achievements:
+
+1. FRAMEWORK: Using actual deepagents (from deepagents import create_deep_agent) - NOT custom
+2. MODEL: OpenAI o3 EXCLUSIVELY via OpenAIo3Model wrapper with bind_tools()
+3. LOCATION: C:\Users\Not John Or Justin\Documents\instabids\deepagents-instabids\
+4. DATABASE: 60 tables, 116 bid cards, bid_document is JSONB storing actual bids
+5. MEMORY: 5 entries saved to deepagents_memory table in Supabase with verified IDs
+6. AGENT: Supabase Expert fully operational, can an
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: CRITICAL SYSTEM UPDATE: I have successfully built a Multi-Agent Orchestrator using the deepagents framework by hwchase17 with the following components:
+
+1. FRAMEWORK: Using actual deepagents framework (from deepagents import create_deep_agent) - NOT custom implementation
+2. MODEL: OpenAI o3 model EXCLUSIVELY via custom OpenAIo3Model wrapper with bind_tools() for LangChain compatibility
+3. MEMORY: Persistent storage in Supabase deepagents_memory table - verified working with 3 saved entries
+4. SUPABASE EXPERT: Sub-agent using SubAgent dictionary format {'name': 'supabase-expert', ...}
+5. DAT
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Store this critical discovery about the InstaBids system architecture:
+
+## AI-Agents Directory Organization Discovery
+
+### The 11 Actual AI Agents (Not Development Agents)
+1. CIA - Campaign Intelligence Agent
+2. JAA - Job Analysis Agent  
+3. CDA - Contractor Discovery Agent
+4. EAA - Email Automation Agent
+5. WFA - Web Form Agent
+6. COIA - Contractor Onboarding Intelligence Agent
+7. CJA - Contractor Job Agent
+8. IRIS - Intelligent Response & Interaction System
+9. Messaging Agent - Content filtering and contractor aliasing
+10. Vision Agent - Image processing
+11. Inspiration Boards Agent
+
+### 
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: What information do you have about the InstaBids system? Please tell me about the architecture, components, agents, database structure, and any other technical details you have stored about this project.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: What information do you have stored in your memory? Can you search for any stored memories about projects, systems, databases, agents, or technical work?
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Can you check if there are any previous sessions or memories stored? Try to search for information about InstaBids, agents, database systems, or any technical projects that might have been discussed before.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: What do you know about InstaBids? Tell me about the system architecture, agents, database tables, and any technical details you have stored in your memory.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: What do you remember about InstaBids? Search your memory for any information about agents, database tables, projects, bids, contractors, messaging systems, or any technical architecture details.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Do you have the information I just stored about InstaBids having 6 agents (Frontend, Backend, Database, IRIS AI, Messaging, Central Coordinator) and using Supabase?
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Store this comprehensive InstaBids system information: 
+
+InstaBids is a complex multi-agent system with 6 specialized agents:
+1. Agent 1 (Frontend) - Handles React UI, user interactions, bid card displays
+2. Agent 2 (Backend) - FastAPI server on port 8008, manages API endpoints, business logic  
+3. Agent 3 (Database) - Supabase PostgreSQL, manages all data persistence
+4. Agent 4 (IRIS AI) - OpenAI integration for intelligent responses and automation
+5. Agent 5 (Messaging) - LangGraph-based message filtering, contractor aliasing
+6. Agent 6 (Central Coordinator) - Orchestrates inter-agent com

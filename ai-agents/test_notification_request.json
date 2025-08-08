@@ -1,0 +1,21 @@
+{
+  "bid_card_id": "test-bid-card-123",
+  "homeowner_id": "11111111-1111-1111-1111-111111111111",
+  "scope_changes": [
+    "material_change",
+    "feature_addition"
+  ],
+  "scope_change_details": {
+    "material_change": {
+      "original": "rocks around trees",
+      "updated": "mulch around trees",
+      "reason": "homeowner preference change"
+    },
+    "feature_addition": {
+      "added": "pergola over patio area",
+      "estimated_cost_impact": "$3000-5000",
+      "reason": "additional shade needed"
+    },
+    "conversation_context": "Homeowner mentioned wanting mulch instead of rocks and also requested adding a pergola during conversation with Contractor B"
+  }
+}

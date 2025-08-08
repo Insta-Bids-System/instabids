@@ -3,14 +3,21 @@ Simplified Supabase-based LangGraph Checkpointer using psycopg2
 Works with psycopg2-binary for compatibility
 """
 
-import os
 import json
+import os
 import uuid
-from datetime import datetime
-from typing import Any, Dict, Optional, List, Tuple, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any, Optional
+
 import psycopg2
-from psycopg2.extras import RealDictCursor, Json
-from langgraph.checkpoint.base import BaseCheckpointSaver, Checkpoint, CheckpointMetadata, CheckpointTuple
+from langgraph.checkpoint.base import (
+    BaseCheckpointSaver,
+    Checkpoint,
+    CheckpointMetadata,
+    CheckpointTuple,
+)
+from psycopg2.extras import Json, RealDictCursor
+
 
 # Simple JSON serializer
 class SimpleJsonSerializer:
@@ -27,38 +34,39 @@ class SupabaseCheckpointer(BaseCheckpointSaver):
     Simplified LangGraph checkpointer using Supabase PostgreSQL as backend.
     Uses psycopg2-binary for compatibility.
     """
-    
+
     def __init__(self, db_url: Optional[str] = None):
         """Initialize checkpointer with database connection"""
         super().__init__(serde=SimpleJsonSerializer())
-        
+
         if db_url is None:
             db_url = os.getenv("SUPABASE_DB_URL")
             if not db_url:
                 # Build PostgreSQL connection URL from Supabase environment variables
                 supabase_url = os.getenv("SUPABASE_URL", "")
                 supabase_key = os.getenv("SUPABASE_ANON_KEY", "")
-                
+
                 if supabase_url and "xrhgrthdcaymxuqcgrmj" in supabase_url:
-                    # Extract project ID from Supabase URL and build PostgreSQL connection
-                    # Use direct connection to bypass pooler issues
-                    db_url = "postgresql://postgres:IQ0PEkM2pFPvAXei@db.xrhgrthdcaymxuqcgrmj.supabase.co:5432/postgres"
+                    # Get the actual Supabase service role key for database access
+                    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+                    # Build proper Supabase PostgreSQL connection URL
+                    db_url = f"postgresql://postgres.xrhgrthdcaymxuqcgrmj:{service_key}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
                 else:
                     # Fallback - use local development database if available
                     db_url = "postgresql://postgres:postgres@localhost:5432/postgres"
-        
+
         self.db_url = db_url
         self.is_setup = False
-    
+
     def get_connection(self):
         """Get a new database connection"""
         return psycopg2.connect(self.db_url, cursor_factory=RealDictCursor)
-    
+
     async def setup(self) -> None:
         """Create necessary tables in Supabase if they don't exist"""
         if self.is_setup:
             return
-        
+
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -76,7 +84,7 @@ class SupabaseCheckpointer(BaseCheckpointSaver):
                         PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id)
                     );
                 """)
-                
+
                 # Create checkpoint writes table
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS langgraph_checkpoint_writes (
@@ -92,26 +100,26 @@ class SupabaseCheckpointer(BaseCheckpointSaver):
                         PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id, task_id, idx)
                     );
                 """)
-                
+
                 # Create indexes
                 cur.execute("""
                     CREATE INDEX IF NOT EXISTS idx_checkpoints_thread_id 
                     ON langgraph_checkpoints(thread_id);
                 """)
-                
+
                 conn.commit()
                 self.is_setup = True
         finally:
             conn.close()
-    
-    async def aget_tuple(self, config: Dict[str, Any]) -> Optional[CheckpointTuple]:
+
+    async def aget_tuple(self, config: dict[str, Any]) -> Optional[CheckpointTuple]:
         """Get a checkpoint tuple by thread_id and checkpoint_id"""
         await self.setup()
-        
+
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = config["configurable"].get("checkpoint_id")
-        
+
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -131,20 +139,20 @@ class SupabaseCheckpointer(BaseCheckpointSaver):
                         ORDER BY created_at DESC 
                         LIMIT 1
                     """, (thread_id, checkpoint_ns))
-                
+
                 row = cur.fetchone()
                 if not row:
                     return None
-                
+
                 # Parse checkpoint data
                 checkpoint = row["checkpoint"]
                 if isinstance(checkpoint, str):
                     checkpoint = json.loads(checkpoint)
-                
+
                 metadata = row["metadata"] or {}
                 if isinstance(metadata, str):
                     metadata = json.loads(metadata)
-                
+
                 # Get pending writes
                 checkpoint_id_for_writes = checkpoint_id or row.get("checkpoint_id")
                 cur.execute("""
@@ -153,7 +161,7 @@ class SupabaseCheckpointer(BaseCheckpointSaver):
                     WHERE thread_id = %s AND checkpoint_ns = %s AND checkpoint_id = %s
                     ORDER BY task_id, idx
                 """, (thread_id, checkpoint_ns, checkpoint_id_for_writes))
-                
+
                 writes_rows = cur.fetchall()
                 pending_writes = []
                 for write_row in writes_rows:
@@ -161,7 +169,7 @@ class SupabaseCheckpointer(BaseCheckpointSaver):
                     if isinstance(value, str):
                         value = json.loads(value)
                     pending_writes.append((write_row["task_id"], write_row["channel"], value))
-                
+
                 return CheckpointTuple(
                     config=config,
                     checkpoint=checkpoint,
@@ -171,38 +179,38 @@ class SupabaseCheckpointer(BaseCheckpointSaver):
                 )
         finally:
             conn.close()
-    
+
     async def alist(
         self,
-        config: Optional[Dict[str, Any]] = None,
+        config: Optional[dict[str, Any]] = None,
         *,
-        filter: Optional[Dict[str, Any]] = None,
-        before: Optional[Dict[str, Any]] = None,
+        filter: Optional[dict[str, Any]] = None,
+        before: Optional[dict[str, Any]] = None,
         limit: Optional[int] = None,
     ) -> AsyncIterator[CheckpointTuple]:
         """List checkpoints with optional filtering"""
         await self.setup()
-        
+
         # Simple implementation - just yield empty for now
         # This is enough to satisfy the interface requirement
         return
         yield  # Make it a generator
-    
+
     async def aput(
         self,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         checkpoint: Checkpoint,
         metadata: CheckpointMetadata,
-        new_versions: Dict[str, str],
-    ) -> Dict[str, Any]:
+        new_versions: dict[str, str],
+    ) -> dict[str, Any]:
         """Save a checkpoint"""
         await self.setup()
-        
+
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = checkpoint.get("id") or str(uuid.uuid4())
         parent_checkpoint_id = config["configurable"].get("checkpoint_id")
-        
+
         # Convert to JSON-serializable format
         checkpoint_data = Json(checkpoint)
         metadata_dict = {
@@ -211,7 +219,7 @@ class SupabaseCheckpointer(BaseCheckpointSaver):
             "writes": getattr(metadata, "writes", {})
         }
         metadata_data = Json(metadata_dict)
-        
+
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
@@ -226,7 +234,7 @@ class SupabaseCheckpointer(BaseCheckpointSaver):
                         created_at = NOW()
                 """, (
                     thread_id,
-                    checkpoint_ns, 
+                    checkpoint_ns,
                     checkpoint_id,
                     parent_checkpoint_id,
                     "checkpoint",
@@ -236,7 +244,7 @@ class SupabaseCheckpointer(BaseCheckpointSaver):
                 conn.commit()
         finally:
             conn.close()
-        
+
         return {
             "configurable": {
                 "thread_id": thread_id,
@@ -244,29 +252,29 @@ class SupabaseCheckpointer(BaseCheckpointSaver):
                 "checkpoint_id": checkpoint_id
             }
         }
-    
+
     async def aput_writes(
         self,
-        config: Dict[str, Any],
-        writes: List[Tuple[str, Any]],
+        config: dict[str, Any],
+        writes: list[tuple[str, Any]],
         task_id: str,
     ) -> None:
         """Save pending writes"""
         await self.setup()
-        
+
         if not writes:
             return
-        
+
         thread_id = config["configurable"]["thread_id"]
         checkpoint_ns = config["configurable"].get("checkpoint_ns", "")
         checkpoint_id = config["configurable"]["checkpoint_id"]
-        
+
         conn = self.get_connection()
         try:
             with conn.cursor() as cur:
                 for idx, (channel, value) in enumerate(writes):
                     value_data = Json(value) if value is not None else None
-                    
+
                     cur.execute("""
                         INSERT INTO langgraph_checkpoint_writes
                         (thread_id, checkpoint_ns, checkpoint_id, task_id, idx, channel, type, value)

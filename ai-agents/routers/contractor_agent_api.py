@@ -5,14 +5,15 @@ Single endpoint for all contractor interactions - pre and post signup
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from agents.coia.unified_graph import create_unified_coia_system
 from agents.coia.supabase_checkpointer import create_supabase_checkpointer
+from agents.coia.unified_graph import create_unified_coia_system
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ _contractor_agent = None
 async def get_contractor_agent():
     """Get or create the contractor agent"""
     global _contractor_agent
-    
+
     if _contractor_agent is None:
         logger.info("Initializing contractor agent system...")
         try:
@@ -36,7 +37,7 @@ async def get_contractor_agent():
         except Exception as e:
             logger.error(f"Failed to initialize contractor agent: {e}")
             raise HTTPException(status_code=500, detail="Failed to initialize agent")
-    
+
     return _contractor_agent
 
 
@@ -45,7 +46,7 @@ class ContractorConversation(BaseModel):
     message: str = Field(..., description="Message from contractor")
     contractor_id: Optional[str] = Field(None, description="Contractor ID if logged in")
     session_id: Optional[str] = Field(None, description="Conversation session ID")
-    context: Optional[Dict[str, Any]] = Field(None, description="Additional context")
+    context: Optional[dict[str, Any]] = Field(None, description="Additional context")
 
 
 class ContractorResponse(BaseModel):
@@ -53,20 +54,20 @@ class ContractorResponse(BaseModel):
     success: bool
     response: str
     session_id: str
-    
+
     # Context about the conversation
     is_onboarding: bool = Field(False, description="Whether this is onboarding conversation")
     is_authenticated: bool = Field(False, description="Whether contractor is logged in")
-    
+
     # Onboarding specific
     onboarding_stage: Optional[str] = None
     profile_completeness: Optional[float] = None
     contractor_created: Optional[bool] = None
-    
+
     # Post-signup specific
     available_projects: Optional[int] = None
     active_bids: Optional[int] = None
-    
+
     # Metadata
     timestamp: str
     error: Optional[str] = None
@@ -81,17 +82,17 @@ async def contractor_conversation(request: ContractorConversation) -> Contractor
     try:
         # Generate session ID if not provided
         session_id = request.session_id or str(uuid4())
-        
+
         # Detect conversation context
         is_authenticated = bool(request.contractor_id)
         is_onboarding = not is_authenticated
-        
+
         logger.info(f"Contractor conversation - Session: {session_id}, "
                    f"Authenticated: {is_authenticated}, Message: {request.message[:50]}...")
-        
+
         # Get the unified agent
         app = await get_contractor_agent()
-        
+
         # Build the input for LangGraph
         input_data = {
             "messages": [{"role": "human", "content": request.message}],
@@ -102,11 +103,11 @@ async def contractor_conversation(request: ContractorConversation) -> Contractor
             "current_mode": "conversation",  # Always start in conversation mode
             "last_updated": datetime.now().isoformat()
         }
-        
+
         # Add any additional context
         if request.context:
             input_data.update(request.context)
-        
+
         # Process through LangGraph with automatic mode switching
         # The graph will automatically:
         # 1. Detect if research is needed (e.g., looking up company info)
@@ -116,7 +117,7 @@ async def contractor_conversation(request: ContractorConversation) -> Contractor
             input_data,
             config={"configurable": {"thread_id": session_id}}
         )
-        
+
         # Extract the response
         response_message = ""
         if result.get("messages"):
@@ -124,7 +125,7 @@ async def contractor_conversation(request: ContractorConversation) -> Contractor
                 if hasattr(msg, "role") and msg.role == "assistant":
                     response_message = msg.content
                     break
-        
+
         # Build response based on context
         response = ContractorResponse(
             success=True,
@@ -134,21 +135,21 @@ async def contractor_conversation(request: ContractorConversation) -> Contractor
             is_authenticated=is_authenticated,
             timestamp=datetime.now().isoformat()
         )
-        
+
         # Add onboarding-specific data if applicable
         if is_onboarding:
             response.onboarding_stage = result.get("current_stage", "welcome")
             response.profile_completeness = result.get("profile_completeness")
             response.contractor_created = result.get("contractor_created", False)
-        
+
         # Add post-signup data if authenticated
         if is_authenticated:
             # TODO: Query available projects and active bids
             response.available_projects = result.get("available_projects", 0)
             response.active_bids = result.get("active_bids", 0)
-        
+
         return response
-        
+
     except Exception as e:
         logger.error(f"Error in contractor conversation: {e}")
         return ContractorResponse(
@@ -163,7 +164,7 @@ async def contractor_conversation(request: ContractorConversation) -> Contractor
 
 
 @router.get("/session/{session_id}")
-async def get_session_state(session_id: str) -> Dict[str, Any]:
+async def get_session_state(session_id: str) -> dict[str, Any]:
     """Get current state of a contractor conversation session"""
     try:
         # TODO: Load from checkpointer
@@ -178,11 +179,11 @@ async def get_session_state(session_id: str) -> Dict[str, Any]:
 
 
 @router.get("/status")
-async def get_agent_status() -> Dict[str, Any]:
+async def get_agent_status() -> dict[str, Any]:
     """Get contractor agent system status"""
     try:
         import os
-        
+
         return {
             "status": "operational",
             "capabilities": {

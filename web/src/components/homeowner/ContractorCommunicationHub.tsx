@@ -1,21 +1,24 @@
-import React, { useEffect, useState } from 'react';
 import {
-  MessageSquare,
-  FileText,
-  Image,
-  User,
+  AlertCircle,
   Calendar,
-  DollarSign,
-  Clock,
+  Camera,
+  CheckCircle,
   ChevronDown,
   ChevronUp,
-  Send,
-  Paperclip,
+  Clock,
+  DollarSign,
   Download,
-  CheckCircle,
-  AlertCircle
-} from 'lucide-react';
-import toast from 'react-hot-toast';
+  FileText,
+  Image,
+  MessageSquare,
+  Paperclip,
+  Send,
+  User,
+} from "lucide-react";
+import type React from "react";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import ImageUploadButton from "@/components/ImageUploadButton";
 
 interface ContractorProposal {
   id: string;
@@ -32,12 +35,12 @@ interface ContractorProposal {
     size: number;
   }>;
   submitted_at: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: "pending" | "accepted" | "rejected";
 }
 
 interface Message {
   id: string;
-  sender_type: 'contractor' | 'homeowner';
+  sender_type: "contractor" | "homeowner";
   sender_id: string;
   content: string;
   filtered_content: string;
@@ -77,11 +80,18 @@ interface Props {
 }
 
 const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId }) => {
+  console.log(
+    "ContractorCommunicationHub: Component mounted with bidCardId:",
+    bidCardId,
+    "homeownerId:",
+    homeownerId
+  );
+
   const [interactions, setInteractions] = useState<ContractorInteraction[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedContractor, setExpandedContractor] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [messageInput, setMessageInput] = useState('');
+  const [messageInput, setMessageInput] = useState("");
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -98,11 +108,13 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
       );
       const proposals = proposalsResponse.ok ? await proposalsResponse.json() : [];
 
-      // Load conversations
+      // Load conversations - use consistent homeowner ID
       const conversationsResponse = await fetch(
-        `http://localhost:8008/api/messages/conversations?bid_card_id=${bidCardId}&user_type=homeowner&user_id=${homeownerId}`
+        `http://localhost:8008/api/messages/conversations/${bidCardId}?user_type=homeowner&user_id=${homeownerId}`
       );
-      const conversationsData = conversationsResponse.ok ? await conversationsResponse.json() : { conversations: [] };
+      const conversationsData = conversationsResponse.ok
+        ? await conversationsResponse.json()
+        : { conversations: [] };
       const conversations = conversationsData.conversations || [];
 
       // Group by contractor
@@ -119,25 +131,26 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
           total_messages: 0,
           unread_messages: 0,
           has_attachments: proposal.attachments && proposal.attachments.length > 0,
-          last_interaction: proposal.submitted_at
+          last_interaction: proposal.submitted_at,
         });
       });
 
       // Add conversations
       for (const conv of conversations) {
         // Load messages for each conversation
-        const messagesResponse = await fetch(
-          `http://localhost:8008/api/messages/${conv.id}`
-        );
+        const messagesResponse = await fetch(`http://localhost:8008/api/messages/${conv.id}`);
         const messagesData = messagesResponse.ok ? await messagesResponse.json() : { messages: [] };
         conv.messages = messagesData.messages || [];
 
         const existing = contractorMap.get(conv.contractor_id);
         if (existing) {
           existing.conversation = conv;
+          // PRIORITY FIX: Use conversation alias instead of real contractor name
+          existing.contractor_name = conv.contractor_alias || existing.contractor_name;
           existing.total_messages = conv.messages.length;
           existing.unread_messages = conv.homeowner_unread_count;
-          existing.has_attachments = existing.has_attachments || 
+          existing.has_attachments =
+            existing.has_attachments ||
             conv.messages.some((m: Message) => m.attachments && m.attachments.length > 0);
           if (conv.last_message_at > existing.last_interaction) {
             existing.last_interaction = conv.last_message_at;
@@ -145,14 +158,16 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
         } else {
           contractorMap.set(conv.contractor_id, {
             contractor_id: conv.contractor_id,
-            contractor_name: conv.contractor_alias || 'Contractor',
+            contractor_name: conv.contractor_alias || "Contractor",
             contractor_company: undefined,
             proposal: undefined,
             conversation: conv,
             total_messages: conv.messages.length,
             unread_messages: conv.homeowner_unread_count,
-            has_attachments: conv.messages.some((m: Message) => m.attachments && m.attachments.length > 0),
-            last_interaction: conv.last_message_at
+            has_attachments: conv.messages.some(
+              (m: Message) => m.attachments && m.attachments.length > 0
+            ),
+            last_interaction: conv.last_message_at,
           });
         }
       }
@@ -163,9 +178,10 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
       );
 
       setInteractions(interactionsList);
+      console.log("ContractorCommunicationHub: Loaded interactions:", interactionsList);
     } catch (error) {
-      console.error('Error loading contractor interactions:', error);
-      toast.error('Failed to load contractor communications');
+      console.error("Error loading contractor interactions:", error);
+      toast.error("Failed to load contractor communications");
     } finally {
       setLoading(false);
     }
@@ -176,57 +192,89 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
 
     try {
       setSending(true);
-      const response = await fetch('http://localhost:8008/api/messages/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("http://localhost:8008/api/messages/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversation_id: conversationId,
           bid_card_id: bidCardId,
           homeowner_id: homeownerId,
-          sender_type: 'homeowner',
+          sender_type: "homeowner",
           sender_id: homeownerId,
-          content: messageInput
-        })
+          content: messageInput,
+        }),
       });
 
       if (response.ok) {
-        toast.success('Message sent');
-        setMessageInput('');
+        toast.success("Message sent");
+        setMessageInput("");
         // Reload to show new message
         await loadContractorInteractions();
       } else {
-        throw new Error('Failed to send message');
+        throw new Error("Failed to send message");
       }
     } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('Failed to send message');
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleImageUpload = async (file: File, conversationId: string) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("conversation_id", conversationId);
+    formData.append("sender_type", "homeowner");
+    formData.append("sender_id", homeownerId);
+    formData.append("message", `Shared an image: ${file.name}`);
+
+    try {
+      const response = await fetch("http://localhost:8008/api/images/upload/conversation", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        toast.success("Image uploaded successfully");
+        // Reload to show new message with image
+        await loadContractorInteractions();
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || "Failed to upload image");
+      }
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      throw error;
     }
   };
 
   const markMessagesAsRead = async (conversationId: string) => {
     try {
       await fetch(`http://localhost:8008/api/messages/${conversationId}/mark-read`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_type: 'homeowner',
-          user_id: homeownerId
-        })
+          user_type: "homeowner",
+          user_id: homeownerId,
+        }),
       });
     } catch (error) {
-      console.error('Error marking messages as read:', error);
+      console.error("Error marking messages as read:", error);
     }
   };
 
   const toggleContractor = (contractorId: string) => {
+    console.log("ContractorCommunicationHub: Toggling contractor:", contractorId);
+    console.log("ContractorCommunicationHub: Current expanded:", expandedContractor);
+
     if (expandedContractor === contractorId) {
       setExpandedContractor(null);
       setSelectedConversation(null);
     } else {
       setExpandedContractor(contractorId);
-      const interaction = interactions.find(i => i.contractor_id === contractorId);
+      const interaction = interactions.find((i) => i.contractor_id === contractorId);
+      console.log("ContractorCommunicationHub: Found interaction:", interaction);
       if (interaction?.conversation) {
         setSelectedConversation(interaction.conversation.id);
         markMessagesAsRead(interaction.conversation.id);
@@ -235,20 +283,27 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "No date";
+
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      console.warn("Invalid date string:", dateString);
+      return "Invalid date";
+    }
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    
+
     if (diffHours < 1) {
       const diffMinutes = Math.floor(diffMs / (1000 * 60));
-      return `${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`;
+      return `${diffMinutes} minute${diffMinutes !== 1 ? "s" : ""} ago`;
     } else if (diffHours < 24) {
-      return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
     } else {
       const diffDays = Math.floor(diffHours / 24);
       if (diffDays < 7) {
-        return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+        return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
       } else {
         return date.toLocaleDateString();
       }
@@ -256,11 +311,11 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -287,11 +342,9 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">
-          Contractor Communications
-        </h3>
+        <h3 className="text-lg font-semibold text-gray-900">Contractor Communications</h3>
         <div className="text-sm text-gray-500">
-          {interactions.length} contractor{interactions.length !== 1 ? 's' : ''}
+          {interactions.length} contractor{interactions.length !== 1 ? "s" : ""}
         </div>
       </div>
 
@@ -311,12 +364,12 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
                   <User className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-900">
-                    {interaction.contractor_name}
-                  </h4>
-                  {interaction.contractor_company && (
-                    <p className="text-sm text-gray-500">{interaction.contractor_company}</p>
-                  )}
+                  <h4 className="font-medium text-gray-900">{interaction.contractor_name}</h4>
+                  {/* Hide company name when using aliases */}
+                  {!interaction.contractor_name.startsWith("Contractor ") &&
+                    interaction.contractor_company && (
+                      <p className="text-sm text-gray-500">{interaction.contractor_company}</p>
+                    )}
                 </div>
               </div>
 
@@ -384,33 +437,47 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
                     </div>
                   </div>
                   <div className="mb-3">
-                    <p className="text-sm text-gray-500 mb-1">Proposal</p>
-                    <p className="text-gray-700">{interaction.proposal.proposal_text}</p>
-                  </div>
-                  {interaction.proposal.attachments && interaction.proposal.attachments.length > 0 && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-2">Attachments</p>
-                      <div className="space-y-2">
-                        {interaction.proposal.attachments.map((attachment, index) => (
-                          <a
-                            key={index}
-                            href={attachment.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center space-x-2 text-blue-600 hover:text-blue-700"
-                          >
-                            {attachment.type.startsWith('image/') ? (
-                              <Image className="w-4 h-4" />
-                            ) : (
-                              <FileText className="w-4 h-4" />
-                            )}
-                            <span className="text-sm">{attachment.name}</span>
-                            <Download className="w-3 h-3" />
-                          </a>
-                        ))}
-                      </div>
+                    <p className="text-sm text-gray-500 mb-1">Proposal Details</p>
+                    <div className="bg-white p-3 rounded border border-gray-200">
+                      <p className="text-gray-700 whitespace-pre-wrap">
+                        {interaction.proposal.proposal_text}
+                      </p>
                     </div>
-                  )}
+                  </div>
+                  {interaction.proposal.attachments &&
+                    interaction.proposal.attachments.length > 0 && (
+                      <div>
+                        <p className="text-sm text-gray-500 mb-2">Attachments</p>
+                        <div className="space-y-3">
+                          {interaction.proposal.attachments.map((attachment, index) => (
+                            <div key={index}>
+                              {attachment.type.startsWith("image/") ? (
+                                <div className="space-y-1">
+                                  <img
+                                    src={attachment.url}
+                                    alt={attachment.name}
+                                    className="max-w-sm max-h-64 rounded-lg border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                                    onClick={() => window.open(attachment.url, '_blank')}
+                                  />
+                                  <p className="text-sm text-gray-500">{attachment.name}</p>
+                                </div>
+                              ) : (
+                                <a
+                                  href={attachment.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center space-x-2 text-blue-600 hover:text-blue-700"
+                                >
+                                  <FileText className="w-4 h-4" />
+                                  <span className="text-sm">{attachment.name}</span>
+                                  <Download className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                 </div>
               )}
 
@@ -421,51 +488,69 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
                     <MessageSquare className="w-4 h-4 mr-2" />
                     Messages
                   </h5>
-                  
+
                   {/* Message Thread */}
                   <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
                     {interaction.conversation.messages.map((message) => (
                       <div
                         key={message.id}
                         className={`flex ${
-                          message.sender_type === 'homeowner' ? 'justify-end' : 'justify-start'
+                          message.sender_type === "homeowner" ? "justify-end" : "justify-start"
                         }`}
                       >
                         <div
                           className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                            message.sender_type === 'homeowner'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-100 text-gray-900'
+                            message.sender_type === "homeowner"
+                              ? "bg-blue-600 text-white"
+                              : "bg-gray-100 text-gray-900"
                           }`}
                         >
                           <p className="text-sm">{message.filtered_content}</p>
                           {message.attachments && message.attachments.length > 0 && (
-                            <div className="mt-2 space-y-1">
+                            <div className="mt-2 space-y-2">
                               {message.attachments.map((attachment, index) => (
-                                <a
-                                  key={index}
-                                  href={attachment.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`flex items-center space-x-1 text-xs ${
-                                    message.sender_type === 'homeowner'
-                                      ? 'text-blue-100 hover:text-white'
-                                      : 'text-blue-600 hover:text-blue-700'
-                                  }`}
-                                >
-                                  {attachment.type.startsWith('image/') ? (
-                                    <Image className="w-3 h-3" />
+                                <div key={index}>
+                                  {attachment.type.startsWith("image/") ? (
+                                    <div className="space-y-1">
+                                      {console.log("DISPLAYING IMAGE:", attachment.url)}
+                                      <img
+                                        src={attachment.url}
+                                        alt={attachment.name}
+                                        className="max-w-xs max-h-48 rounded-lg border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                                        onClick={() => window.open(attachment.url, '_blank')}
+                                      />
+                                      <p className={`text-xs ${
+                                        message.sender_type === "homeowner"
+                                          ? "text-blue-100"
+                                          : "text-gray-500"
+                                      }`}>
+                                        {attachment.name}
+                                      </p>
+                                    </div>
                                   ) : (
-                                    <FileText className="w-3 h-3" />
+                                    <a
+                                      href={attachment.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`flex items-center space-x-1 text-xs ${
+                                        message.sender_type === "homeowner"
+                                          ? "text-blue-100 hover:text-white"
+                                          : "text-blue-600 hover:text-blue-700"
+                                      }`}
+                                    >
+                                      <FileText className="w-3 h-3" />
+                                      <span>{attachment.name}</span>
+                                    </a>
                                   )}
-                                  <span>{attachment.name}</span>
-                                </a>
+                                </div>
                               ))}
                             </div>
                           )}
                           <p
                             className={`text-xs mt-1 ${
-                              message.sender_type === 'homeowner' ? 'text-blue-100' : 'text-gray-500'
+                              message.sender_type === "homeowner"
+                                ? "text-blue-100"
+                                : "text-gray-500"
                             }`}
                           >
                             {formatDate(message.created_at)}
@@ -477,12 +562,18 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
 
                   {/* Message Input */}
                   <div className="flex space-x-2">
+                    <ImageUploadButton
+                      onUpload={(file) => handleImageUpload(file, interaction.conversation!.id)}
+                      buttonIcon="camera"
+                      buttonText=""
+                      className="px-3 py-2 border rounded-lg hover:bg-gray-50"
+                    />
                     <input
                       type="text"
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
                       onKeyPress={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
+                        if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
                           sendMessage(interaction.conversation!.id, interaction.contractor_id);
                         }
@@ -492,7 +583,9 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
                       disabled={sending}
                     />
                     <button
-                      onClick={() => sendMessage(interaction.conversation!.id, interaction.contractor_id)}
+                      onClick={() =>
+                        sendMessage(interaction.conversation!.id, interaction.contractor_id)
+                      }
                       disabled={sending || !messageInput.trim()}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >

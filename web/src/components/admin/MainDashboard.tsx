@@ -2,15 +2,22 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
 import { useWebSocket } from "../../hooks/useWebSocket";
+import type {
+  AdminDashboardData,
+  AgentHealthStatus,
+  SystemMetrics as SystemMetricsType,
+} from "../../types";
 import LoadingSpinner from "../ui/LoadingSpinner";
 import AdminHeader from "./AdminHeader";
 import AgentStatusPanel from "./AgentStatusPanel";
 import AlertToast from "./AlertToast";
-import BidCardTable from "./BidCardTable";
 import BidCardMonitor from "./BidCardMonitor";
+import BidCardTable from "./BidCardTable";
 import DatabaseViewer from "./DatabaseViewer";
 import SystemMetrics from "./SystemMetrics";
-import type { AdminDashboardData, SystemMetrics as SystemMetricsType, AgentHealthStatus } from "../../types";
+import EnhancedSearchPanel from "./EnhancedSearchPanel";
+import ContractorManagement from "./ContractorManagement";
+import CampaignManagement from "./CampaignManagement";
 
 interface DatabaseStats {
   total_tables: number;
@@ -24,7 +31,7 @@ interface DatabaseStats {
 
 interface DatabaseOperation {
   id: string;
-  operation_type: 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE';
+  operation_type: "SELECT" | "INSERT" | "UPDATE" | "DELETE";
   table_name: string;
   execution_time_ms: number;
   timestamp: string;
@@ -137,7 +144,7 @@ const MainDashboard: React.FC = () => {
           },
           monitoring_enabled: true,
         };
-        
+
         setDashboardData(realData);
         setIsLoading(false);
       } catch (error) {
@@ -222,8 +229,10 @@ const MainDashboard: React.FC = () => {
   const tabs = [
     { id: "overview", name: "Overview", icon: "📊" },
     { id: "bid-cards", name: "Bid Cards", icon: "📋" },
+    { id: "campaigns", name: "Campaigns", icon: "🎯" },
+    { id: "search", name: "Search", icon: "🔍" },
     { id: "agents", name: "Agents", icon: "🤖" },
-    { id: "database", name: "Database", icon: "💾" },
+    { id: "contractors", name: "Contractors", icon: "👷" },
     { id: "metrics", name: "Metrics", icon: "📈" },
   ];
 
@@ -236,17 +245,7 @@ const MainDashboard: React.FC = () => {
         alertCount={alerts.length}
       />
 
-      {/* Connection Status Bar */}
-      {!isConnected && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2">
-          <div className="flex items-center justify-center">
-            <div className="animate-pulse w-2 h-2 bg-yellow-400 rounded-full mr-2"></div>
-            <span className="text-sm text-yellow-800">
-              {wsError || "Connecting to real-time updates..."}
-            </span>
-          </div>
-        </div>
-      )}
+      {/* Connection Status Bar - REMOVED: Redundant with header indicator */}
 
       {/* Alerts */}
       <div className="fixed top-20 right-4 z-50 space-y-2">
@@ -286,8 +285,9 @@ const MainDashboard: React.FC = () => {
                 <p className="text-sm font-medium text-gray-500">Agents Online</p>
                 <p className="text-2xl font-semibold text-gray-900">
                   {
-                    Object.values(dashboardData.agent_statuses).filter((a) => a.status === "healthy")
-                      .length
+                    Object.values(dashboardData.agent_statuses).filter(
+                      (a) => a.status === "healthy"
+                    ).length
                   }
                   /{Object.keys(dashboardData.agent_statuses).length}
                 </p>
@@ -358,16 +358,18 @@ const MainDashboard: React.FC = () => {
             </div>
           )}
 
-          {selectedTab === "bid-cards" && (
-            <BidCardMonitor />
-          )}
+          {selectedTab === "bid-cards" && <BidCardMonitor />}
+
+          {selectedTab === "campaigns" && <CampaignManagement />}
+
+          {selectedTab === "search" && <EnhancedSearchPanel />}
 
           {selectedTab === "agents" && (
             <AgentStatusPanel agentStatuses={dashboardData.agent_statuses} />
           )}
 
-          {selectedTab === "database" && (
-            <DatabaseViewer databaseStats={dashboardData.database_stats} />
+          {selectedTab === "contractors" && (
+            <ContractorManagement />
           )}
 
           {selectedTab === "metrics" && (

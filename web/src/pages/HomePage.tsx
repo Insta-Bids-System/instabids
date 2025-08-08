@@ -26,12 +26,36 @@ const HomePage: React.FC = () => {
 
   const handleSendMessage = async (message: string, images: string[]) => {
     try {
-      // Use authenticated user ID if available, otherwise undefined for anonymous
-      const userId = user?.id;
-      const result = await apiService.sendChatMessage(message, images, userId, sessionId);
+      // Check if this is a contractor trying to use the landing page
+      const isContractorMessage = /\b(contractor|contracting|hvac|plumbing|electrical|painting|roofing|construction|carpentry|flooring|landscaping|pool|solar)\b/i.test(message) ||
+        /\b(company|business|years? (?:in business|experience)|license|insurance|contractor account|create account|sign up|signup)\b/i.test(message) ||
+        /\b(i'm .+ from|we're|my company|my business)\b/i.test(message);
+      
+      let result;
+      if (isContractorMessage) {
+        console.log("🔧 Detected contractor message, using COIA landing page API");
+        // Use COIA landing page API for contractors
+        result = await apiService.sendContractorLandingMessage(
+          message, 
+          sessionId, 
+          sessionId, // Use sessionId as contractor_lead_id for consistency
+          { interface: "landing_page" }
+        );
+      } else {
+        console.log("🏠 Using CIA homeowner API");
+        // Use authenticated user ID if available, otherwise undefined for anonymous
+        const userId = user?.id;
+        result = await apiService.sendChatMessage(message, images, userId, sessionId);
+      }
 
       if (result.success && result.data) {
-        // Check if conversation has reached a completion phase
+        // Handle contractor responses (signup links)
+        if (result.data.signup_link_generated || result.data.signup_data) {
+          console.log("✅ Contractor signup link generated:", result.data);
+          // Could show special contractor signup UI here
+        }
+        
+        // Check if homeowner conversation has reached a completion phase
         if (result.data.phase === "review" || result.data.phase === "complete") {
           setConversationComplete(true);
           setProjectData(result.data.extractedData);
@@ -66,7 +90,14 @@ const HomePage: React.FC = () => {
             </h1>
             <nav className="flex gap-6">
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-500">Login as:</span>
+                <button
+                  type="button"
+                  onClick={() => navigate("/intelligent-messaging-test")}
+                  className="text-red-600 hover:text-red-800 font-bold transition-colors border-2 border-red-600 px-3 py-1 rounded"
+                >
+                  🛡️ Messaging Agent
+                </button>
+                <span className="text-sm text-gray-500 ml-4">Login as:</span>
                 <button
                   type="button"
                   onClick={() => navigate("/login")}

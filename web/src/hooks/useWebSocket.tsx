@@ -73,7 +73,7 @@ export const useWebSocket = (options: WebSocketHookOptions = {}): WebSocketHookR
     setError(null);
 
     try {
-      const wsUrl = `ws://localhost:8008/api/admin/ws/admin`;
+      const wsUrl = `ws://localhost:8008/ws/admin`;
       log("Connecting to WebSocket", wsUrl);
 
       wsRef.current = new WebSocket(wsUrl);

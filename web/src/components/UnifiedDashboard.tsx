@@ -1,14 +1,13 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
 import type React from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-
+import AdminTab from "./tabs/AdminTab";
 // Tab Components (will be created next)
 import CIAChatTab from "./tabs/CIAChatTab";
-import DashboardTab from "./tabs/DashboardTab";
-import AdminTab from "./tabs/AdminTab";
 import ContractorTab from "./tabs/ContractorTab";
+import DashboardTab from "./tabs/DashboardTab";
 import InspirationTab from "./tabs/InspirationTab";
 
 interface TabButtonProps {
@@ -24,9 +23,10 @@ const TabButton: React.FC<TabButtonProps> = ({ active, onClick, children, icon }
     onClick={onClick}
     className={`
       flex items-center gap-2 px-6 py-3 text-sm font-medium rounded-lg transition-all duration-200
-      ${active 
-        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+      ${
+        active
+          ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
+          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
       }
     `}
   >
@@ -36,15 +36,15 @@ const TabButton: React.FC<TabButtonProps> = ({ active, onClick, children, icon }
 );
 
 const UnifiedDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('chat');
+  const [activeTab, setActiveTab] = useState("chat");
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
   // Extract tab from URL parameters
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const tab = urlParams.get('tab');
-    if (tab && ['chat', 'dashboard', 'admin', 'contractor', 'inspiration'].includes(tab)) {
+    const tab = urlParams.get("tab");
+    if (tab && ["chat", "dashboard", "admin", "contractor", "inspiration"].includes(tab)) {
       setActiveTab(tab);
     }
   }, []);
@@ -53,7 +53,7 @@ const UnifiedDashboard: React.FC = () => {
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     const newUrl = `/?tab=${tab}`;
-    window.history.replaceState({}, '', newUrl);
+    window.history.replaceState({}, "", newUrl);
   };
 
   return (
@@ -66,7 +66,7 @@ const UnifiedDashboard: React.FC = () => {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               Instabids
             </h1>
-            
+
             {/* User Menu */}
             <div className="flex items-center gap-4">
               {user ? (
@@ -105,37 +105,37 @@ const UnifiedDashboard: React.FC = () => {
 
           {/* Tab Navigation */}
           <nav className="flex flex-wrap gap-2">
-            <TabButton 
-              active={activeTab === 'chat'} 
-              onClick={() => handleTabChange('chat')}
+            <TabButton
+              active={activeTab === "chat"}
+              onClick={() => handleTabChange("chat")}
               icon="💬"
             >
               Chat
             </TabButton>
-            <TabButton 
-              active={activeTab === 'dashboard'} 
-              onClick={() => handleTabChange('dashboard')}
+            <TabButton
+              active={activeTab === "dashboard"}
+              onClick={() => handleTabChange("dashboard")}
               icon="📊"
             >
               Dashboard
             </TabButton>
-            <TabButton 
-              active={activeTab === 'admin'} 
-              onClick={() => handleTabChange('admin')}
+            <TabButton
+              active={activeTab === "admin"}
+              onClick={() => handleTabChange("admin")}
               icon="⚙️"
             >
               Admin
             </TabButton>
-            <TabButton 
-              active={activeTab === 'contractor'} 
-              onClick={() => handleTabChange('contractor')}
+            <TabButton
+              active={activeTab === "contractor"}
+              onClick={() => handleTabChange("contractor")}
               icon="👷"
             >
               Contractors
             </TabButton>
-            <TabButton 
-              active={activeTab === 'inspiration'} 
-              onClick={() => handleTabChange('inspiration')}
+            <TabButton
+              active={activeTab === "inspiration"}
+              onClick={() => handleTabChange("inspiration")}
               icon="✨"
             >
               Inspiration
@@ -143,7 +143,7 @@ const UnifiedDashboard: React.FC = () => {
           </nav>
         </div>
       </header>
-      
+
       {/* Tab Content */}
       <main className="pt-32 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -153,11 +153,11 @@ const UnifiedDashboard: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
-            {activeTab === 'chat' && <CIAChatTab />}
-            {activeTab === 'dashboard' && <DashboardTab />}
-            {activeTab === 'admin' && <AdminTab />}
-            {activeTab === 'contractor' && <ContractorTab />}
-            {activeTab === 'inspiration' && <InspirationTab />}
+            {activeTab === "chat" && <CIAChatTab />}
+            {activeTab === "dashboard" && <DashboardTab />}
+            {activeTab === "admin" && <AdminTab />}
+            {activeTab === "contractor" && <ContractorTab />}
+            {activeTab === "inspiration" && <InspirationTab />}
           </motion.div>
         </div>
       </main>

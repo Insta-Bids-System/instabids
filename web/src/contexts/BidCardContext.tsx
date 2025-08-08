@@ -29,7 +29,15 @@ interface BidCardContextType {
   getHomeownerBidCards: () => Promise<HomeownerBidCardView[]>;
 
   // Contractor functions
-  searchBidCards: (filters: BidCardFilters) => Promise<{bid_cards: MarketplaceBidCardView[]; total: number; page: number; page_size: number; has_more: boolean}>;
+  searchBidCards: (
+    filters: BidCardFilters
+  ) => Promise<{
+    bid_cards: MarketplaceBidCardView[];
+    total: number;
+    page: number;
+    page_size: number;
+    has_more: boolean;
+  }>;
   getBidCardDetails: (id: string) => Promise<ContractorBidCardView>;
   submitBid: (bid: BidSubmissionRequest) => Promise<ContractorBid>;
   updateBid: (bidId: string, updates: Partial<ContractorBid>) => Promise<ContractorBid>;
@@ -153,22 +161,19 @@ export const BidCardProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   // Contractor functions
-  const searchBidCards = useCallback(
-    async (filters: BidCardFilters) => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await apiService.get("/api/bid-cards/search", { params: filters });
-        return response.data;
-      } catch (err: unknown) {
-        setError(err.message || "Failed to search bid cards");
-        throw err;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    []
-  );
+  const searchBidCards = useCallback(async (filters: BidCardFilters) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await apiService.get("/api/bid-cards/search", { params: filters });
+      return response.data;
+    } catch (err: unknown) {
+      setError(err.message || "Failed to search bid cards");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const getBidCardDetails = useCallback(async (id: string): Promise<ContractorBidCardView> => {
     setIsLoading(true);
@@ -193,39 +198,39 @@ export const BidCardProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (bid.attachments && bid.attachments.length > 0) {
           // Use multipart form data endpoint for file uploads
           const formData = new FormData();
-          
+
           // Prepare bid data without attachments for JSON string
           const bidDataWithoutFiles = {
             ...bid,
             contractor_id: user?.id || "22222222-2222-2222-2222-222222222222",
-            attachments: undefined // Remove attachments from JSON
+            attachments: undefined, // Remove attachments from JSON
           };
-          
+
           // Convert to JSON string
-          formData.append('bid_data', JSON.stringify(bidDataWithoutFiles));
-          
+          formData.append("bid_data", JSON.stringify(bidDataWithoutFiles));
+
           // Add files to form data
           for (const attachment of bid.attachments) {
             if (attachment.file) {
-              formData.append('files', attachment.file);
+              formData.append("files", attachment.file);
             }
           }
-          
+
           const response = await apiService.post("/api/bid-cards/submit-bid-with-files", formData, {
             headers: {
-              'Content-Type': 'multipart/form-data',
+              "Content-Type": "multipart/form-data",
             },
           });
-          
+
           return {
-            id: response.data.bid_id,
+            id: response.data.proposal_id,
             bid_card_id: bid.bid_card_id,
             contractor_id: user?.id || "22222222-2222-2222-2222-222222222222",
             amount: bid.amount,
             timeline: {
               start_date: bid.timeline.start_date,
               end_date: bid.timeline.end_date,
-              milestones: bid.milestones
+              milestones: bid.milestones,
             },
             proposal: bid.proposal,
             approach: bid.approach,
@@ -235,24 +240,29 @@ export const BidCardProvider: React.FC<{ children: React.ReactNode }> = ({ child
             allows_messages: true,
             submitted_at: new Date().toISOString(),
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           } as ContractorBid;
         } else {
-          // Use regular JSON endpoint for bids without files
-          const response = await apiService.post("/api/bid-cards/submit-bid", {
-            ...bid,
+          // Use regular JSON endpoint for bids without files - FIXED ENDPOINT
+          const response = await apiService.post("/api/contractor-proposals/submit", {
+            bid_card_id: bid.bid_card_id,
             contractor_id: user?.id || "22222222-2222-2222-2222-222222222222",
+            contractor_name: user?.name || "Contractor",
+            bid_amount: bid.amount,
+            timeline_days: Math.ceil((new Date(bid.timeline.end_date).getTime() - new Date(bid.timeline.start_date).getTime()) / (1000 * 60 * 60 * 24)),
+            proposal_text: bid.proposal,
+            attachments: []
           });
-          
+
           return {
-            id: response.data.bid_id,
+            id: response.data.proposal_id,
             bid_card_id: bid.bid_card_id,
             contractor_id: user?.id || "22222222-2222-2222-2222-222222222222",
             amount: bid.amount,
             timeline: {
               start_date: bid.timeline.start_date,
               end_date: bid.timeline.end_date,
-              milestones: bid.milestones
+              milestones: bid.milestones,
             },
             proposal: bid.proposal,
             approach: bid.approach,
@@ -262,7 +272,7 @@ export const BidCardProvider: React.FC<{ children: React.ReactNode }> = ({ child
             allows_messages: true,
             submitted_at: new Date().toISOString(),
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           } as ContractorBid;
         }
       } catch (err: any) {

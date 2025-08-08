@@ -3,16 +3,17 @@ Tier 2: Re-engagement of Previous Contacts
 Query previous outreach attempts for viable candidates
 ENHANCED: Added radius-based geographical search using uszipcode + haversine
 """
+import os
+import sys
 from datetime import datetime, timedelta
 from typing import Any
-import sys
-import os
 
 from supabase import Client
 
+
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from utils.radius_search_fixed import get_zip_codes_in_radius, calculate_distance_miles
+from utils.radius_search_fixed import calculate_distance_miles
 
 
 class Tier2Reengagement:
@@ -40,11 +41,11 @@ class Tier2Reengagement:
             # Extract location data
             location = bid_data.get("location", {})
             zip_code = location.get("zip_code", "")
-            
+
             if not zip_code:
-                print(f"[Tier2 ERROR] No zip code provided in bid data")
+                print("[Tier2 ERROR] No zip code provided in bid data")
                 return []
-            
+
             # Calculate 6 months ago threshold
             six_months_ago = datetime.now() - timedelta(days=180)
             six_months_iso = six_months_ago.isoformat()
@@ -119,13 +120,13 @@ class Tier2Reengagement:
             import traceback
             traceback.print_exc()
             return []
-            
+
     def _check_radius_location_match(self, contractor: dict[str, Any], project_zip: str, radius_miles: int) -> bool:
         """Check if contractor is within radius of project location using distance calculation"""
         try:
             # Get contractor's zip code
             contractor_zip = None
-            
+
             # Try different zip code fields the contractor might have
             if contractor.get("zip_code"):
                 contractor_zip = str(contractor["zip_code"]).strip()
@@ -135,29 +136,29 @@ class Tier2Reengagement:
                 contractor_zip = str(contractor["postal_code"]).strip()
             elif contractor.get("location_zip"):
                 contractor_zip = str(contractor["location_zip"]).strip()
-                
+
             if not contractor_zip:
                 print(f"[Tier2] No zip code found for contractor {contractor.get('id', 'unknown')}")
                 return False
-                
+
             # Calculate distance between project and contractor
             distance = calculate_distance_miles(project_zip, contractor_zip)
-            
+
             if distance is None:
                 print(f"[Tier2] Could not calculate distance between {project_zip} and {contractor_zip}")
                 return False
-                
+
             # Add distance to contractor data for sorting
             contractor["distance_miles"] = distance
-            
+
             # Check if within radius
             within_radius = distance <= radius_miles
-            
+
             if within_radius:
                 print(f"[Tier2] Previous contractor {contractor.get('company_name', 'Unknown')} is {distance} miles away (within {radius_miles} mile radius)")
-            
+
             return within_radius
-            
+
         except Exception as e:
             print(f"[Tier2] Error checking radius location match: {e}")
             return False
@@ -245,7 +246,7 @@ class Tier2Reengagement:
         distance = contractor.get("distance_miles")
         city = contractor.get("city", "")
         state = contractor.get("state", "")
-        
+
         if distance is not None:
             if city and state:
                 reasons.append(f"Based in {city}, {state} ({distance} miles away)")

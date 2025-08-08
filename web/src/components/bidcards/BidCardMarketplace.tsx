@@ -71,7 +71,7 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
 
   const loadBidCards = useCallback(async () => {
     try {
-      // Flatten location filters for API compatibility  
+      // Flatten location filters for API compatibility
       const flatFilters = {
         ...filters,
         // Flatten location object to individual parameters
@@ -86,7 +86,7 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
         page,
         page_size: pageSize,
       };
-      
+
       const result = await searchBidCards(flatFilters);
       setBidCards(result.bid_cards);
       setTotal(result.total);
@@ -169,7 +169,6 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
           }}
         />
       </Form.Item>
-
 
       <Form.Item label="Timeline">
         <Radio.Group
@@ -356,29 +355,31 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
   );
 
   return (
-    <div style={{ display: 'flex', gap: 24 }}>
+    <div style={{ display: "flex", gap: 24 }}>
       {/* Left Sidebar - Always Visible Location Filter */}
-      <div style={{ 
-        width: 280, 
-        background: 'white', 
-        padding: 20, 
-        borderRadius: 8, 
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        height: 'fit-content',
-        position: 'sticky',
-        top: 24
-      }}>
+      <div
+        style={{
+          width: 280,
+          background: "white",
+          padding: 20,
+          borderRadius: 8,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          height: "fit-content",
+          position: "sticky",
+          top: 24,
+        }}
+      >
         <Title level={4} style={{ marginBottom: 16 }}>
           <EnvironmentOutlined /> Location Search
         </Title>
-        
+
         <Form
           layout="vertical"
           initialValues={{
             location: {
-              zip_code: filters.location?.zip_code || '',
-              radius_miles: filters.location?.radius_miles || 25
-            }
+              zip_code: filters.location?.zip_code || "",
+              radius_miles: filters.location?.radius_miles || 25,
+            },
           }}
           onValuesChange={(_, values) => {
             if (values.location?.zip_code?.length === 5) {
@@ -386,56 +387,57 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
             }
           }}
         >
-          <Form.Item 
-            label="Your ZIP Code" 
+          <Form.Item
+            label="Your ZIP Code"
             name={["location", "zip_code"]}
-            rules={[{ pattern: /^\d{5}$/, message: 'Enter valid 5-digit ZIP' }]}
+            rules={[{ pattern: /^\d{5}$/, message: "Enter valid 5-digit ZIP" }]}
           >
             <Input
               placeholder="e.g., 90210"
               size="large"
-              style={{ fontWeight: 'bold' }}
+              style={{ fontWeight: "bold" }}
               maxLength={5}
             />
           </Form.Item>
-          
+
           <Form.Item label="Search Radius" name={["location", "radius_miles"]}>
             <Slider
               min={5}
               max={100}
               marks={{
-                5: '5mi',
-                25: '25mi',
-                50: '50mi',
-                100: '100mi',
+                5: "5mi",
+                25: "25mi",
+                50: "50mi",
+                100: "100mi",
               }}
               tooltip={{
                 formatter: (value) => `${value} miles`,
               }}
             />
           </Form.Item>
-          
-          <Button 
-            type="primary" 
-            block 
+
+          <Button
+            type="primary"
+            block
             size="large"
             icon={<SearchOutlined />}
             onClick={() => {
               // Trigger search with current form values
-              const form = document.querySelector('form');
+              const form = document.querySelector("form");
               if (form) {
-                form.dispatchEvent(new Event('submit', { bubbles: true }));
+                form.dispatchEvent(new Event("submit", { bubbles: true }));
               }
             }}
           >
             Search in Radius
           </Button>
         </Form>
-        
+
         <Divider />
-        
+
         <Text type="secondary" style={{ fontSize: 12 }}>
-          Find projects within your service area. The search updates automatically when you enter a valid ZIP code.
+          Find projects within your service area. The search updates automatically when you enter a
+          valid ZIP code.
         </Text>
       </div>
 
@@ -494,66 +496,66 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
           </Col>
         </Row>
 
-      {isLoading ? (
-        <div style={{ textAlign: "center", padding: 100 }}>
-          <Spin size="large" />
-        </div>
-      ) : bidCards.length === 0 ? (
-        <Empty
-          description="No projects found matching your criteria"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        />
-      ) : (
-        <>
-          <Row gutter={[16, 16]}>
-            {bidCards.map((card) => (
-              <Col key={card.id} xs={24} sm={12} md={8} lg={6}>
-                {renderBidCard(card)}
-              </Col>
-            ))}
-          </Row>
-
-          <Row justify="center" style={{ marginTop: 32 }}>
-            <Pagination
-              current={page}
-              pageSize={pageSize}
-              total={total}
-              onChange={setPage}
-              showSizeChanger={false}
-              showTotal={(total) => `Total ${total} projects`}
-            />
-          </Row>
-        </>
-      )}
-
-      <Drawer
-        title="Project Details"
-        placement="right"
-        width={800}
-        visible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-        bodyStyle={{ padding: 0 }}
-      >
-        {selectedCard && (
-          <ContractorBidCard
-            bidCard={selectedCard as any}
-            onBidSubmitted={() => {
-              loadBidCards();
-              setDrawerVisible(false);
-            }}
+        {isLoading ? (
+          <div style={{ textAlign: "center", padding: 100 }}>
+            <Spin size="large" />
+          </div>
+        ) : bidCards.length === 0 ? (
+          <Empty
+            description="No projects found matching your criteria"
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
           />
-        )}
-      </Drawer>
+        ) : (
+          <>
+            <Row gutter={[16, 16]}>
+              {bidCards.map((card) => (
+                <Col key={card.id} xs={24} sm={12} md={8} lg={6}>
+                  {renderBidCard(card)}
+                </Col>
+              ))}
+            </Row>
 
-      <Drawer
-        title="More Filters"
-        placement="right"
-        width={400}
-        visible={filterDrawerVisible}
-        onClose={() => setFilterDrawerVisible(false)}
-      >
-        {renderFilters()}
-      </Drawer>
+            <Row justify="center" style={{ marginTop: 32 }}>
+              <Pagination
+                current={page}
+                pageSize={pageSize}
+                total={total}
+                onChange={setPage}
+                showSizeChanger={false}
+                showTotal={(total) => `Total ${total} projects`}
+              />
+            </Row>
+          </>
+        )}
+
+        <Drawer
+          title="Project Details"
+          placement="right"
+          width={800}
+          visible={drawerVisible}
+          onClose={() => setDrawerVisible(false)}
+          bodyStyle={{ padding: 0 }}
+        >
+          {selectedCard && (
+            <ContractorBidCard
+              bidCard={selectedCard as any}
+              onBidSubmitted={() => {
+                loadBidCards();
+                setDrawerVisible(false);
+              }}
+            />
+          )}
+        </Drawer>
+
+        <Drawer
+          title="More Filters"
+          placement="right"
+          width={400}
+          visible={filterDrawerVisible}
+          onClose={() => setFilterDrawerVisible(false)}
+        >
+          {renderFilters()}
+        </Drawer>
       </div>
     </div>
   );

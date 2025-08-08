@@ -338,10 +338,11 @@ class MCPEmailChannel:
                                   bid_card_data: dict[str, Any],
                                   contractor: dict[str, Any],
                                   message_id: str) -> str:
-        """Create unique bid form URL with contractor tracking"""
-        base_url = bid_card_data.get("external_url", f"https://instabids.com/bid-cards/{bid_card_data.get('public_token', 'demo')}")
+        """Create unique bid form URL with contractor tracking - routes to COIA agent"""
+        # Route to contractor landing page with COIA agent instead of bid cards
+        base_url = "https://instabids.com/contractor"
 
-        # Add unique tracking parameters
+        # Add unique tracking parameters for COIA pre-loading
         tracking_params = {
             "source": "email",
             "contractor": contractor.get("company_name", "unknown").replace(" ", "_"),

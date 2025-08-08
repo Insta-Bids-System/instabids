@@ -53,7 +53,7 @@ const CIAChatTab: React.FC = () => {
     console.log("Account created:", userData);
     // Switch to dashboard tab instead of navigating
     const newUrl = "/?tab=dashboard";
-    window.history.replaceState({}, '', newUrl);
+    window.history.replaceState({}, "", newUrl);
     window.location.reload(); // Refresh to update tab state
   };
 
