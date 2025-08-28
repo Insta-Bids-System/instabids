@@ -52,7 +52,9 @@ services:
       - TAVILY_API_KEY=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
       - REDIS_URL=redis://redis:6379
       - USE_DEEPAGENTS_LANDING=true
-    # No bind mount - Watch will handle file sync
+    # Add volume mount for live code updates
+    volumes:
+      - ./ai-agents:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8008 --reload
     restart: unless-stopped
     networks:
