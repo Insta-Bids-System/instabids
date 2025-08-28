@@ -85,7 +85,7 @@ const HomeownerProjectWorkspace: React.FC = () => {
 
       try {
         console.log("Loading bid card with ID:", projectId);
-        const response = await fetch(`http://localhost:8008/api/bid-cards/homeowner/${user.id}`);
+        const response = await fetch(`/api/bid-cards/homeowner/${user.id}`);
 
         if (response.ok) {
           const allCards = await response.json();

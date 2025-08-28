@@ -93,6 +93,10 @@ export const HomeownerBidCard: React.FC<HomeownerBidCardProps> = ({ bidCard, onU
       project_type: bidCard.project_type,
       categories: bidCard.categories,
       requirements: bidCard.requirements,
+      service_complexity: bidCard.service_complexity || "single-trade",
+      trade_count: bidCard.trade_count || 1,
+      primary_trade: bidCard.primary_trade || "",
+      secondary_trades: bidCard.secondary_trades || [],
       location: {
         address: bidCard.location.address,
         city: bidCard.location.city,
@@ -124,6 +128,10 @@ export const HomeownerBidCard: React.FC<HomeownerBidCardProps> = ({ bidCard, onU
         project_type: values.project_type,
         categories: values.categories,
         requirements: values.requirements,
+        service_complexity: values.service_complexity,
+        trade_count: values.trade_count,
+        primary_trade: values.primary_trade,
+        secondary_trades: values.secondary_trades,
         location: values.location,
         group_bid_eligible: values.group_bid_eligible,
         allows_questions: values.allows_questions,
@@ -238,6 +246,52 @@ export const HomeownerBidCard: React.FC<HomeownerBidCardProps> = ({ bidCard, onU
           <Option value="roofing">Roofing</Option>
           <Option value="flooring">Flooring</Option>
           <Option value="painting">Painting</Option>
+        </Select>
+      </Form.Item>
+
+      <Divider>Service Complexity</Divider>
+
+      <Form.Item name="service_complexity" label="Service Complexity">
+        <Select placeholder="Select service complexity">
+          <Option value="single-trade">Single Trade (e.g., lawn care, pool cleaning, roofing)</Option>
+          <Option value="multi-trade">Multi Trade (e.g., kitchen remodel, bathroom renovation)</Option>
+          <Option value="complex-coordination">Complex Coordination (e.g., whole house renovation)</Option>
+        </Select>
+      </Form.Item>
+
+      <Form.Item name="trade_count" label="Number of Trades Involved">
+        <InputNumber min={1} max={20} placeholder="e.g., 1 for lawn care, 3-5 for kitchen remodel" />
+      </Form.Item>
+
+      <Form.Item name="primary_trade" label="Primary Trade">
+        <Select placeholder="Select primary trade">
+          <Option value="landscaping">Landscaping</Option>
+          <Option value="pools">Pools</Option>
+          <Option value="turf">Turf Installation</Option>
+          <Option value="roofing">Roofing</Option>
+          <Option value="kitchen">Kitchen Renovation</Option>
+          <Option value="bathroom">Bathroom Renovation</Option>
+          <Option value="plumbing">Plumbing</Option>
+          <Option value="electrical">Electrical</Option>
+          <Option value="hvac">HVAC</Option>
+          <Option value="flooring">Flooring</Option>
+          <Option value="painting">Painting</Option>
+          <Option value="general">General Construction</Option>
+        </Select>
+      </Form.Item>
+
+      <Form.Item name="secondary_trades" label="Secondary Trades">
+        <Select mode="tags" placeholder="Select secondary trades (if applicable)">
+          <Option value="landscaping">Landscaping</Option>
+          <Option value="pools">Pools</Option>
+          <Option value="turf">Turf Installation</Option>
+          <Option value="roofing">Roofing</Option>
+          <Option value="plumbing">Plumbing</Option>
+          <Option value="electrical">Electrical</Option>
+          <Option value="hvac">HVAC</Option>
+          <Option value="flooring">Flooring</Option>
+          <Option value="painting">Painting</Option>
+          <Option value="general">General Construction</Option>
         </Select>
       </Form.Item>
 
@@ -454,6 +508,29 @@ export const HomeownerBidCard: React.FC<HomeownerBidCardProps> = ({ bidCard, onU
               {bidCard.location.city}, {bidCard.location.state} {bidCard.location.zip_code}
             </Text>
           </Space>
+          {bidCard.service_complexity && (
+            <Tag 
+              color={
+                bidCard.service_complexity === "single-trade" ? "blue" : 
+                bidCard.service_complexity === "multi-trade" ? "orange" : "red"
+              }
+            >
+              {bidCard.service_complexity === "single-trade" && "Single Trade"}
+              {bidCard.service_complexity === "multi-trade" && "Multi Trade"}
+              {bidCard.service_complexity === "complex-coordination" && "Complex"}
+              {bidCard.trade_count && ` (${bidCard.trade_count} trades)`}
+            </Tag>
+          )}
+          {bidCard.primary_trade && (
+            <Tag color="purple">
+              Primary: {bidCard.primary_trade}
+            </Tag>
+          )}
+          {bidCard.secondary_trades && bidCard.secondary_trades.length > 0 && (
+            <Tag color="cyan">
+              +{bidCard.secondary_trades.length} more trades
+            </Tag>
+          )}
           {bidCard.group_bid_eligible && (
             <Tag color="green" icon={<TeamOutlined />}>
               Group Bid Eligible

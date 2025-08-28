@@ -10,9 +10,14 @@ from typing import Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-# Import COIA agent for contractor communication (now using OpenAI O3)
+# Import unified COIA API client for contractor communication
 # Import database connection
 from database_simple import db
+# Import contractor bid matching API
+from api.contractor_bid_matching import find_matching_projects
+# Import HTTP client for unified COIA API calls
+import httpx
+from config.service_urls import get_backend_url
 
 
 # Create router
@@ -42,82 +47,89 @@ class ContractorChatResponse(BaseModel):
     contractor_id: Optional[str] = None
     session_data: dict[str, Any]
 
-class BidSubmissionRequest(BaseModel):
-    bid_card_id: str
-    contractor_id: str
-    bid_amount: float
-    timeline_days: int
-    message: str
-    included_items: dict[str, bool] = {
-        "materials": True,
-        "permits": False,
-        "cleanup": True,
-        "warranty": True
-    }
-    payment_terms: str = "50% upfront, 50% completion"
+# BidSubmissionRequest model removed - using bid_card_api_simple.py for bid submissions
 
-class ContractorBidView(BaseModel):
-    id: str
-    bid_card_id: str
-    contractor_id: str
-    bid_amount: float
-    timeline_days: int
-    message: str
-    included_items: dict[str, bool]
-    payment_terms: str
-    submitted_at: str
-    status: str = "pending"
+# ContractorBidView model removed - using bid_card_api_simple.py for bid submissions
 
-# Global COIA agent instance (initialized in main.py)
-coia_agent = None
+# Unified COIA API endpoint base URL
+COIA_API_BASE = f"{get_backend_url()}/api/coia"
 
-def set_coia_agent(agent):
-    """Set the COIA agent instance"""
-    global coia_agent
-    coia_agent = agent
+async def call_coia_api(endpoint: str, data: dict) -> dict:
+    """Make HTTP call to unified COIA API"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(f"{COIA_API_BASE}/{endpoint}", json=data, timeout=30.0)
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.error(f"Error calling COIA API {endpoint}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "response": "I'm having trouble connecting right now. Please try again in a moment."
+        }
 
 @router.post("/chat/message", response_model=ContractorChatResponse)
 async def contractor_chat(chat_data: ContractorChatMessage):
-    """Handle contractor onboarding chat messages with CoIA agent"""
-    if not coia_agent:
-        # Fallback response if CoIA not initialized
-        return ContractorChatResponse(
-            response="I'm having trouble connecting right now. Please try again in a moment.",
-            stage=chat_data.current_stage or "welcome",
-            profile_progress={
-                "completeness": 0,
-                "stage": chat_data.current_stage or "welcome",
-                "collectedData": {},
-                "matchingProjects": 0
-            },
-            contractor_id=None,
-            session_data={}
-        )
-
+    """Handle contractor onboarding chat messages via unified COIA API"""
     try:
-        # Process message with CoIA agent - include bid card context for pre-loaded contractors
-        context = {
-            "current_stage": chat_data.current_stage,
-            "profile_data": chat_data.profile_data or {}
+        # Prepare request data for unified COIA API
+        api_request = {
+            "message": chat_data.message,
+            "session_id": chat_data.session_id,
+            "contractor_lead_id": None,  # Could be enhanced to track contractor leads
+            "context": {
+                "current_stage": chat_data.current_stage,
+                "profile_data": chat_data.profile_data or {}
+            }
         }
         
         # Add bid card context if available
         if chat_data.bid_card_context:
-            context["bid_card_context"] = chat_data.bid_card_context.dict()
+            api_request["context"]["bid_card_context"] = chat_data.bid_card_context.dict()
             logger.info(f"Processing contractor chat with bid card context: {chat_data.bid_card_context.contractor_name}")
         
-        result = await coia_agent.process_message(
-            session_id=chat_data.session_id,
-            user_message=chat_data.message,
-            context=context
+        # Call unified COIA API
+        result = await call_coia_api("chat", api_request)
+        
+        if not result.get("success", False):
+            # API returned error
+            return ContractorChatResponse(
+                response=result.get("response", "I'm having trouble processing that right now. Please try again."),
+                stage=chat_data.current_stage or "welcome",
+                profile_progress={
+                    "completeness": 0,
+                    "stage": chat_data.current_stage or "welcome",
+                    "collectedData": chat_data.profile_data or {},
+                    "matchingProjects": 0
+                },
+                contractor_id=None,
+                session_data={}
+            )
+        
+        # Convert unified API response to contractor chat response format
+        return ContractorChatResponse(
+            response=result.get("response", "Thank you for your message."),
+            stage=result.get("current_mode", chat_data.current_stage or "conversation"),
+            profile_progress={
+                "completeness": result.get("profile_completeness", 0) or 0,
+                "stage": result.get("current_mode", "conversation"),
+                "collectedData": result.get("contractor_profile", {}),
+                "matchingProjects": 0  # Could be enhanced with bid card search results
+            },
+            contractor_id=result.get("contractor_id"),
+            session_data={
+                "completion_ready": result.get("completion_ready", False),
+                "contractor_created": result.get("contractor_created", False),
+                "research_completed": result.get("research_completed", False),
+                "last_updated": result.get("last_updated")
+            }
         )
-
-        return ContractorChatResponse(**result)
 
     except Exception as e:
         import traceback
-        print(f"Error in contractor chat: {e}")
-        print(traceback.format_exc())
+        logger.error(f"Error in contractor chat: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
 
         # Fallback response
         return ContractorChatResponse(
@@ -164,7 +176,8 @@ async def get_contractor_bid_card_view(bid_card_id: str, contractor_id: str = Qu
         # Get bid card details using safe query
         result = supabase_client.table("bid_cards").select(
             "id, bid_card_number, project_type, status, budget_min, budget_max, "
-            "created_at, urgency_level, contractor_count_needed"
+            "created_at, urgency_level, contractor_count_needed, "
+            "service_complexity, trade_count, primary_trade, secondary_trades"
         ).eq("id", bid_card_id).single().execute()
 
         if not result.data:
@@ -189,7 +202,12 @@ async def get_contractor_bid_card_view(bid_card_id: str, contractor_id: str = Qu
             "has_submitted_bid": False,  # Simplified for now
             "can_bid": True,  # Simplified for now
             "created_at": bid_card.get("created_at", ""),
-            "bids_received_count": 0  # Simplified for now
+            "bids_received_count": 0,  # Simplified for now
+            # Service complexity classification
+            "service_complexity": bid_card.get("service_complexity", "single-trade"),
+            "trade_count": bid_card.get("trade_count", 1),
+            "primary_trade": bid_card.get("primary_trade", "general"),
+            "secondary_trades": bid_card.get("secondary_trades", [])
         }
 
     except HTTPException:
@@ -199,151 +217,14 @@ async def get_contractor_bid_card_view(bid_card_id: str, contractor_id: str = Qu
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/contractor-bids")
-async def submit_contractor_bid(bid_data: BidSubmissionRequest):
-    """
-    Submit a bid on a bid card
-    - Updates bid_cards.bid_document JSONB field
-    - Creates entry in bids table
-    - Tracks in contractor_responses table
-    """
-    try:
-        supabase_client = db.client
-
-        # Get current bid card
-        bid_card_response = supabase_client.table("bid_cards").select("*").eq("id", bid_data.bid_card_id).single().execute()
-
-        if not bid_card_response.data:
-            raise HTTPException(status_code=404, detail="Bid card not found")
-
-        bid_card = bid_card_response.data
-
-        # Check if bid card is still accepting bids
-        if bid_card.get("status") not in ["active", "collecting_bids"]:
-            raise HTTPException(status_code=400, detail="Bid card is no longer accepting bids")
-
-        # Initialize bid_document if it doesn't exist or doesn't have submitted_bids
-        bid_document = bid_card.get("bid_document", {})
-        if not isinstance(bid_document, dict):
-            bid_document = {}
-
-        # Ensure submitted_bids array exists
-        if "submitted_bids" not in bid_document:
-            bid_document["submitted_bids"] = []
-        if "bids_received_count" not in bid_document:
-            bid_document["bids_received_count"] = 0
-        if "bids_target_met" not in bid_document:
-            bid_document["bids_target_met"] = False
-
-        # Check if contractor already submitted a bid
-        for existing_bid in bid_document["submitted_bids"]:
-            if existing_bid.get("contractor_id") == bid_data.contractor_id:
-                raise HTTPException(status_code=400, detail="You have already submitted a bid for this project")
-
-        # Create new bid entry
-        new_bid = {
-            "contractor_id": bid_data.contractor_id,
-            "contractor_name": f"Contractor {bid_data.contractor_id[:8]}",  # TODO: Get actual name
-            "bid_amount": bid_data.bid_amount,
-            "timeline_days": bid_data.timeline_days,
-            "submission_time": datetime.utcnow().isoformat(),
-            "message": bid_data.message,
-            "included": bid_data.included_items,
-            "payment_terms": bid_data.payment_terms,
-            "status": "pending"
-        }
-
-        # Add bid to bid_document
-        bid_document["submitted_bids"].append(new_bid)
-        bid_document["bids_received_count"] = len(bid_document["submitted_bids"])
-
-        # Check if target met - get contractor count from bid_document structure
-        contractor_count_needed = 4  # Default
-        if bid_document and "all_extracted_data" in bid_document:
-            contractor_reqs = bid_document.get("all_extracted_data", {}).get("contractor_requirements", {})
-            contractor_count_needed = contractor_reqs.get("contractor_count", 4)
-
-        if bid_document["bids_received_count"] >= contractor_count_needed:
-            bid_document["bids_target_met"] = True
-            # Update status to bids_complete if target met
-            update_data = {
-                "bid_document": bid_document,
-                "status": "bids_complete"
-            }
-        else:
-            update_data = {
-                "bid_document": bid_document
-            }
-
-        # Update bid card with new bid
-        update_response = supabase_client.table("bid_cards").update(update_data).eq("id", bid_data.bid_card_id).execute()
-
-        # Also create entry in bids table for tracking
-        bid_record = {
-            "bid_card_id": bid_data.bid_card_id,
-            "contractor_id": bid_data.contractor_id,
-            "bid_amount": bid_data.bid_amount,
-            "timeline_days": bid_data.timeline_days,
-            "message": bid_data.message,
-            "status": "pending",
-            "submitted_at": datetime.utcnow().isoformat()
-        }
-
-        try:
-            supabase_client.table("bids").insert(bid_record).execute()
-        except Exception as e:
-            logger.warning(f"Failed to insert into bids table: {e}")
-
-        # Return the submitted bid
-        return ContractorBidView(
-            id=f"bid_{bid_data.bid_card_id}_{bid_data.contractor_id}",
-            bid_card_id=bid_data.bid_card_id,
-            contractor_id=bid_data.contractor_id,
-            bid_amount=bid_data.bid_amount,
-            timeline_days=bid_data.timeline_days,
-            message=bid_data.message,
-            included_items=bid_data.included_items,
-            payment_terms=bid_data.payment_terms,
-            submitted_at=new_bid["submission_time"],
-            status="pending"
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        logger.error(f"Error submitting contractor bid: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=str(e))
+# Unused bid submission endpoint removed - using bid_card_api_simple.py for production bid submissions
 
 
 @router.get("/contractors/{contractor_id}/profile")
 async def get_contractor_profile(contractor_id: str):
     """Get contractor profile data"""
     try:
-        # For demo contractor, return the hardcoded data that frontend expects
-        if contractor_id == "c24d60b5-5469-4207-a364-f20363422d8a":
-            return {
-                "company_name": "JM Holiday Lighting, Inc.",
-                "phone": "(561) 573-7090",
-                "website": "http://jmholidaylighting.com/",
-                "address": "5051 NW 13th Ave Bay G, Pompano Beach, FL 33064, USA",
-                "specialties": ["Holiday lighting installation", "Christmas lighting installation"],
-                "service_areas": [
-                    "Pompano Beach",
-                    "Fort Lauderdale",
-                    "Boca Raton",
-                    "Delray Beach",
-                    "Boynton Beach",
-                ],
-                "social_media": {
-                    "facebook": "https://www.facebook.com/jmholidaylighting",
-                    "instagram": "https://www.instagram.com/jmholidaylighting",
-                },
-                "research_source": "coia_intelligent_research",
-            }
-
-        # For other contractors, try to get from database
+        # Always get from database - no more hardcoded demo data
         supabase_client = db.client
         result = supabase_client.table("contractors").select("*").eq("id", contractor_id).single().execute()
 
@@ -357,20 +238,39 @@ async def get_contractor_profile(contractor_id: str):
                 "specialties": contractor.get("specialties", []),
                 "service_areas": contractor.get("service_areas", []),
                 "social_media": contractor.get("social_media", {}),
+                "verified": contractor.get("verified", False),
+                "rating": contractor.get("rating"),
+                "tier": contractor.get("tier", 3),
                 "research_source": "database",
             }
         else:
-            # Return fallback data
-            return {
-                "company_name": f"Contractor {contractor_id[:8]}",
-                "phone": "Not available",
-                "website": "",
-                "address": "Not available",
-                "specialties": ["General contractor"],
-                "service_areas": ["Local area"],
-                "social_media": {},
-                "research_source": "fallback",
-            }
+            # Try contractor_leads table as fallback
+            leads_result = supabase_client.table("contractor_leads").select("*").eq("id", contractor_id).single().execute()
+            
+            if leads_result.data:
+                lead = leads_result.data
+                return {
+                    "company_name": lead.get("company_name", "Contractor"),
+                    "phone": lead.get("phone", ""),
+                    "website": lead.get("website", ""),
+                    "address": lead.get("address", ""),
+                    "specialties": lead.get("specialties", []),
+                    "service_areas": lead.get("service_areas", []),
+                    "social_media": lead.get("social_media", {}),
+                    "research_source": "contractor_leads",
+                }
+            else:
+                # Return minimal fallback data
+                return {
+                    "company_name": f"Contractor {contractor_id[:8]}",
+                    "phone": "Not available",
+                    "website": "",
+                    "address": "Not available",
+                    "specialties": ["General contractor"],
+                    "service_areas": ["Local area"],
+                    "social_media": {},
+                    "research_source": "fallback",
+                }
 
     except Exception as e:
         logger.error(f"Error getting contractor profile: {e}")
@@ -503,3 +403,106 @@ async def get_contractor_bids(contractor_id: str = Query(...), status: Optional[
         logger.error(f"Error getting contractor bids: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# Contractor Bid Matching Endpoint
+class ContractorMatchingRequest(BaseModel):
+    contractor_id: Optional[str] = None
+    main_service_type: str = "General Construction"
+    specialties: list[str] = []
+    zip_codes: list[str] = []
+    service_radius_miles: int = 25
+    contractor_size_category: str = "small_business"
+    years_in_business: Optional[int] = None
+    certifications: list[str] = []
+
+@router.post("/matching-projects")
+async def get_matching_projects(request: ContractorMatchingRequest):
+    """
+    Find bid cards that match contractor profile and specialties
+    Returns personalized project matches with scores and reasons
+    """
+    try:
+        logger.info(f"Finding matching projects for contractor: {request.contractor_id}")
+        
+        # Convert request to dict for the matching API
+        contractor_data = {
+            'contractor_id': request.contractor_id or 'unknown',
+            'main_service_type': request.main_service_type,
+            'specialties': request.specialties,
+            'zip_codes': request.zip_codes,
+            'service_radius_miles': request.service_radius_miles,
+            'contractor_size_category': request.contractor_size_category,
+            'years_in_business': request.years_in_business,
+            'certifications': request.certifications
+        }
+        
+        # Get matching projects using the bid matching API
+        result = await find_matching_projects(contractor_data)
+        
+        logger.info(f"Found {result.get('total_matches', 0)} matching projects")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error finding matching projects: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'matching_projects': [],
+            'total_matches': 0
+        }
+
+@router.get("/profile-data-by-name/{contractor_name}")
+async def get_contractor_profile_by_name(contractor_name: str):
+    """
+    Get contractor profile data by company name for pre-loading bid card email arrivals
+    """
+    try:
+        logger.info(f"Looking up contractor profile by name: {contractor_name}")
+        
+        supabase_client = db.client
+        
+        # Search contractor_leads table for matching company names
+        result = supabase_client.table("contractor_leads").select(
+            "id, company_name, contact_name, phone, email, website, "
+            "specialties, main_service_type, zip_code, service_radius_miles, "
+            "contractor_size_category, years_in_business, certifications"
+        ).ilike("company_name", f"%{contractor_name}%").limit(1).execute()
+        
+        if result.data and len(result.data) > 0:
+            contractor_data = result.data[0]
+            
+            # Format the data for frontend use
+            formatted_data = {
+                'id': contractor_data.get('id'),
+                'company_name': contractor_data.get('company_name'),
+                'contact_name': contractor_data.get('contact_name'),
+                'phone': contractor_data.get('phone'),
+                'email': contractor_data.get('email'),
+                'website': contractor_data.get('website'),
+                'specialties': contractor_data.get('specialties', []),
+                'main_service_type': contractor_data.get('main_service_type', ''),
+                'zip_codes': [contractor_data.get('zip_code')] if contractor_data.get('zip_code') else [],
+                'service_radius_miles': contractor_data.get('service_radius_miles', 25),
+                'contractor_size_category': contractor_data.get('contractor_size_category', 'small_business'),
+                'years_in_business': contractor_data.get('years_in_business'),
+                'certifications': contractor_data.get('certifications', [])
+            }
+            
+            return {
+                'found': True,
+                'data': formatted_data
+            }
+        else:
+            logger.info(f"No contractor found with name matching: {contractor_name}")
+            return {
+                'found': False,
+                'data': None
+            }
+            
+    except Exception as e:
+        logger.error(f"Error looking up contractor by name: {e}")
+        return {
+            'found': False,
+            'data': None,
+            'error': str(e)
+        }

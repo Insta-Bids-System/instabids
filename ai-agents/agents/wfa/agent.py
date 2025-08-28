@@ -2,6 +2,7 @@
 Claude-Enhanced WFA (Website Form Automation Agent)
 Uses Claude Opus 4 to intelligently understand and fill any website form
 """
+import asyncio
 import json
 import os
 import re
@@ -216,13 +217,14 @@ Return JSON like:
             # Navigate to website
             try:
                 page.goto(website, wait_until="networkidle", timeout=30000)
-                time.sleep(2)  # Let page fully load
+                # Let page fully load - using page wait instead of blocking sleep
+                page.wait_for_timeout(2000)
             except:
                 # Try adding https if missing
                 if not website.startswith(("http://", "https://")):
                     website = f"https://{website}"
                     page.goto(website, wait_until="networkidle", timeout=30000)
-                    time.sleep(2)
+                    page.wait_for_timeout(2000)
 
             # Get page HTML for Claude
             html_content = page.content()
@@ -238,7 +240,7 @@ Return JSON like:
 
                 if contact_link:
                     page.click(contact_link)
-                    time.sleep(2)
+                    page.wait_for_timeout(2000)
                     html_content = page.content()
                     form_analysis = self.analyze_form_with_claude(page, html_content)
 
@@ -306,7 +308,7 @@ Return JSON like:
                     try:
                         # Type with human-like delays
                         page.fill(selector, str(value))
-                        time.sleep(0.5)  # Small delay between fields
+                        page.wait_for_timeout(500)  # Small delay between fields
                     except:
                         # Try clicking first then typing
                         try:
@@ -318,9 +320,9 @@ Return JSON like:
             # Submit form
             submit_btn = form_analysis.get("form_analysis", {}).get("submit_button", {})
             if submit_btn.get("selector"):
-                time.sleep(1)  # Pause before submit
+                page.wait_for_timeout(1000)  # Pause before submit
                 page.click(submit_btn["selector"])
-                time.sleep(3)  # Wait for submission
+                page.wait_for_timeout(3000)  # Wait for submission
 
                 return {"success": True}
             else:

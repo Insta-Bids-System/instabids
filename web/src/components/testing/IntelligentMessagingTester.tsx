@@ -106,7 +106,7 @@ export const IntelligentMessagingTester: React.FC = () => {
         formData.append('bid_card_id', '11111111-2222-3333-4444-555555555555');
         formData.append('image', selectedFile);
 
-        const response = await fetch('http://localhost:8008/api/intelligent-messages/send-with-image', {
+        const response = await fetch('/api/intelligent-messages/send-with-image', {
           method: 'POST',
           body: formData,
         });
@@ -114,7 +114,7 @@ export const IntelligentMessagingTester: React.FC = () => {
         result = await response.json();
       } else {
         // Test text message - use query parameter as backend expects
-        const testUrl = `http://localhost:8008/api/intelligent-messages/test-security?test_content=${encodeURIComponent(message)}`;
+        const testUrl = `/api/intelligent-messages/test-security?test_content=${encodeURIComponent(message)}`;
         console.log('Testing message:', message);
         console.log('API URL:', testUrl);
         

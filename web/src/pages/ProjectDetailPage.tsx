@@ -68,7 +68,7 @@ const ProjectDetailPage: React.FC = () => {
         .from("projects")
         .select(`
           *,
-          homeowner:homeowners!projects_homeowner_id_fkey(
+          homeowner:homeowners!projects_user_id_fkey(
             id,
             email,
             full_name

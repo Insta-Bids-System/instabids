@@ -49,7 +49,7 @@ except Exception as e:
 router = APIRouter()
 
 @router.get("/api/demo/inspiration/boards")
-async def get_demo_boards(homeowner_id: str):
+async def get_demo_boards(user_id: str):
     """
     Return the REAL board with REAL images that we created
     """
@@ -60,7 +60,7 @@ async def get_demo_boards(homeowner_id: str):
             "title": "My Dream Kitchen Transformation",
             "description": "Transform my compact kitchen into a modern industrial space",
             "room_type": "kitchen",
-            "homeowner_id": homeowner_id,
+            "user_id": user_id,
             "status": "organizing",
             "created_at": "2025-07-31T16:25:18.134Z",
             "updated_at": "2025-07-31T16:25:18.134Z",
@@ -78,7 +78,7 @@ async def create_demo_board(board_data: dict):
             "title": board_data.get("title", "New Board"),
             "description": board_data.get("description"),
             "room_type": board_data.get("room_type"),
-            "homeowner_id": board_data.get("homeowner_id"),
+            "user_id": board_data.get("user_id"),
             "status": board_data.get("status", "collecting")
         }).execute()
 
@@ -98,9 +98,9 @@ async def get_board_images(board_id: str):
             {
                 "id": "5d46e708-3f0c-4985-9617-68afd8e2892b",
                 "board_id": board_id,
-                "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
-                "image_url": "http://localhost:8008/test-images/current-state/kitchen-outdated-2.webp",
-                "thumbnail_url": "http://localhost:8008/test-images/current-state/kitchen-outdated-2.webp",
+                "user_id": "550e8400-e29b-41d4-a716-446655440001",
+                "image_url": "/test-images/current-state/kitchen-outdated-2.webp",
+                "thumbnail_url": "/test-images/current-state/kitchen-outdated-2.webp",
                 "source": "url",
                 "tags": ["kitchen", "current", "compact", "needs-update"],
                 "ai_analysis": {
@@ -118,9 +118,9 @@ async def get_board_images(board_id: str):
             {
                 "id": "115f9265-e462-458f-a159-568790fc6941",
                 "board_id": board_id,
-                "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
-                "image_url": "http://localhost:8008/test-images/inspiration/kitchen-modern-1.webp",
-                "thumbnail_url": "http://localhost:8008/test-images/inspiration/kitchen-modern-1.webp",
+                "user_id": "550e8400-e29b-41d4-a716-446655440001",
+                "image_url": "/test-images/inspiration/kitchen-modern-1.webp",
+                "thumbnail_url": "/test-images/inspiration/kitchen-modern-1.webp",
                 "source": "url",
                 "tags": ["kitchen", "inspiration", "modern", "industrial"],
                 "ai_analysis": {
@@ -155,7 +155,7 @@ async def get_board_images(board_id: str):
             sample_vision = {
                 "id": "ai-vision-sample-123",
                 "board_id": board_id,
-                "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+                "user_id": "550e8400-e29b-41d4-a716-446655440001",
                 "image_url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-XbuLu3W08vzqjwSOLNAQHWLb/user-ulYaQfAoRoaE5j0IF3KcRnA1/img-QIIeE7YrfH99kOYzKKZje0S7.png?st=2025-08-01T04%3A19%3A52Z&se=2025-08-01T06%3A19%3A52Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=8b33a531-2df9-46a3-bc02-d4b1430a422c&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-07-31T08%3A37%3A40Z&ske=2025-08-01T08%3A37%3A40Z&sks=b&skv=2024-08-04&sig=C%2B5Kkph8tBbp/Pqkq5y7SdG4PkleB4UpGXlYpWaDAhA%3D",
                 "thumbnail_url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-XbuLu3W08vzqjwSOLNAQHWLb/user-ulYaQfAoRoaE5j0IF3KcRnA1/img-QIIeE7YrfH99kOYzKKZje0S7.png?st=2025-08-01T04%3A19%3A52Z&se=2025-08-01T06%3A19%3A52Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=8b33a531-2df9-46a3-bc02-d4b1430a422c&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-07-31T08%3A37%3A40Z&ske=2025-08-01T08%3A37%3A40Z&sks=b&skv=2024-08-04&sig=C%2B5Kkph8tBbp/Pqkq5y7SdG4PkleB4UpGXlYpWaDAhA%3D",
                 "source": "url",

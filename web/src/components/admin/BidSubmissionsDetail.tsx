@@ -40,7 +40,7 @@ const BidSubmissionsDetail: React.FC<BidSubmissionsDetailProps> = ({
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:8008/api/contractor-proposals/bid-card/${bidCardId}`
+        `/api/contractor-proposals/bid-card/${bidCardId}`
       );
 
       if (response.ok) {
@@ -89,7 +89,7 @@ const BidSubmissionsDetail: React.FC<BidSubmissionsDetailProps> = ({
   const handleUpdateStatus = async (submissionId: string, newStatus: 'accepted' | 'rejected') => {
     try {
       const response = await fetch(
-        `http://localhost:8008/api/contractor-proposals/${submissionId}/status`,
+        `/api/contractor-proposals/${submissionId}/status`,
         {
           method: 'PUT',
           headers: {
@@ -97,7 +97,7 @@ const BidSubmissionsDetail: React.FC<BidSubmissionsDetailProps> = ({
           },
           body: JSON.stringify({
             status: newStatus,
-            homeowner_id: '11111111-1111-1111-1111-111111111111' // Test homeowner ID
+            user_id: '11111111-1111-1111-1111-111111111111' // Test homeowner ID
           }),
         }
       );

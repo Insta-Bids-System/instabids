@@ -1,0 +1,9 @@
+{
+  "session_id": "contractor_session_full_test_456",
+  "message": "Hi! I'm Jake Rodriguez from Superior Landscaping & Turfgrass in Austin, Texas. We specialize in artificial turf installation and have been in business for 8 years. I heard about InstaBids and want to learn about opportunities.",
+  "context": {
+    "current_stage": "welcome",
+    "profile_data": {},
+    "interface": "landing"
+  }
+}

@@ -60,7 +60,7 @@ def create_homeowner_and_test_iris():
                     print(f"\nIris Message {j+1}: {iris_msg}")
                     iris_payload = {
                         "message": iris_msg,
-                        "homeowner_id": user_id,  # Using user_id as homeowner_id
+                        "user_id": user_id,  # Using user_id as user_id
                         "board_id": None,
                         "conversation_context": []
                     }

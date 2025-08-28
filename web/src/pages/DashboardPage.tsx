@@ -4,8 +4,12 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
 import EnhancedBidCard from "@/components/bidcards/homeowner/EnhancedBidCard";
+import PotentialBidCard from "@/components/bidcards/PotentialBidCard";
 import ContractorCommunicationHub from "@/components/homeowner/ContractorCommunicationHub";
+import RFINotifications from "@/components/homeowner/RFINotifications";
 import InspirationDashboard from "@/components/inspiration/InspirationDashboard";
+import PropertyDashboard from "@/components/property/PropertyDashboard";
+import PopularServicesTab from "@/components/groupbidding/PopularServicesTab";
 import { useAuth } from "@/contexts/AuthContext";
 import { type Project, supabase } from "@/lib/supabase";
 
@@ -14,8 +18,11 @@ const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [bidCards, setBidCards] = useState<any[]>([]);
+  const [potentialBidCards, setPotentialBidCards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"projects" | "inspiration">("projects");
+  const [activeTab, setActiveTab] = useState<"projects" | "popular" | "inspiration" | "property">("projects");
+  
+  console.log("[DashboardPage] Current activeTab:", activeTab);
 
   const loadProjects = async () => {
     if (!user) return;
@@ -24,7 +31,7 @@ const DashboardPage: React.FC = () => {
       const { data, error } = await supabase
         .from("projects")
         .select("*")
-        .eq("homeowner_id", user.id)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -42,24 +49,15 @@ const DashboardPage: React.FC = () => {
 
     try {
       // Load bid cards from the backend API using the API service
-      const response = await fetch(`http://localhost:8008/api/bid-cards/homeowner/${user.id}`);
+      const response = await fetch(`/api/bid-cards/user/${user.id}`);
       if (response.ok) {
         const data = await response.json();
         console.log("[Dashboard] Loaded bid cards:", data);
         setBidCards(data || []);
       } else {
-        console.log("[Dashboard] API call failed, trying fallback to Supabase");
-        // Fallback - get all bid cards for now since we don't have homeowner_id
-        // In production, this should be filtered properly through the API
-        const { data, error } = await supabase
-          .from("bid_cards")
-          .select("*")
-          .neq("status", "draft")
-          .order("created_at", { ascending: false })
-          .limit(10);
-
-        if (error) throw error;
-        setBidCards(data || []);
+        console.error("[Dashboard] API call failed - no fallback for security");
+        // Don't show all bid cards as fallback - security risk
+        setBidCards([]);
       }
     } catch (error) {
       console.error("[Dashboard] Error loading bid cards:", error);
@@ -67,10 +65,85 @@ const DashboardPage: React.FC = () => {
     }
   };
 
+  const loadPotentialBidCards = async () => {
+    if (!user) return;
+
+    try {
+      const response = await fetch(`/api/cia/user/${user.id}/potential-bid-cards`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log("[Dashboard] Loaded potential bid cards:", data);
+        setPotentialBidCards(data.bid_cards || []);
+      }
+    } catch (error) {
+      console.error("[Dashboard] Error loading potential bid cards:", error);
+    }
+  };
+
+  const handleReviewPotentialBidCard = async (bidCard: any) => {
+    // For now, trigger conversion directly
+    // Later we can add a confirmation chat here
+    try {
+      const response = await fetch(
+        `/api/cia/potential-bid-cards/${bidCard.id}/convert-to-bid-card`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        toast.success("Your project is now live! Finding contractors...");
+        
+        // Reload to show the new bid card
+        await loadBidCards();
+        await loadPotentialBidCards();
+      } else {
+        const error = await response.json();
+        if (error.detail?.includes("authenticated")) {
+          toast.error("Please sign in to get bids");
+        } else {
+          toast.error("Some details are missing. Please complete your project first.");
+        }
+      }
+    } catch (error) {
+      console.error("Error converting bid card:", error);
+      toast.error("Failed to start finding contractors");
+    }
+  };
+
+  const handleDeletePotentialBidCard = async (bidCardId: string) => {
+    try {
+      const response = await fetch(
+        `/api/cia/potential-bid-cards/${bidCardId}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (response.ok) {
+        toast.success("Draft bid card deleted");
+        // Reload the potential bid cards list
+        await loadPotentialBidCards();
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || "Failed to delete bid card");
+      }
+    } catch (error) {
+      console.error("Error deleting bid card:", error);
+      toast.error("Failed to delete bid card");
+    }
+  };
+
   useEffect(() => {
-    loadProjects();
-    loadBidCards();
-  }, [user]);
+    if (user) {
+      loadProjects();
+      loadBidCards();
+      loadPotentialBidCards();
+    }
+  }, [user?.id]);
 
   const getStatusIcon = (status: Project["status"]) => {
     switch (status) {
@@ -151,6 +224,22 @@ const DashboardPage: React.FC = () => {
             >
               My Projects
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("popular")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm relative ${
+                activeTab === "popular"
+                  ? "border-primary-500 text-primary-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              Popular Services
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Save 15-25%!
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={() => setActiveTab("inspiration")}
@@ -162,12 +251,27 @@ const DashboardPage: React.FC = () => {
             >
               Inspiration Board
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("property")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === "property"
+                  ? "border-primary-500 text-primary-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              My Property
+            </button>
           </nav>
         </div>
 
         {/* Conditional Content */}
         {activeTab === "projects" ? (
           <>
+            {/* RFI Notifications Section */}
+            {user && <RFINotifications homeownerId={user.id} />}
+            
             <div className="mb-8 flex justify-between items-center">
               <h1 className="text-3xl font-bold text-gray-900">My Projects</h1>
               <Link
@@ -183,7 +287,7 @@ const DashboardPage: React.FC = () => {
               <div className="flex justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
               </div>
-            ) : projects.length === 0 && bidCards.length === 0 ? (
+            ) : projects.length === 0 && bidCards.length === 0 && potentialBidCards.length === 0 ? (
               <div className="bg-white rounded-lg shadow p-12 text-center">
                 <Home className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">No projects yet</h2>
@@ -200,7 +304,38 @@ const DashboardPage: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-8">
-                {/* Bid Cards Section */}
+                {/* Potential Bid Cards Section - Show FIRST */}
+                {potentialBidCards.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-2xl font-semibold text-gray-900">
+                          Projects Ready for Bids
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Complete your project details to start finding contractors
+                        </p>
+                      </div>
+                      <span className="text-sm text-gray-500">{potentialBidCards.length} draft{potentialBidCards.length > 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="grid gap-6 lg:grid-cols-2">
+                      {potentialBidCards.map((bidCard) => (
+                        <PotentialBidCard
+                          key={bidCard.id}
+                          bidCard={bidCard}
+                          onReview={handleReviewPotentialBidCard}
+                          onDelete={handleDeletePotentialBidCard}
+                          onBidCardUpdate={() => {
+                            loadBidCards();
+                            loadPotentialBidCards();
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Active Bid Cards Section */}
                 {bidCards.length > 0 && (
                   <div>
                     <div className="flex items-center justify-between mb-6">
@@ -294,8 +429,20 @@ const DashboardPage: React.FC = () => {
               </div>
             )}
           </>
-        ) : (
+        ) : activeTab === "popular" ? (
+          <PopularServicesTab />
+        ) : activeTab === "inspiration" ? (
           <InspirationDashboard />
+        ) : activeTab === "property" ? (
+          (() => {
+            console.log("[DashboardPage] Rendering PropertyDashboard for activeTab:", activeTab);
+            return <PropertyDashboard />;
+          })()
+        ) : (
+          (() => {
+            console.log("[DashboardPage] Default fallback case - activeTab:", activeTab);
+            return <PropertyDashboard />;
+          })()
         )}
       </main>
     </div>

@@ -24,7 +24,7 @@ def test_iris_conversation_flow():
     
     initial_request = {
         "message": "I want to see what my kitchen would look like with the industrial inspiration",
-        "homeowner_id": DEMO_HOMEOWNER_ID,
+        "user_id": DEMO_HOMEOWNER_ID,
         "board_id": DEMO_BOARD_ID,
         "conversation_context": []
     }
@@ -50,7 +50,7 @@ def test_iris_conversation_flow():
                 
                 confirmation_request = {
                     "message": "Yes, generate my dream kitchen with the exposed brick and pendant lights",
-                    "homeowner_id": DEMO_HOMEOWNER_ID,
+                    "user_id": DEMO_HOMEOWNER_ID,
                     "board_id": DEMO_BOARD_ID,
                     "conversation_context": [
                         {"role": "user", "content": initial_request["message"]},

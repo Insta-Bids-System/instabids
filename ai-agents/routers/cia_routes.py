@@ -141,10 +141,10 @@ async def cia_chat(chat_data: ChatMessage):
                     # For authenticated users, check homeowner relationship
                     homeowner_result = db.client.table("homeowners").select("id").eq("user_id", user_id).execute()
                     if homeowner_result.data:
-                        homeowner_id = homeowner_result.data[0]["id"]
-                        if bid_card_context.get("homeowner_id") != homeowner_id:
+                        user_id = homeowner_result.data[0]["id"]
+                        if bid_card_context.get("user_id") != user_id:
                             raise HTTPException(status_code=403, detail="Bid card access denied")
-                        print(f"[CIA] Verified bid card access for homeowner {homeowner_id}")
+                        print(f"[CIA] Verified bid card access for homeowner {user_id}")
             except HTTPException:
                 raise
             except Exception as e:

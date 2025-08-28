@@ -5,6 +5,7 @@ langchain-anthropic>=0.1.1
 langchain-openai>=0.0.5
 langchain-groq>=0.0.1
 langsmith>=0.0.77
+deepagents>=0.0.3  # BSA - Bid Submission Agent framework
 
 # AI/ML
 openai>=1.6.1

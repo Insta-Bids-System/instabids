@@ -65,7 +65,7 @@ const ImageCategorizer: React.FC<ImageCategorizerProps> = ({
     <div className="flex gap-1 p-1 bg-white/90 rounded-lg">
       <button
         type="button"
-        onClick={match.match(/onClick={[^}]+}/)[0]}
+        onClick={() => _updateCategory("current")}
         disabled={updating}
         className={`p-1.5 rounded transition-all ${
           category === "current" ? "bg-blue-500 text-white" : "hover:bg-gray-100 text-gray-600"
@@ -77,7 +77,7 @@ const ImageCategorizer: React.FC<ImageCategorizerProps> = ({
 
       <button
         type="button"
-        onClick={match.match(/onClick={[^}]+}/)[0]}
+        onClick={() => _updateCategory("inspiration")}
         disabled={updating}
         className={`p-1.5 rounded transition-all ${
           category === "inspiration"
@@ -91,7 +91,7 @@ const ImageCategorizer: React.FC<ImageCategorizerProps> = ({
 
       <button
         type="button"
-        onClick={match.match(/onClick={[^}]+}/)[0]}
+        onClick={() => _updateCategory("vision")}
         disabled={updating}
         className={`p-1.5 rounded transition-all ${
           category === "vision" ? "bg-green-500 text-white" : "hover:bg-gray-100 text-gray-600"

@@ -209,13 +209,13 @@ class MultiProjectMemoryStore:
             # Get current project details from main projects table
             current_project = None
             try:
-                # Get homeowner_id for user
+                # Get user_id for user
                 homeowner_result = self.db.client.table("homeowners").select("id").eq("user_id", user_id).execute()
                 if homeowner_result.data:
-                    homeowner_id = homeowner_result.data[0]["id"]
+                    user_id = homeowner_result.data[0]["id"]
                     project_result = self.db.client.table("projects").select("*").eq(
                         "id", current_project_id
-                    ).eq("homeowner_id", homeowner_id).execute()
+                    ).eq("user_id", user_id).execute()
                     if project_result.data:
                         current_project = project_result.data[0]
             except Exception as e:
@@ -248,9 +248,9 @@ class MultiProjectMemoryStore:
             if not homeowner_result.data:
                 return {"related_projects": [], "analysis": "No previous projects found"}
 
-            homeowner_id = homeowner_result.data[0]["id"]
+            user_id = homeowner_result.data[0]["id"]
             projects_result = self.db.client.table("projects").select("*").eq(
-                "homeowner_id", homeowner_id
+                "user_id", user_id
             ).execute()
 
             if not projects_result.data:

@@ -36,7 +36,7 @@ const ContractorLandingPage: React.FC = () => {
       if (contractorName) {
         try {
           console.log(`Loading contractor data for: ${contractorName}`);
-          const response = await fetch(`http://localhost:8008/api/contractors/profile-data-by-name/${encodeURIComponent(contractorName)}`);
+          const response = await fetch(`/api/contractors/profile-data-by-name/${encodeURIComponent(contractorName)}`);
           
           if (response.ok) {
             const result = await response.json();
@@ -84,57 +84,7 @@ const ContractorLandingPage: React.FC = () => {
     },
   ];
 
-  const handleSendMessage = async (message: string, _images: string[]) => {
-    try {
-      // Call the real contractor chat endpoint
-      const response = await fetch("http://localhost:8008/api/contractor-chat/message", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          session_id: sessionId,
-          message: message,
-          current_stage: "onboarding",
-          profile_data: contractorData || {},
-          // Include bid card context for pre-loaded contractors
-          bid_card_context: {
-            contractor_name: contractorName,
-            message_id: messageId,
-            campaign_id: campaignId,
-            source: source,
-            pre_loaded_data: preLoadedData
-          }
-        }),
-      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
-      // Update contractor data from profile progress
-      if (result.profile_progress) {
-        setContractorData(result.profile_progress);
-      }
-
-      // Check if onboarding is complete
-      if (result.stage === "completed" && result.contractor_id) {
-        setConversationComplete(true);
-        setTimeout(() => setShowSignupPrompt(true), 2000);
-      }
-
-      return {
-        response: result.response,
-        phase: result.stage,
-        extractedData: result.profile_progress,
-      };
-    } catch (error) {
-      console.error("[ContractorLandingPage] Error sending message:", error);
-      throw error;
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -152,17 +102,30 @@ const ContractorLandingPage: React.FC = () => {
             <nav className="flex gap-4">
               <button
                 type="button"
-                onClick={() => navigate("/contractor/marketplace")}
+                onClick={() => navigate("/")}
                 className="text-gray-700 hover:text-primary-600 transition-colors"
               >
                 Homeowner Portal
               </button>
               <button
                 type="button"
-                onClick={() => navigate("/contractor/marketplace")}
-                className="text-gray-700 hover:text-primary-600 transition-colors"
+                onClick={() => {
+                  // Set contractor role in localStorage for demo
+                  localStorage.setItem(
+                    "DEMO_USER",
+                    JSON.stringify({
+                      id: "87f93fbd-151d-4f17-9311-70ef9ba5256f",
+                      email: "info@greenscapelandscape.com",
+                      role: "contractor",
+                      full_name: "GreenScape Landscape Design",
+                    })
+                  );
+                  // Navigate directly to contractor dashboard for demo users
+                  navigate("/contractor/dashboard");
+                }}
+                className="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700 transition-colors font-semibold"
               >
-                Login
+                Login as Existing Contractor
               </button>
             </nav>
           </div>
@@ -180,12 +143,18 @@ const ContractorLandingPage: React.FC = () => {
             className="text-center mb-8"
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-              Grow Your Business Without Lead Fees
+              {contractorName ? `Welcome, ${contractorName}!` : "Grow Your Business Without Lead Fees"}
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Join 10,000+ contractors getting pre-qualified homeowner projects. No upfront costs,
-              no monthly fees. Pay only when you win the job.
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-4">
+              {contractorName 
+                ? "We have a project opportunity for you. Tell us about your business to get started."
+                : "Join 10,000+ contractors getting pre-qualified homeowner projects. No upfront costs, no monthly fees."}
             </p>
+            <div className="text-lg text-gray-700 font-medium">
+              {contractorName 
+                ? "Complete your profile below to submit your bid"
+                : "New contractor? Start chatting below. Existing contractor? Click login above."}
+            </div>
           </motion.div>
 
           {/* Trust Indicators */}
@@ -212,8 +181,12 @@ const ContractorLandingPage: React.FC = () => {
           >
             <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
               <ContractorOnboardingChat
-                onSendMessage={handleSendMessage}
-                initialMessage="Welcome to Instabids! I'm your contractor success assistant. Let's get your business set up to receive pre-qualified leads. What's your company name and what services do you offer?"
+                sessionId={sessionId}
+                onComplete={(contractorId) => {
+                  console.log('Contractor onboarding complete:', contractorId);
+                  setConversationComplete(true);
+                  setShowSignupPrompt(true);
+                }}
               />
             </div>
           </motion.div>

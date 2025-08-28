@@ -252,12 +252,12 @@ async def get_public_bid_card(
         print(f"Error fetching bid card: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/homeowner/{homeowner_id}")
-async def get_homeowner_bid_cards(homeowner_id: str):
+@router.get("/homeowner/{user_id}")
+async def get_homeowner_bid_cards(user_id: str):
     """Get all bid cards for a specific homeowner"""
     try:
         # First get all conversations for this user
-        conversations_result = supabase.table("agent_conversations").select("thread_id").eq("user_id", homeowner_id).execute()
+        conversations_result = supabase.table("agent_conversations").select("thread_id").eq("user_id", user_id).execute()
 
         if not conversations_result.data:
             return []

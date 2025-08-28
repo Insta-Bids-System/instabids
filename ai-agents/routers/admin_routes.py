@@ -22,6 +22,9 @@ from admin.auth_service import admin_auth_service
 from admin.monitoring_service import AdminMonitoringService
 from admin.websocket_manager import AdminWebSocketManager
 
+# Import Redis cache
+from utils.redis_cache import cache
+
 
 # Create router
 router = APIRouter()
@@ -44,14 +47,8 @@ async def admin_websocket_endpoint(websocket: WebSocket):
         await websocket.accept()
         print(f"[ADMIN WS] Connection accepted for {client_id}")
 
-        # Send test message immediately
-        try:
-            await websocket.send_json({"type": "test", "message": "WebSocket connected successfully"})
-            print("[ADMIN WS] Test message sent")
-        except Exception as e:
-            print(f"[ADMIN WS] Error sending test message: {e}")
-            await websocket.close()
-            return
+        # Don't send test message immediately - wait for auth first
+        print("[ADMIN WS] Connection established, waiting for authentication...")
 
         # Wait for authentication message
         print("[ADMIN WS] Waiting for auth message...")
@@ -186,25 +183,14 @@ async def admin_websocket_endpoint(websocket: WebSocket):
                 break
             except Exception as e:
                 print(f"[ADMIN WS] Error handling message: {e}")
-                await websocket.send_json({
-                    "type": "error",
-                    "message": f"Error processing message: {e!s}"
-                })
+                # Don't send error message on broken connection - just log
+                break
 
     except WebSocketDisconnect:
         print(f"[ADMIN WS] WebSocket disconnected for {client_id}")
     except Exception as e:
         print(f"[ADMIN WS] Connection error: {e}")
-        import traceback
-        traceback.print_exc()
-        # Try to send error to client
-        try:
-            await websocket.send_json({
-                "type": "error",
-                "message": f"Server error: {e!s}"
-            })
-        except:
-            pass
+        # Don't try to send on broken connection - just log and clean up
     finally:
         # Clean up connection
         if client_id:
@@ -390,12 +376,15 @@ async def get_admin_bid_cards(request: Request):
 
         # Get recent bid cards from Supabase database
         try:
-            # Query real bid cards from Supabase
+            # Define desc for ordering
+            desc = True
+            # Query real bid cards from Supabase  
             response = database.db.client.table("bid_cards").select(
                 "id, bid_card_number, project_type, status, contractor_count_needed, "
                 "budget_min, budget_max, location_city, location_state, urgency_level, "
-                "created_at, updated_at, bid_count, interested_contractors, bid_deadline"
-            ).order("created_at", desc=True).execute()
+                "created_at, updated_at, bid_count, interested_contractors, bid_deadline, "
+                "service_complexity, trade_count, primary_trade, secondary_trades"
+            ).order("created_at", desc=desc).execute()
 
             bid_cards = []
             for card in response.data:
@@ -556,12 +545,15 @@ async def get_admin_bid_cards_fixed(request: Request):
 
         # Get recent bid cards from Supabase database
         try:
+            # Define desc for ordering
+            desc = True
             # Query real bid cards from Supabase with FIXED logic
             response = database.db.client.table("bid_cards").select(
                 "id, bid_card_number, project_type, status, contractor_count_needed, "
                 "budget_min, budget_max, location_city, location_state, urgency_level, "
-                "created_at, updated_at, bid_count, interested_contractors, bid_deadline"
-            ).order("created_at", desc=True).execute()
+                "created_at, updated_at, bid_count, interested_contractors, bid_deadline, "
+                "service_complexity, trade_count, primary_trade, secondary_trades"
+            ).order("created_at", desc=desc).execute()
 
             bid_cards = []
             for card in response.data:
@@ -763,6 +755,12 @@ async def get_campaigns(
 ):
     """Get all campaigns with their current status"""
     try:
+        # Try to get from cache first
+        cache_params = {"status": status, "limit": limit, "offset": offset}
+        cached_result = cache.get("campaigns", cache_params)
+        if cached_result:
+            print(f"[CAMPAIGNS] Cache hit, returning cached data")
+            return cached_result
         from database_simple import get_client
         db = get_client()
 
@@ -774,8 +772,10 @@ async def get_campaigns(
         if status:
             query = query.eq("status", status)
 
+        # Define desc for ordering
+        desc = True
         # Get campaigns with bid card info
-        result = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+        result = query.order("created_at", desc=desc).range(offset, offset + limit - 1).execute()
 
         campaigns = []
         for campaign in result.data:
@@ -819,11 +819,18 @@ async def get_campaigns(
         # Count active campaigns
         active_count = len([c for c in campaigns if c["campaign_status"] == "active"])
 
-        return {
+        result = {
             "campaigns": campaigns,
             "total": len(campaigns),
             "active_count": active_count
         }
+        
+        # Cache the result for 60 seconds
+        cache_params = {"status": status, "limit": limit, "offset": offset}
+        cache.set("campaigns", result, cache_params, ttl_seconds=60)
+        print(f"[CAMPAIGNS] Cached result for 60 seconds")
+        
+        return result
 
     except Exception as e:
         print(f"Error fetching campaigns: {e}")
@@ -834,6 +841,12 @@ async def get_campaigns(
 async def get_campaign_details(campaign_id: str):
     """Get detailed information about a specific campaign including all contractors"""
     try:
+        # Try to get from cache first
+        cache_params = {"campaign_id": campaign_id}
+        cached_result = cache.get("campaign_details", cache_params)
+        if cached_result:
+            print(f"[CAMPAIGN DETAILS] Cache hit for campaign {campaign_id}")
+            return cached_result
         from database_simple import get_client
         db = get_client()
 
@@ -926,6 +939,11 @@ async def get_campaign_details(campaign_id: str):
                 "status": check_in.get("status", "pending")
             })
 
+        # Cache the result for 60 seconds
+        cache_params = {"campaign_id": campaign_id}
+        cache.set("campaign_details", response, cache_params, ttl_seconds=60)
+        print(f"[CAMPAIGN DETAILS] Cached result for campaign {campaign_id}")
+        
         return response
 
     except HTTPException:

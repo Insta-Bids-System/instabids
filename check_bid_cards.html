@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Bid Cards</title>
+</head>
+<body>
+    <h1>Testing COIA Bid Card Response</h1>
+    <button onclick="testCOIA()">Test COIA API</button>
+    <pre id="result"></pre>
+    
+    <script>
+    async function testCOIA() {
+        const result = document.getElementById('result');
+        result.textContent = 'Calling COIA API...';
+        
+        try {
+            const response = await fetch('http://localhost:8008/api/coia/landing', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: "I am a General Contractor. Please show me available projects.",
+                    session_id: "html-test-" + Date.now()
+                })
+            });
+            
+            const data = await response.json();
+            
+            console.log('Full response:', data);
+            console.log('bidCards field:', data.bidCards);
+            console.log('Number of bid cards:', data.bidCards?.length);
+            
+            result.textContent = JSON.stringify(data, null, 2);
+            
+            if (data.bidCards && data.bidCards.length > 0) {
+                alert(`SUCCESS! Found ${data.bidCards.length} bid cards!`);
+            } else {
+                alert('No bid cards in response');
+            }
+            
+        } catch (error) {
+            result.textContent = 'Error: ' + error.message;
+            console.error('Error:', error);
+        }
+    }
+    </script>
+</body>
+</html>

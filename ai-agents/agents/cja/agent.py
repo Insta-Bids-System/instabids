@@ -41,8 +41,16 @@ class ContractorJobAgent:
             raise ValueError("OpenAI API key not found. Please set OPENAI_API_KEY environment variable.")
 
         self.client = OpenAI(api_key=openai_key)
-        self.api_base_url = "http://localhost:8008"
-        logger.info("Contractor Job Agent initialized")
+        
+        # Use environment variable or config module for base URL
+        try:
+            from config.service_urls import get_backend_url
+            self.api_base_url = get_backend_url()
+        except ImportError:
+            import os
+            self.api_base_url = os.getenv("BACKEND_URL", get_backend_url())
+        
+        logger.info(f"Contractor Job Agent initialized with backend at {self.api_base_url}")
 
         # Conversation memory
         self.conversations = {}

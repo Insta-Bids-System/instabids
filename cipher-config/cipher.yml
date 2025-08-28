@@ -13,9 +13,14 @@ mcpServers:
 # LLM Configuration
 llm:
   provider: openai
-  model: gpt-4
+  model: gpt-4o
   apiKey: $OPENAI_API_KEY
-  maxIterations: 50
+  maxIterations: 1000
+  maxTokens: 128000
+  temperature: 0.1
+  contextWindow: 128000
+  enableMemoryCompression: true
+  memoryCompressionRatio: 0.3
 
 # Embedding configuration for vector storage
 embedding:
@@ -38,6 +43,8 @@ storage:
   
 # Session configuration
 session:
-  persistent: true
-  defaultSession: instabids
-  autoRestore: true
+  persistent: false
+  defaultSession: instabids_fresh
+  autoRestore: false
+  maxHistory: 50
+  clearOnRestart: true

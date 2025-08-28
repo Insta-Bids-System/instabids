@@ -481,7 +481,7 @@ Keep responses conversational and natural. Use casual language while maintaining
               />
               <button
                 type="button"
-                onClick={match.match(/onClick={[^}]+}/)[0]}
+                onClick={_toggleVoice}
                 className={`p-2 rounded-lg transition-colors ${
                   voiceEnabled ? "text-blue-600 bg-blue-50" : "text-gray-400"
                 }`}
@@ -568,7 +568,7 @@ Keep responses conversational and natural. Use casual language while maintaining
                 <span className="truncate max-w-[100px]">{file.name}</span>
                 <button
                   type="button"
-                  onClick={match.match(/onClick={[^}]+}/)[0]}
+                  onClick={() => _removeFromQueue(index)}
                   className="text-red-500 hover:text-red-700"
                 >
                   ×

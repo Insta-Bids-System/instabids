@@ -3,7 +3,15 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Debug environment variables
+console.log("[Supabase Debug] URL:", supabaseUrl);
+console.log("[Supabase Debug] Key:", supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'undefined');
+console.log("[Supabase Debug] All env vars:", import.meta.env);
+
 if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("[Supabase Debug] Missing environment variables!");
+  console.error("[Supabase Debug] URL exists:", !!supabaseUrl);
+  console.error("[Supabase Debug] Key exists:", !!supabaseAnonKey);
   throw new Error("Missing Supabase environment variables");
 }
 
@@ -27,7 +35,7 @@ export type Profile = {
 
 export type Project = {
   id: string;
-  homeowner_id: string;
+  user_id: string;
   title: string;
   description: string;
   category: string;

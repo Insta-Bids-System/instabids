@@ -57,7 +57,7 @@ export default function CIAChat({ onSendMessage, onAccountCreated, sessionId }: 
       if (!sessionId) return;
 
       try {
-        const response = await fetch(`http://localhost:8008/cia/conversation/${sessionId}`);
+        const response = await fetch(`/cia/conversation/${sessionId}`);
         const data = await response.json();
 
         if (data.success && data.messages && data.messages.length > 0) {
@@ -268,13 +268,14 @@ export default function CIAChat({ onSendMessage, onAccountCreated, sessionId }: 
           console.log("🔧 Detected contractor message in CIAChat, using COIA landing page API");
           // Call COIA landing page API directly
           try {
-            const apiResponse = await fetch("http://localhost:8008/api/coia/landing", {
+            const apiResponse = await fetch("/api/coia/landing", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
                 message: inputMessage,
+                user_id: sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 session_id: sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 contractor_lead_id: sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 context: { interface: "landing_page" }

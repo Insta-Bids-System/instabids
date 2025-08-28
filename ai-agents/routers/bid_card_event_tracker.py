@@ -133,19 +133,19 @@ async def get_bid_card_timeline(bid_card_id: str):
 
 # Event Tracking Helper Functions
 
-async def track_bid_card_creation(bid_card_id: str, homeowner_id: str, project_type: str, urgency: str):
+async def track_bid_card_creation(bid_card_id: str, user_id: str, project_type: str, urgency: str):
     """Track bid card creation event"""
     await EventTracker.track_event(
         bid_card_id=bid_card_id,
         event_type="bid_card_created",
         description="Bid card created",
         details={
-            "homeowner_id": homeowner_id,
+            "user_id": user_id,
             "project_type": project_type,
             "urgency_level": urgency,
             "status": "generated"
         },
-        created_by=homeowner_id,
+        created_by=user_id,
         created_by_type="homeowner"
     )
 
@@ -258,14 +258,14 @@ async def track_project_completion(bid_card_id: str, contractor_id: str, final_a
     )
 
 
-async def track_homeowner_action(bid_card_id: str, action: str, details: Dict[str, Any], homeowner_id: str):
+async def track_homeowner_action(bid_card_id: str, action: str, details: Dict[str, Any], user_id: str):
     """Track any homeowner action"""
     await EventTracker.track_event(
         bid_card_id=bid_card_id,
         event_type=f"homeowner_{action}",
         description=f"Homeowner performed: {action}",
         details=details,
-        created_by=homeowner_id,
+        created_by=user_id,
         created_by_type="homeowner"
     )
 

@@ -55,7 +55,7 @@ def test_cia_and_iris_separately():
     iris_url = "http://localhost:8008/api/iris/chat"
     iris_payload = {
         "message": "Generate a modern kitchen design with white cabinets and granite countertops",
-        "homeowner_id": user_id,
+        "user_id": user_id,
         "board_id": None,
         "conversation_context": []
     }

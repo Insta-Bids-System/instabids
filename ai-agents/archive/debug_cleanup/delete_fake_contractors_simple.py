@@ -6,6 +6,7 @@ Removes contractors: Premium Kitchen, Budget Home Solutions, Modern Design Build
 
 
 import requests
+from config.service_urls import get_backend_url
 
 
 # Fake contractor IDs to delete
@@ -15,7 +16,7 @@ FAKE_CONTRACTORS = [
     {"id": "77244f42-7265-4261-9a8a-ccb16ceaeb23", "name": "Modern Design Builders"}
 ]
 
-API_BASE = "http://localhost:8008/api"
+API_BASE = f"{get_backend_url()}/api"
 
 def delete_fake_contractors():
     """Delete fake contractors via API calls"""

@@ -24,7 +24,7 @@ export interface Message {
 export interface Conversation {
   id: string;
   bid_card_id: string;
-  homeowner_id: string;
+  user_id: string;
   contractor_id: string;
   contractor_alias: string;
   status: string;
@@ -223,7 +223,7 @@ export async function getUnreadCount(
 export async function startBidCardConversation(
   bid_card_id: string,
   contractor_id: string,
-  _homeowner_id: string,
+  _user_id: string,
   initialMessage?: string
 ): Promise<{
   success: boolean;

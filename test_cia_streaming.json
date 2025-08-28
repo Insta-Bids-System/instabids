@@ -1,0 +1,11 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "I need help with my backyard landscaping project in Austin 78702. Looking to install new sod and irrigation system. My email is test@example.com"
+    }
+  ],
+  "conversation_id": "test_landscaping_789",
+  "user_id": "test_user_123",
+  "max_tokens": 100
+}

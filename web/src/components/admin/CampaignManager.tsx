@@ -58,13 +58,14 @@ const CampaignManager: React.FC = () => {
 
   useEffect(() => {
     fetchCampaigns();
-    const interval = setInterval(fetchCampaigns, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
+    // Polling disabled for performance - use manual refresh instead
+    // const interval = setInterval(fetchCampaigns, 30000);
+    // return () => clearInterval(interval);
   }, []);
 
   const fetchCampaigns = async () => {
     try {
-      const response = await fetch("http://localhost:8008/api/admin/campaigns");
+      const response = await fetch("/api/admin/campaigns");
       if (response.ok) {
         const data = await response.json();
         setCampaigns(data.campaigns || []);
@@ -79,7 +80,7 @@ const CampaignManager: React.FC = () => {
   const fetchCampaignDetails = async (campaignId: string) => {
     try {
       const response = await fetch(
-        `http://localhost:8008/api/admin/campaigns/${campaignId}/details`
+        `/api/admin/campaigns/${campaignId}/details`
       );
       if (response.ok) {
         const data = await response.json();
@@ -126,7 +127,7 @@ const CampaignManager: React.FC = () => {
   const triggerEscalation = async (campaignId: string) => {
     try {
       const response = await fetch(
-        `http://localhost:8008/api/admin/campaigns/${campaignId}/escalate`,
+        `/api/admin/campaigns/${campaignId}/escalate`,
         {
           method: "POST",
         }

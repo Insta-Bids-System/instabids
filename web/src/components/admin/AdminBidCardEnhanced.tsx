@@ -22,6 +22,12 @@ interface BidCardData {
   location_city?: string;
   location_state?: string;
   location_zip?: string;
+  
+  // Service complexity classification
+  service_complexity?: "single-trade" | "multi-trade" | "complex-coordination";
+  trade_count?: number;
+  primary_trade?: string;
+  secondary_trades?: string[];
 
   // Contractor targets
   contractor_count_needed?: number;
@@ -102,6 +108,22 @@ export function AdminBidCardEnhanced({ bidCard, onStatusChange }: Props) {
               {bidCard.urgency_level && (
                 <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
                   {bidCard.urgency_level} urgency
+                </span>
+              )}
+              {bidCard.service_complexity && (
+                <span className={`px-2 py-1 rounded-full text-xs ${
+                  bidCard.service_complexity === "single-trade" ? "bg-blue-100 text-blue-800" :
+                  bidCard.service_complexity === "multi-trade" ? "bg-orange-100 text-orange-800" :
+                  "bg-red-100 text-red-800"
+                }`}>
+                  {bidCard.service_complexity === "single-trade" && "Single Trade"}
+                  {bidCard.service_complexity === "multi-trade" && "Multi Trade"} 
+                  {bidCard.service_complexity === "complex-coordination" && "Complex"}
+                </span>
+              )}
+              {bidCard.primary_trade && (
+                <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">
+                  {bidCard.primary_trade}
                 </span>
               )}
             </div>
@@ -203,6 +225,23 @@ export function AdminBidCardEnhanced({ bidCard, onStatusChange }: Props) {
                   <span className="text-gray-500">Complexity:</span>
                   <span className="font-medium">{bidCard.complexity_score || 0}/10</span>
                 </div>
+                {bidCard.service_complexity && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Service Type:</span>
+                    <span className="font-medium">
+                      {bidCard.service_complexity === "single-trade" && "Single Trade"}
+                      {bidCard.service_complexity === "multi-trade" && "Multi Trade"}
+                      {bidCard.service_complexity === "complex-coordination" && "Complex"}
+                      {bidCard.trade_count && ` (${bidCard.trade_count} trades)`}
+                    </span>
+                  </div>
+                )}
+                {bidCard.secondary_trades && bidCard.secondary_trades.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Secondary Trades:</span>
+                    <span className="font-medium">+{bidCard.secondary_trades.length} more</span>
+                  </div>
+                )}
                 {deadline && (
                   <div className="flex justify-between">
                     <span className="text-gray-500">Deadline:</span>

@@ -1,0 +1,4 @@
+Simple test file for contact detection.
+This file should not be flagged.
+No phone numbers or email addresses here.
+Just a clean project proposal.

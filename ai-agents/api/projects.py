@@ -22,7 +22,7 @@ router = APIRouter()
 
 # Pydantic models for request/response
 class CreateProjectRequest(BaseModel):
-    homeowner_id: str
+    user_id: str
     title: str
     category: str
     description: str
@@ -41,7 +41,7 @@ class UpdateProjectRequest(BaseModel):
 
 class ProjectResponse(BaseModel):
     id: str
-    homeowner_id: str
+    user_id: str
     title: str
     description: str
     category: str
@@ -63,14 +63,14 @@ async def create_project(request: CreateProjectRequest):
     """Create a new project for a homeowner"""
     try:
         # Verify homeowner exists
-        homeowner_check = db.client.table("homeowners").select("id").eq("id", request.homeowner_id).execute()
+        homeowner_check = db.client.table("homeowners").select("id").eq("id", request.user_id).execute()
 
         if not homeowner_check.data:
             raise HTTPException(status_code=404, detail="Homeowner not found")
 
         # Create project with required fields
         project_data = {
-            "homeowner_id": request.homeowner_id,
+            "user_id": request.user_id,
             "title": request.title,
             "category": request.category,
             "description": request.description,
@@ -90,7 +90,7 @@ async def create_project(request: CreateProjectRequest):
         # Convert to response model
         return ProjectResponse(
             id=project["id"],
-            homeowner_id=project["homeowner_id"],
+            user_id=project["user_id"],
             title=project["title"],
             description=project["description"],
             category=project["category"],
@@ -112,13 +112,13 @@ async def create_project(request: CreateProjectRequest):
         logger.error(f"Error creating project: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/homeowners/{homeowner_id}/projects", response_model=list[ProjectResponse])
-async def get_homeowner_projects(homeowner_id: str):
+@router.get("/homeowners/{user_id}/projects", response_model=list[ProjectResponse])
+async def get_homeowner_projects(user_id: str):
     """Get all projects for a specific homeowner"""
     try:
         # Get projects for homeowner
         projects_result = db.client.table("projects").select("*").eq(
-            "homeowner_id", homeowner_id
+            "user_id", user_id
         ).order("updated_at", desc=True).execute()
 
         if not projects_result.data:
@@ -146,7 +146,7 @@ async def get_homeowner_projects(homeowner_id: str):
 
             projects_with_stats.append(ProjectResponse(
                 id=project["id"],
-                homeowner_id=project["homeowner_id"],
+                user_id=project["user_id"],
                 title=project["title"],
                 description=project["description"],
                 category=project["category"],
@@ -183,7 +183,7 @@ async def get_project(project_id: str):
 
         return ProjectResponse(
             id=project["id"],
-            homeowner_id=project["homeowner_id"],
+            user_id=project["user_id"],
             title=project["title"],
             description=project["description"],
             category=project["category"],
@@ -235,7 +235,7 @@ async def update_project(project_id: str, request: UpdateProjectRequest):
 
         return ProjectResponse(
             id=project["id"],
-            homeowner_id=project["homeowner_id"],
+            user_id=project["user_id"],
             title=project["title"],
             description=project["description"],
             category=project["category"],

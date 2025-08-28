@@ -1,0 +1,13 @@
+{
+  "session_id": "contractor_session_full_test_456",
+  "message": "Yes, that's correct - Superior Landscaping & Turfgrass in Austin, Texas. We also do irrigation systems, landscape design, and lawn maintenance. Our phone is 512-555-0199 and email is jake@superiorlandscaping.com. We've completed over 200 artificial turf installations.",
+  "context": {
+    "current_stage": "profile_building",
+    "profile_data": {
+      "company_name": "Superior Landscaping & Turfgrass",
+      "years_in_business": 8,
+      "specializations": ["artificial turf installation"]
+    },
+    "interface": "landing"
+  }
+}

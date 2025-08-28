@@ -10,17 +10,17 @@ def test_iris_with_image_generation():
     print("="*50)
     
     iris_url = "http://localhost:8008/api/iris/chat"
-    homeowner_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
     
     # Message that should trigger image generation
     payload = {
         "message": "Can you generate a modern bathroom design with a floating vanity, good lighting, and white/gray colors?",
-        "homeowner_id": homeowner_id,
+        "user_id": user_id,
         "board_id": None,
         "conversation_context": []
     }
     
-    print(f"Homeowner ID: {homeowner_id}")
+    print(f"Homeowner ID: {user_id}")
     print(f"Message: {payload['message']}")
     print("\nSending image generation request to Iris...")
     

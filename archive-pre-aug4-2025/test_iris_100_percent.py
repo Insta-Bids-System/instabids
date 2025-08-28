@@ -20,7 +20,7 @@ print("-" * 40)
 
 payload = {
     "message": "Generate a vision of a modern kitchen with white cabinets",
-    "homeowner_id": user_id,
+    "user_id": user_id,
     "board_id": board_id
 }
 
@@ -57,7 +57,7 @@ print("-" * 40)
 
 payload2 = {
     "message": "What did I just ask you to generate?",
-    "homeowner_id": user_id,
+    "user_id": user_id,
     "board_id": board_id,
     "conversation_context": [{
         "role": "user",

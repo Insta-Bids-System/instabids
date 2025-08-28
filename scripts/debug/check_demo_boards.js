@@ -12,7 +12,7 @@ async function checkBoards() {
   const { data, error } = await supabase
     .from('inspiration_boards')
     .select('*')
-    .eq('homeowner_id', '550e8400-e29b-41d4-a716-446655440001')
+    .eq('user_id', '550e8400-e29b-41d4-a716-446655440001')
     .order('created_at', { ascending: false });
   
   if (error) {

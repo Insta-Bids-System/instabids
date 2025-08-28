@@ -27,7 +27,7 @@ print("-" * 50)
 # Use the exact same structure that worked in our earlier test
 vision_image_record = {
     "board_id": "26cf972b-83e4-484c-98b6-a5d1a4affee3",
-    "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",
     "image_url": "https://example.com/debug_test.jpg",
     "thumbnail_url": "https://example.com/debug_test.jpg",
     "source": "url",  # Known to work
@@ -67,7 +67,7 @@ print("-" * 50)
 # Test with an actual OpenAI URL format
 openai_url_record = {
     "board_id": "26cf972b-83e4-484c-98b6-a5d1a4affee3",
-    "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",
     "image_url": "https://oaidalleapiprodscus.blob.core.windows.net/private/test.png",
     "thumbnail_url": "https://oaidalleapiprodscus.blob.core.windows.net/private/test.png",
     "source": "url",

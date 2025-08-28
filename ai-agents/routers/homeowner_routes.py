@@ -40,7 +40,7 @@ async def create_inspiration_board(board_data: dict):
                 "title": board_data.get("title", "Demo Board"),
                 "description": board_data.get("description"),
                 "room_type": board_data.get("room_type"),
-                "homeowner_id": board_data.get("homeowner_id"),
+                "user_id": board_data.get("user_id"),
                 "status": "collecting",
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat(),
@@ -51,20 +51,20 @@ async def create_inspiration_board(board_data: dict):
 
         supabase = create_client(supabase_url, service_key)
 
-        # Handle homeowner_id - use valid UUID or default test user
-        homeowner_id = board_data.get("homeowner_id")
-        if not homeowner_id or homeowner_id.startswith("test-user-"):
+        # Handle user_id - use valid UUID or default test user
+        user_id = board_data.get("user_id")
+        if not user_id or user_id.startswith("test-user-"):
             # For demo/test users, use the default test user
-            homeowner_id = "4442e0a3-2fea-4f88-82d5-c8e77a531844"  # test@instabids.com
-            print(f"[DEBUG] Using default test user UUID: {homeowner_id}")
+            user_id = "4442e0a3-2fea-4f88-82d5-c8e77a531844"  # test@instabids.com
+            print(f"[DEBUG] Using default test user UUID: {user_id}")
 
         # Insert board using service role (bypasses RLS)
-        print(f"[DEBUG] Inserting board with homeowner_id: {homeowner_id}")
+        print(f"[DEBUG] Inserting board with user_id: {user_id}")
         response = supabase.table("inspiration_boards").insert({
             "title": board_data.get("title"),
             "description": board_data.get("description"),
             "room_type": board_data.get("room_type"),
-            "homeowner_id": homeowner_id,
+            "user_id": user_id,
             "status": board_data.get("status", "collecting")
         }).execute()
 
@@ -83,7 +83,7 @@ async def create_inspiration_board(board_data: dict):
             "title": board_data.get("title", "Demo Board"),
             "description": board_data.get("description"),
             "room_type": board_data.get("room_type"),
-            "homeowner_id": board_data.get("homeowner_id"),
+            "user_id": board_data.get("user_id"),
             "status": "collecting",
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
@@ -125,8 +125,8 @@ async def transfer_conversation(data: dict):
         print(f"[TRANSFER ERROR] {e}")
         raise HTTPException(500, f"Failed to transfer conversation: {e!s}")
 
-@router.get("/bid-cards/homeowner/{homeowner_id}")
-async def get_homeowner_bid_cards_direct(homeowner_id: str):
+@router.get("/bid-cards/homeowner/{user_id}")
+async def get_homeowner_bid_cards_direct(user_id: str):
     """Get all bid cards for a specific homeowner - Direct implementation"""
     try:
         from asyncio import timeout as async_timeout
@@ -134,7 +134,7 @@ async def get_homeowner_bid_cards_direct(homeowner_id: str):
         # Add timeout to prevent hanging
         async with async_timeout(10):  # 10 second timeout
             # Get conversations for this user
-            conversations_result = db.client.table("agent_conversations").select("thread_id").eq("user_id", homeowner_id).execute()
+            conversations_result = db.client.table("agent_conversations").select("thread_id").eq("user_id", user_id).execute()
 
             if not conversations_result.data:
                 return []
@@ -161,7 +161,7 @@ async def get_homeowner_bid_cards_direct(homeowner_id: str):
         return bid_cards
 
     except TimeoutError:
-        print(f"[API ERROR] Timeout getting bid cards for {homeowner_id}")
+        print(f"[API ERROR] Timeout getting bid cards for {user_id}")
         raise HTTPException(status_code=504, detail="Database query timeout")
     except Exception as e:
         print(f"[API ERROR] Failed to get homeowner bid cards: {e}")

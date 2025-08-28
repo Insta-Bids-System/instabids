@@ -43,7 +43,7 @@ export class OpenAIRealtimeClient extends EventEmitter {
     return new Promise((resolve, reject) => {
       try {
         // Connect to our backend proxy which handles authentication
-        const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8008";
+        const backendUrl = import.meta.env.VITE_API_URL || "";
         // Convert http to ws protocol
         const wsUrl = backendUrl.replace(/^http/, "ws");
         const url = `${wsUrl}/ws/realtime`;

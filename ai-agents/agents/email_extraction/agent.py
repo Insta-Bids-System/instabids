@@ -3,6 +3,7 @@ Email Extraction Agent (EEA)
 Automated email extraction from contractor websites using Playwright
 Fills missing email addresses in potential_contractors table
 """
+import asyncio
 import contextlib
 import json
 import os
@@ -135,8 +136,8 @@ class EmailExtractionAgent:
                 results["contractors"].append(contractor_result)
                 results["total_processed"] += 1
 
-                # Small delay between requests
-                time.sleep(2)
+                # Small delay between requests - TODO: Convert to async when method becomes async
+                time.sleep(2)  # NOTE: Leave as sync until full agent conversion
 
             # Stop browser
             self.stop_browser()
@@ -261,7 +262,7 @@ class EmailExtractionAgent:
                     if emails:  # If we found emails, no need to try other variations
                         break
 
-                    time.sleep(1)  # Small delay between attempts
+                    time.sleep(1)  # TODO: Convert to async when method becomes async
 
             except Exception:
                 continue  # Try next contact page

@@ -53,7 +53,7 @@ def test_iris_complete_flow():
         
         iris_request = {
             "message": message,
-            "homeowner_id": USER_ID,
+            "user_id": USER_ID,
             "board_id": BOARD_ID,
             "conversation_context": []
         }

@@ -41,7 +41,7 @@ def test_iris_vision_generation():
         # API request payload
         payload = {
             "message": test_case["message"],
-            "homeowner_id": "550e8400-e29b-41d4-a716-446655440001", 
+            "user_id": "550e8400-e29b-41d4-a716-446655440001", 
             "board_id": "26cf972b-83e4-484c-98b6-a5d1a4affee3",
             "conversation_context": conversation_context
         }

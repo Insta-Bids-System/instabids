@@ -34,6 +34,7 @@ const ChatBidCardAttachment: React.FC<ChatBidCardAttachmentProps> = ({
   aiRecommendation,
   onCardClick,
 }) => {
+  
   const handleCardClick = (card: BidCard) => {
     if (onCardClick) {
       onCardClick(card);
@@ -45,6 +46,12 @@ const ChatBidCardAttachment: React.FC<ChatBidCardAttachmentProps> = ({
   };
 
   const formatBudget = (min: number, max: number) => {
+    if (!min && !max) {
+      return "Budget TBD";
+    }
+    if (!min) {
+      return max ? `Up to $${max.toLocaleString()}` : "Budget TBD";
+    }
     if (max && max > min) {
       return `$${min.toLocaleString()} - $${max.toLocaleString()}`;
     }

@@ -37,6 +37,11 @@ class CampaignSummary(BaseModel):
     target_completion_date: Optional[str] = None
     progress_percentage: float
     response_rate: float
+    # Urgency and timeline fields
+    urgency_level: Optional[str] = None
+    user_timeline_days: Optional[int] = None
+    internal_timeline_hours: Optional[int] = None
+    deadline_adjusted_timeline_hours: Optional[int] = None
 
 
 class CampaignDetail(BaseModel):
@@ -61,6 +66,12 @@ class CampaignDetail(BaseModel):
     updated_at: str
     target_completion_date: Optional[str] = None
     
+    # Date flow fields for deadline-based timing
+    bid_collection_deadline: Optional[str] = None
+    project_completion_deadline: Optional[str] = None
+    deadline_adjusted_timeline_hours: Optional[int] = None
+    deadline_hard: Optional[bool] = None
+    
     # Performance metrics
     progress_percentage: float
     response_rate: float
@@ -74,6 +85,10 @@ class CampaignDetail(BaseModel):
     
     # Check-ins and progress
     check_ins: List[Dict[str, Any]]
+    
+    # Campaign decision audit trail
+    strategy_data: Optional[Dict[str, Any]] = None
+    decision_inputs: Optional[Dict[str, Any]] = None
 
 
 class CampaignStats(BaseModel):
@@ -188,6 +203,45 @@ async def get_all_campaigns(
             
             bid_card = campaign.get("bid_cards", {})
             
+            # Calculate internal timeline based on urgency level
+            urgency_level = bid_card.get("urgency_level", "standard")
+            internal_timeline_hours = None
+            user_timeline_days = None
+            
+            # Map urgency levels to internal timelines
+            urgency_timelines = {
+                "emergency": 24,  # 1 day internal target
+                "urgent": 48,     # 2 days internal target
+                "week": 48,       # User says week, we try for 2 days
+                "standard": 72,   # 3 days internal target
+                "flexible": 120,  # 5 days internal target
+                "group": 168      # 7 days internal target
+            }
+            
+            # Get internal timeline based on urgency
+            internal_timeline_hours = urgency_timelines.get(urgency_level, 72)
+            
+            # Calculate user's timeline expectation
+            if urgency_level == "emergency":
+                user_timeline_days = 1
+            elif urgency_level == "urgent":
+                user_timeline_days = 3
+            elif urgency_level == "week":
+                user_timeline_days = 7
+            elif urgency_level == "standard":
+                user_timeline_days = 7
+            elif urgency_level == "flexible":
+                user_timeline_days = 14
+            elif urgency_level == "group":
+                user_timeline_days = 30
+            
+            # Check for deadline-adjusted timeline from strategy data
+            strategy_data = campaign.get("strategy_data", {})
+            if strategy_data and isinstance(strategy_data, dict):
+                deadline_adjusted = strategy_data.get("timeline_hours")
+                if deadline_adjusted:
+                    internal_timeline_hours = deadline_adjusted
+            
             campaign_summary = CampaignSummary(
                 id=campaign["id"],
                 name=campaign.get("name") or f"Campaign for {bid_card.get('bid_card_number', 'Unknown')}",
@@ -203,7 +257,11 @@ async def get_all_campaigns(
                 updated_at=campaign["updated_at"],
                 target_completion_date=campaign.get("target_completion_date"),
                 progress_percentage=round(progress_percentage, 1),
-                response_rate=round(response_rate, 1)
+                response_rate=round(response_rate, 1),
+                urgency_level=urgency_level,
+                user_timeline_days=user_timeline_days,
+                internal_timeline_hours=internal_timeline_hours,
+                deadline_adjusted_timeline_hours=internal_timeline_hours
             )
             
             campaigns.append(campaign_summary)
@@ -241,7 +299,15 @@ async def get_campaign_detail(campaign_id: str):
                 bid_cards!inner(
                     bid_card_number,
                     project_type,
-                    contractor_count_needed
+                    contractor_count_needed,
+                    bid_collection_deadline,
+                    project_completion_deadline,
+                    deadline_hard,
+                    deadline_context,
+                    urgency_level,
+                    budget_min,
+                    budget_max,
+                    description
                 )
             """)\
             .eq("id", campaign_id)\
@@ -414,13 +480,38 @@ async def get_campaign_detail(campaign_id: str):
         else:
             progress_percentage = 0
         
+        # Build decision inputs from bid card data
+        decision_inputs = {
+            "project_details": {
+                "project_type": bid_card.get("project_type"),
+                "urgency_level": bid_card.get("urgency_level"),
+                "budget_range": {
+                    "min": bid_card.get("budget_min"),
+                    "max": bid_card.get("budget_max")
+                },
+                "contractor_count_needed": bid_card.get("contractor_count_needed"),
+                "project_description": bid_card.get("description")
+            },
+            "timing_requirements": {
+                "bid_collection_deadline": bid_card.get("bid_collection_deadline"),
+                "project_completion_deadline": bid_card.get("project_completion_deadline"),
+                "deadline_hard": bid_card.get("deadline_hard", False),
+                "deadline_context": bid_card.get("deadline_context")
+            },
+            "campaign_settings": {
+                "max_contractors": max_contractors,
+                "target_criteria": campaign.get("target_criteria"),
+                "created_at": campaign["created_at"]
+            }
+        }
+
         return CampaignDetail(
             id=campaign["id"],
             name=campaign.get("name") or f"Campaign for {bid_card.get('bid_card_number', 'Unknown')}",
             bid_card_id=campaign["bid_card_id"],
             bid_card_number=bid_card.get("bid_card_number"),
             project_type=bid_card.get("project_type"),
-            project_description=None,  # Field not available in current schema
+            project_description=bid_card.get("description"),
             status=campaign.get("status", "unknown"),
             max_contractors=max_contractors,
             contractors_targeted=contractors_targeted,
@@ -429,12 +520,20 @@ async def get_campaign_detail(campaign_id: str):
             created_at=campaign["created_at"],
             updated_at=campaign["updated_at"],
             target_completion_date=campaign.get("target_completion_date"),
+            # Date flow fields from bid card
+            bid_collection_deadline=bid_card.get("bid_collection_deadline"),
+            project_completion_deadline=bid_card.get("project_completion_deadline"),
+            deadline_adjusted_timeline_hours=campaign.get("deadline_adjusted_timeline_hours"),
+            deadline_hard=bid_card.get("deadline_hard", False),
             progress_percentage=round(progress_percentage, 1),
             response_rate=round(response_rate, 1),
             avg_response_time_hours=None,  # Would calculate from response times
             assigned_contractors=assigned_contractors,
             outreach_history=outreach_history[:20],  # Last 20 attempts
-            check_ins=check_ins
+            check_ins=check_ins,
+            # Campaign decision audit trail
+            strategy_data=campaign.get("strategy_data"),
+            decision_inputs=decision_inputs
         )
 
     except HTTPException:

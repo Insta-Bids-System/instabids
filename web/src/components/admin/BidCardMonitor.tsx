@@ -1,6 +1,6 @@
 import type React from "react";
 import { useEffect, useState } from "react";
-import { useWebSocket } from "../../hooks/useWebSocket";
+import { useWebSocketContext } from "../../context/WebSocketContext";
 import BidCardLifecycleView from "./BidCardLifecycleView";
 
 interface BidCard {
@@ -19,8 +19,13 @@ interface BidCard {
   location: string;
   urgency_level?: string;
   last_activity: string;
+  // Service complexity classification
+  service_complexity?: "single-trade" | "multi-trade" | "complex-coordination";
+  trade_count?: number;
+  primary_trade?: string;
+  secondary_trades?: string[];
   // Homeowner information
-  homeowner_id?: string;
+  user_id?: string;
   homeowner_name?: string;
   homeowner_email?: string;
   homeowner_phone?: string;
@@ -40,7 +45,7 @@ const BidCardMonitor: React.FC = () => {
   const [timelineFilter, setTimelineFilter] = useState<string>("all");
   const [outreachFilter, setOutreachFilter] = useState<string>("all");
 
-  const { lastMessage, subscribe, unsubscribe } = useWebSocket();
+  const { lastMessage, subscribe } = useWebSocketContext();
 
   // Update current time every minute for live countdown
   useEffect(() => {
@@ -55,7 +60,7 @@ const BidCardMonitor: React.FC = () => {
   useEffect(() => {
     const loadBidCards = async () => {
       try {
-        const response = await fetch("http://localhost:8008/api/admin/bid-cards-enhanced", {
+        const response = await fetch("/api/admin/bid-cards-enhanced", {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("admin_session_id")}`,
           },
@@ -78,10 +83,14 @@ const BidCardMonitor: React.FC = () => {
     loadBidCards();
 
     // Subscribe to bid card updates
-    subscribe("bid_cards");
+    const unsubscribe = subscribe("bid_cards", () => {});
 
-    return () => unsubscribe("bid_cards");
-  }, [subscribe, unsubscribe]);
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [subscribe]);
 
   // Handle WebSocket updates
   useEffect(() => {
@@ -761,13 +770,13 @@ const BidCardMonitor: React.FC = () => {
                     </div>
 
                     {/* Homeowner Information */}
-                    {(card.homeowner_name || card.homeowner_id) && (
+                    {(card.homeowner_name || card.user_id) && (
                       <div className="mt-2 flex items-center space-x-4 text-sm text-gray-600">
                         {card.homeowner_name && (
                           <span>👤 Homeowner: {card.homeowner_name}</span>
                         )}
-                        {card.homeowner_id && (
-                          <span className="text-xs text-gray-500">ID: {card.homeowner_id.slice(0, 8)}...</span>
+                        {card.user_id && (
+                          <span className="text-xs text-gray-500">ID: {card.user_id.slice(0, 8)}...</span>
                         )}
                         {card.homeowner_email && (
                           <span>📧 {card.homeowner_email}</span>

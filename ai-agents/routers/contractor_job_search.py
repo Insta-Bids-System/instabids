@@ -123,7 +123,12 @@ async def search_jobs_by_radius(
                 "categories": card.get("categories", []),
                 "group_bid_eligible": card.get("group_bid_eligible", False),
                 "created_at": card.get("created_at"),
-                "distance_miles": distance_miles
+                "distance_miles": distance_miles,
+                # Service complexity classification
+                "service_complexity": card.get("service_complexity", "single-trade"),
+                "trade_count": card.get("trade_count", 1),
+                "primary_trade": card.get("primary_trade", "general"),
+                "secondary_trades": card.get("secondary_trades", [])
             }
 
             job_opportunities.append(job)

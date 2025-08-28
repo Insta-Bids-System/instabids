@@ -104,13 +104,13 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
 
       // Load proposals
       const proposalsResponse = await fetch(
-        `http://localhost:8008/api/contractor-proposals/bid-card/${bidCardId}`
+        `/api/contractor-proposals/bid-card/${bidCardId}`
       );
       const proposals = proposalsResponse.ok ? await proposalsResponse.json() : [];
 
       // Load conversations - use consistent homeowner ID
       const conversationsResponse = await fetch(
-        `http://localhost:8008/api/messages/conversations/${bidCardId}?user_type=homeowner&user_id=${homeownerId}`
+        `/api/messages/conversations/${bidCardId}?user_type=homeowner&user_id=${homeownerId}`
       );
       const conversationsData = conversationsResponse.ok
         ? await conversationsResponse.json()
@@ -138,7 +138,7 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
       // Add conversations
       for (const conv of conversations) {
         // Load messages for each conversation
-        const messagesResponse = await fetch(`http://localhost:8008/api/messages/${conv.id}`);
+        const messagesResponse = await fetch(`/api/messages/${conv.id}`);
         const messagesData = messagesResponse.ok ? await messagesResponse.json() : { messages: [] };
         conv.messages = messagesData.messages || [];
 
@@ -192,13 +192,13 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
 
     try {
       setSending(true);
-      const response = await fetch("http://localhost:8008/api/messages/send", {
+      const response = await fetch("/api/messages/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversation_id: conversationId,
           bid_card_id: bidCardId,
-          homeowner_id: homeownerId,
+          user_id: homeownerId,
           sender_type: "homeowner",
           sender_id: homeownerId,
           content: messageInput,
@@ -230,7 +230,7 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
     formData.append("message", `Shared an image: ${file.name}`);
 
     try {
-      const response = await fetch("http://localhost:8008/api/images/upload/conversation", {
+      const response = await fetch("/api/images/upload/conversation", {
         method: "POST",
         body: formData,
       });
@@ -251,7 +251,7 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
 
   const markMessagesAsRead = async (conversationId: string) => {
     try {
-      await fetch(`http://localhost:8008/api/messages/${conversationId}/mark-read`, {
+      await fetch(`/api/messages/${conversationId}/mark-read`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -261,6 +261,32 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
       });
     } catch (error) {
       console.error("Error marking messages as read:", error);
+    }
+  };
+
+  const selectWinningContractor = async (contractorId: string, bidAmount: number) => {
+    try {
+      const response = await fetch(`/api/bid-cards/${bidCardId}/select-contractor`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contractor_id: contractorId,
+          user_id: homeownerId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast.success(`Contractor selected! Connection fee: $${result.connection_fee}`);
+        // Reload to show updated status
+        await loadContractorInteractions();
+      } else {
+        throw new Error(result.error || "Failed to select contractor");
+      }
+    } catch (error) {
+      console.error("Error selecting contractor:", error);
+      toast.error("Failed to select contractor");
     }
   };
 
@@ -418,10 +444,21 @@ const ContractorCommunicationHub: React.FC<Props> = ({ bidCardId, homeownerId })
               {/* Bid Proposal Section */}
               {interaction.proposal && (
                 <div className="p-4 bg-gray-50 border-b">
-                  <h5 className="font-medium text-gray-900 mb-3 flex items-center">
-                    <FileText className="w-4 h-4 mr-2" />
-                    Submitted Bid
-                  </h5>
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="font-medium text-gray-900 flex items-center">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Submitted Bid
+                    </h5>
+                    {interaction.proposal.status === "pending" && (
+                      <button
+                        onClick={() => selectWinningContractor(interaction.contractor_id, interaction.proposal.bid_amount)}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 transition-colors"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        Select This Contractor
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-4 mb-3">
                     <div>
                       <p className="text-sm text-gray-500">Bid Amount</p>

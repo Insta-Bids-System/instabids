@@ -8,7 +8,7 @@ def test_iris_direct():
     print("Testing Iris agent for design inspiration...")
     
     iris_url = "http://localhost:8008/api/iris/chat"
-    homeowner_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
     
     # Test messages to Iris
     test_messages = [
@@ -24,7 +24,7 @@ def test_iris_direct():
         
         payload = {
             "message": message,
-            "homeowner_id": homeowner_id,
+            "user_id": user_id,
             "board_id": None,
             "conversation_context": []
         }
@@ -65,7 +65,7 @@ def test_iris_direct():
         except Exception as e:
             print(f"\n[ERROR] Request failed: {e}")
     
-    print(f"\n\nHomeowner ID for testing: {homeowner_id}")
+    print(f"\n\nHomeowner ID for testing: {user_id}")
     print("Check inspiration board at http://localhost:5174/inspiration-demo")
 
 if __name__ == "__main__":

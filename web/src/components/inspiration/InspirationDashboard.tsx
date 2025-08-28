@@ -4,13 +4,15 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
-import IrisChat from "./AIAssistant/IrisChat";
 import BoardCreator from "./BoardCreator";
 import BoardView from "./BoardView";
+import FloatingIrisChat from "../unified/FloatingIrisChat";
+import { useIris } from "@/contexts/IrisContext";
+import PotentialBidCardsInspiration from "./PotentialBidCardsInspiration";
 
 export interface InspirationBoard {
   id: string;
-  homeowner_id: string;
+  user_id: string;
   title: string;
   description?: string;
   room_type?: string;
@@ -24,61 +26,15 @@ export interface InspirationBoard {
 
 const InspirationDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { setBoardContext, clearContext } = useIris();
   const [boards, setBoards] = useState<InspirationBoard[]>([]);
   const [loading, setLoading] = useState(true);
   const [showBoardCreator, setShowBoardCreator] = useState(false);
-  const [showIrisChat, setShowIrisChat] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState<InspirationBoard | null>(null);
 
   const loadBoards = async () => {
     try {
       setLoading(true);
-      console.log("🔍 loadBoards called");
-
-      // Check for demo user
-      const demoUser = localStorage.getItem("DEMO_USER");
-      console.log("🔍 Demo user from localStorage:", demoUser);
-      if (demoUser) {
-        const demoData = JSON.parse(demoUser);
-        console.log("🔍 Demo data parsed:", demoData);
-        console.log(
-          "🔍 Making API call to:",
-          `http://localhost:8008/api/demo/inspiration/boards?homeowner_id=${encodeURIComponent(demoData.id)}`
-        );
-        // Load demo boards from backend API
-        try {
-          const response = await fetch(
-            `http://localhost:8008/api/demo/inspiration/boards?homeowner_id=${encodeURIComponent(demoData.id)}`,
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          console.log("🔍 API response status:", response.status);
-          if (!response.ok) {
-            throw new Error("Failed to load demo boards");
-          }
-
-          const boardsData = await response.json();
-          console.log("🔍 Boards data received:", boardsData);
-          setBoards(boardsData);
-          console.log("🔍 Boards state updated with", boardsData?.length, "boards");
-
-          // Force update to test rendering
-          if (boardsData && boardsData.length > 0) {
-            console.log("🔍 Successfully set boards, should render now");
-          }
-        } catch (error) {
-          console.error("Error loading demo boards:", error);
-          // Fallback to empty state
-          setBoards([]);
-        }
-        setLoading(false);
-        return;
-      }
 
       // Load boards with image count
       const { data: boardsData, error: boardsError } = await supabase
@@ -87,7 +43,7 @@ const InspirationDashboard: React.FC = () => {
           *,
           inspiration_images(count)
         `)
-        .eq("homeowner_id", user?.id)
+        .eq("user_id", user?.id)
         .order("created_at", { ascending: false });
 
       if (boardsError) throw boardsError;
@@ -109,67 +65,37 @@ const InspirationDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    console.log("🔍 useEffect triggered, user:", user);
-    const demoUser = localStorage.getItem("DEMO_USER");
-    console.log("🔍 useEffect demo user check:", demoUser);
-    if (user || demoUser) {
-      console.log("🔍 Calling loadBoards from useEffect");
+    if (user) {
       loadBoards();
     } else {
-      console.log("🔍 No user or demo user found, not loading boards");
+      // Stop loading if no user
+      setLoading(false);
     }
-  }, [user, loadBoards]);
+  }, [user]);
 
   const handleCreateBoard = async (boardData: Partial<InspirationBoard>) => {
     try {
-      // Check for demo user
-      const demoUser = localStorage.getItem("DEMO_USER");
-
-      if (demoUser) {
-        // For demo users, use the backend API which has service-level permissions
-        const demoData = JSON.parse(demoUser);
-        const response = await fetch("http://localhost:8008/api/demo/inspiration/boards", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title: boardData.title || "New Inspiration Board",
-            description: boardData.description,
-            room_type: boardData.room_type,
-            homeowner_id: demoData.id,
-            status: "collecting",
-            is_demo: true,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to create demo board");
-        }
-
-        const data = await response.json();
-
-        toast.success("Board created successfully!");
-        setBoards([data, ...boards]);
-        setShowBoardCreator(false);
-      } else {
-        // For authenticated users, use direct Supabase access
-        const { data, error } = await supabase
-          .from("inspiration_boards")
-          .insert({
-            ...boardData,
-            homeowner_id: user?.id,
-            status: "collecting",
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        toast.success("Board created successfully!");
-        setBoards([data, ...boards]);
-        setShowBoardCreator(false);
+      if (!user) {
+        toast.error("Please sign in to create boards");
+        return;
       }
+
+      // For authenticated users, use direct Supabase access
+      const { data, error } = await supabase
+        .from("inspiration_boards")
+        .insert({
+          ...boardData,
+          user_id: user.id,
+          status: "collecting",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success("Board created successfully!");
+      setBoards([data, ...boards]);
+      setShowBoardCreator(false);
     } catch (error) {
       console.error("Error creating board:", error);
       toast.error("Failed to create board");
@@ -178,6 +104,8 @@ const InspirationDashboard: React.FC = () => {
 
   const handleBoardClick = (board: InspirationBoard) => {
     setSelectedBoard(board);
+    // Set board context for IRIS when viewing a specific board
+    setBoardContext(board.id);
   };
 
   const getStatusColor = (status: InspirationBoard["status"]) => {
@@ -218,20 +146,48 @@ const InspirationDashboard: React.FC = () => {
     );
   }
 
+  if (!user) {
+    return (
+      <div className="max-w-2xl mx-auto py-12">
+        <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Please Sign In
+          </h2>
+          <p className="text-gray-600 mb-6">
+            You need to be signed in to view your inspiration boards.
+          </p>
+          <a
+            href="/login"
+            className="inline-flex items-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Sign In
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   if (selectedBoard) {
     return (
       <>
         <BoardView
           board={selectedBoard}
-          onBack={() => setSelectedBoard(null)}
+          onBack={() => {
+            setSelectedBoard(null);
+            // Clear board context when leaving board view
+            clearContext();
+          }}
           onBoardUpdate={(updatedBoard) => {
             setBoards((prev) => prev.map((b) => (b.id === updatedBoard.id ? updatedBoard : b)));
             setSelectedBoard(updatedBoard);
           }}
         />
 
-        {/* Iris Chat Assistant */}
-        {showIrisChat && <IrisChat board={selectedBoard} onClose={() => setShowIrisChat(false)} />}
+        {/* Floating IRIS Chat - automatically available with board context */}
+        <FloatingIrisChat
+          boardId={selectedBoard.id}
+          initialContext="inspiration"
+        />
       </>
     );
   }
@@ -247,14 +203,6 @@ const InspirationDashboard: React.FC = () => {
         <div className="flex gap-4">
           <button
             type="button"
-            onClick={() => setShowIrisChat(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <MessageSquare className="w-5 h-5" />
-            Chat with Iris
-          </button>
-          <button
-            type="button"
             onClick={() => setShowBoardCreator(true)}
             className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
           >
@@ -262,6 +210,11 @@ const InspirationDashboard: React.FC = () => {
             New Board
           </button>
         </div>
+      </div>
+
+      {/* Potential Bid Cards Section */}
+      <div className="mb-8">
+        <PotentialBidCardsInspiration userId={user?.id} />
       </div>
 
       {/* Empty State */}
@@ -353,16 +306,8 @@ const InspirationDashboard: React.FC = () => {
         <BoardCreator onClose={() => setShowBoardCreator(false)} onCreate={handleCreateBoard} />
       )}
 
-      {/* Iris Chat Assistant */}
-      {showIrisChat && (
-        <IrisChat
-          boardId={selectedBoard?.id || "demo-board"}
-          boardTitle={selectedBoard?.title || "My Inspiration Board"}
-          images={[]}
-          onGenerateVision={(elements) => console.log("Generate vision:", elements)}
-          onClose={() => setShowIrisChat(false)}
-        />
-      )}
+      {/* Floating IRIS Chat - available on main dashboard */}
+      <FloatingIrisChat initialContext="inspiration" />
     </div>
   );
 };

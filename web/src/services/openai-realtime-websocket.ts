@@ -51,7 +51,7 @@ export class OpenAIRealtimeWebSocket extends EventEmitter {
   async connect(): Promise<void> {
     try {
       // Connect to our proxy WebSocket endpoint
-      const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8008";
+      const backendUrl = import.meta.env.VITE_API_URL || "";
       const wsUrl = backendUrl.replace(/^http/, "ws");
       const url = `${wsUrl}/ws/realtime`;
 

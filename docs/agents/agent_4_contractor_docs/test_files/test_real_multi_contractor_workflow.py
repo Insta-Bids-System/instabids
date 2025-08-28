@@ -134,7 +134,7 @@ def create_fresh_bid_card():
     bid_card_data = {
         "id": bid_card_id,
         "bid_card_number": f"BC-TEST-{int(time.time())}",
-        "homeowner_id": HOMEOWNER_ID,
+        "user_id": HOMEOWNER_ID,
         "project_type": "kitchen_remodel",
         "project_title": "Complete Kitchen Remodel - Testing Multi-Contractor Chat",
         "project_description": "Full kitchen remodel including cabinets, countertops, and appliances. Need multiple contractor quotes.",

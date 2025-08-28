@@ -101,7 +101,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           .from("inspiration_images")
           .insert({
             board_id: boardId,
-            homeowner_id: userId,
+            user_id: userId,
             image_url: publicUrl,
             thumbnail_url: publicUrl, // For now, same as image_url
             source: "upload",
@@ -178,7 +178,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={match.match(/onClick={[^}]+}/)[0]}
+            onClick={() => _setUploadCategory("current")}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
               uploadCategory === "current"
                 ? "bg-blue-500 text-white"
@@ -190,7 +190,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           </button>
           <button
             type="button"
-            onClick={match.match(/onClick={[^}]+}/)[0]}
+            onClick={() => _setUploadCategory("inspiration")}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
               uploadCategory === "inspiration"
                 ? "bg-purple-500 text-white"
@@ -202,7 +202,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           </button>
           <button
             type="button"
-            onClick={match.match(/onClick={[^}]+}/)[0]}
+            onClick={() => _setUploadCategory("vision")}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
               uploadCategory === "vision"
                 ? "bg-green-500 text-white"
@@ -228,7 +228,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
             {uploadQueue.some((u) => u.status === "success") && (
               <button
                 type="button"
-                onClick={match.match(/onClick={[^}]+}/)[0]}
+                onClick={_clearCompleted}
                 className="text-sm text-primary-600 hover:text-primary-700"
               >
                 Clear completed
@@ -278,7 +278,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                   upload.status === "success") && (
                   <button
                     type="button"
-                    onClick={match.match(/onClick={[^}]+}/)[0]}
+                    onClick={() => _removeFromQueue(index)}
                     className="text-gray-400 hover:text-gray-600"
                   >
                     <X className="w-4 h-4" />

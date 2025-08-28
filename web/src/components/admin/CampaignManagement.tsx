@@ -15,6 +15,15 @@ interface Campaign {
   updated_at: string;
   target_completion_date?: string;
   progress_percentage: number;
+  // Date flow fields
+  bid_collection_deadline?: string;
+  project_completion_deadline?: string;
+  deadline_adjusted_timeline_hours?: number;
+  deadline_hard?: boolean;
+  // Urgency and timeline fields
+  urgency_level?: string;
+  user_timeline_days?: number;
+  internal_timeline_hours?: number;
 }
 
 interface CampaignStats {
@@ -44,6 +53,11 @@ interface CampaignDetail {
   progress_percentage: number;
   response_rate: number;
   avg_response_time_hours?: number;
+  // Date flow fields
+  bid_collection_deadline?: string;
+  project_completion_deadline?: string;
+  deadline_adjusted_timeline_hours?: number;
+  deadline_hard?: boolean;
   assigned_contractors: Array<{
     assignment_id: string;
     contractor_id: string;
@@ -75,6 +89,42 @@ interface CampaignDetail {
     escalation_triggered: boolean;
     notes: string;
   }>;
+  // Campaign decision audit trail
+  strategy_data?: {
+    urgency_level: string;
+    timeline_hours: number;
+    bids_needed: number;
+    total_contractors: number;
+    expected_responses: number;
+    confidence_score: number;
+    tier_breakdown: {
+      tier_1: { count: number; expected: number };
+      tier_2: { count: number; expected: number };
+      tier_3: { count: number; expected: number };
+    };
+    risk_factors: string[];
+    recommendations: string[];
+  };
+  decision_inputs?: {
+    project_details: {
+      project_type: string;
+      urgency_level: string;
+      budget_range: { min: number; max: number };
+      contractor_count_needed: number;
+      project_description?: string;
+    };
+    timing_requirements: {
+      bid_collection_deadline?: string;
+      project_completion_deadline?: string;
+      deadline_hard: boolean;
+      deadline_context?: string;
+    };
+    campaign_settings: {
+      max_contractors: number;
+      target_criteria?: any;
+      created_at: string;
+    };
+  };
 }
 
 const CampaignManagement: React.FC = () => {
@@ -104,8 +154,8 @@ const CampaignManagement: React.FC = () => {
       
       // Fetch real campaign data from API
       const [campaignsResponse, statsResponse] = await Promise.all([
-        fetch(`http://localhost:8008/api/campaign-management/campaigns?status=${selectedStatus || ''}`),
-        fetch('http://localhost:8008/api/campaign-management/dashboard-stats')
+        fetch(`/api/campaign-management/campaigns?status=${selectedStatus || ''}`),
+        fetch('/api/campaign-management/dashboard-stats')
       ]);
 
       if (!campaignsResponse.ok || !statsResponse.ok) {
@@ -156,7 +206,7 @@ const CampaignManagement: React.FC = () => {
   const fetchCampaignDetail = async (campaignId: string) => {
     try {
       setDetailLoading(true);
-      const response = await fetch(`http://localhost:8008/api/campaign-management/campaigns/${campaignId}`);
+      const response = await fetch(`/api/campaign-management/campaigns/${campaignId}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch campaign details: ${response.status}`);
@@ -180,7 +230,7 @@ const CampaignManagement: React.FC = () => {
   const fetchAvailableContractors = async () => {
     try {
       setContractorLoading(true);
-      const response = await fetch('http://localhost:8008/api/contractor-management/contractors?limit=100');
+      const response = await fetch('/api/contractor-management/contractors?limit=100');
       
       if (!response.ok) {
         throw new Error(`Failed to fetch contractors: ${response.status}`);
@@ -219,7 +269,7 @@ const CampaignManagement: React.FC = () => {
     try {
       setAssignmentLoading(true);
       const response = await fetch(
-        `http://localhost:8008/api/campaign-management/campaigns/${assignmentCampaignId}/assign-contractors`,
+        `/api/campaign-management/campaigns/${assignmentCampaignId}/assign-contractors`,
         {
           method: 'POST',
           headers: {
@@ -279,7 +329,7 @@ const CampaignManagement: React.FC = () => {
     try {
       // Update campaign status via API
       const response = await fetch(
-        `http://localhost:8008/api/campaign-management/campaigns/${campaignId}/status`,
+        `/api/campaign-management/campaigns/${campaignId}/status`,
         {
           method: 'PUT',
           headers: {
@@ -315,9 +365,9 @@ const CampaignManagement: React.FC = () => {
   useEffect(() => {
     fetchCampaigns();
     
-    // Refresh every 30 seconds for real-time updates
-    const interval = setInterval(fetchCampaigns, 30000);
-    return () => clearInterval(interval);
+    // Polling disabled for performance - use manual refresh instead
+    // const interval = setInterval(fetchCampaigns, 30000);
+    // return () => clearInterval(interval);
   }, [selectedStatus]);
 
   // Filter campaigns by search term and status
@@ -408,6 +458,32 @@ const CampaignManagement: React.FC = () => {
               </div>
             </div>
             <div className="space-y-4">
+              {/* Deadline Alert if Rush Mode */}
+              {selectedCampaign.deadline_adjusted_timeline_hours && (
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <span className="text-yellow-400 text-xl">⚡</span>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-yellow-800">
+                        Rush Mode: {selectedCampaign.deadline_adjusted_timeline_hours}h timeline
+                      </p>
+                      {selectedCampaign.bid_collection_deadline && (
+                        <p className="text-xs text-yellow-600 mt-1">
+                          Bid collection deadline: {new Date(selectedCampaign.bid_collection_deadline).toLocaleDateString()}
+                        </p>
+                      )}
+                      {selectedCampaign.deadline_hard && (
+                        <p className="text-xs text-red-600 mt-1 font-semibold">
+                          ⚠️ FIRM DEADLINE - Cannot be extended
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* Progress Chart */}
               <div>
                 <div className="flex justify-between items-center mb-2">
@@ -559,6 +635,196 @@ const CampaignManagement: React.FC = () => {
               ))
             ) : (
               <div className="text-center py-4 text-gray-500">No check-ins recorded yet</div>
+            )}
+          </div>
+        </div>
+
+        {/* Campaign Decision Audit Trail */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div className="p-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Campaign Decision Audit Trail</h3>
+            <p className="text-sm text-gray-600 mt-1">What information went into creating this campaign</p>
+          </div>
+          <div className="p-4 space-y-6">
+            
+            {/* Input Analysis Section */}
+            <div className="space-y-4">
+              <h4 className="text-md font-semibold text-blue-900 border-b border-blue-200 pb-2">
+                📋 Input Analysis
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div className="bg-blue-50 p-3 rounded">
+                    <div className="text-sm font-medium text-blue-900">Project Requirements</div>
+                    <div className="mt-1 space-y-1">
+                      <div className="text-sm text-blue-700">
+                        Type: {selectedCampaign.decision_inputs?.project_details?.project_type || 'Not specified'}
+                      </div>
+                      <div className="text-sm text-blue-700">
+                        Urgency: {selectedCampaign.decision_inputs?.project_details?.urgency_level || 'Standard'}
+                      </div>
+                      <div className="text-sm text-blue-700">
+                        Contractors Needed: {selectedCampaign.decision_inputs?.project_details?.contractor_count_needed || 'N/A'}
+                      </div>
+                      {selectedCampaign.decision_inputs?.project_details?.budget_range && (
+                        <div className="text-sm text-blue-700">
+                          Budget: ${selectedCampaign.decision_inputs.project_details.budget_range.min?.toLocaleString() || 'N/A'} - ${selectedCampaign.decision_inputs.project_details.budget_range.max?.toLocaleString() || 'N/A'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="bg-green-50 p-3 rounded">
+                    <div className="text-sm font-medium text-green-900">Timing Constraints</div>
+                    <div className="mt-1 space-y-1">
+                      {selectedCampaign.bid_collection_deadline && (
+                        <div className="text-sm text-green-700">
+                          Bid Deadline: {formatDate(selectedCampaign.bid_collection_deadline)}
+                        </div>
+                      )}
+                      {selectedCampaign.project_completion_deadline && (
+                        <div className="text-sm text-green-700">
+                          Project Deadline: {formatDate(selectedCampaign.project_completion_deadline)}
+                        </div>
+                      )}
+                      {selectedCampaign.deadline_hard !== undefined && (
+                        <div className="text-sm text-green-700">
+                          Hard Deadline: {selectedCampaign.deadline_hard ? 'Yes' : 'No'}
+                        </div>
+                      )}
+                      {selectedCampaign.deadline_adjusted_timeline_hours && (
+                        <div className="text-sm text-green-700">
+                          Adjusted Timeline: {selectedCampaign.deadline_adjusted_timeline_hours} hours
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 p-3 rounded">
+                <div className="text-sm font-medium text-gray-900">Campaign Configuration</div>
+                <div className="mt-1 space-y-1">
+                  <div className="text-sm text-gray-700">
+                    Max Contractors: {selectedCampaign.decision_inputs?.campaign_settings?.max_contractors || selectedCampaign.max_contractors}
+                  </div>
+                  {selectedCampaign.decision_inputs?.campaign_settings?.target_criteria && (
+                    <div className="text-sm text-gray-700">
+                      Target Criteria: {JSON.stringify(selectedCampaign.decision_inputs.campaign_settings.target_criteria)}
+                    </div>
+                  )}
+                  <div className="text-sm text-gray-700">
+                    Created: {formatDate(selectedCampaign.decision_inputs?.campaign_settings?.created_at || selectedCampaign.created_at)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Strategy Calculations Section */}
+            {selectedCampaign.strategy_data && (
+              <div className="space-y-4">
+                <h4 className="text-md font-semibold text-purple-900 border-b border-purple-200 pb-2">
+                  🎯 Strategy Calculations
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-purple-50 p-3 rounded">
+                    <div className="text-sm font-medium text-purple-900">Strategy Overview</div>
+                    <div className="mt-1 space-y-1">
+                      <div className="text-sm text-purple-700">
+                        Urgency Level: {selectedCampaign.strategy_data.urgency_level}
+                      </div>
+                      <div className="text-sm text-purple-700">
+                        Timeline: {selectedCampaign.strategy_data.timeline_hours} hours
+                      </div>
+                      <div className="text-sm text-purple-700">
+                        Bids Needed: {selectedCampaign.strategy_data.bids_needed}
+                      </div>
+                      <div className="text-sm text-purple-700">
+                        Total Contractors: {selectedCampaign.strategy_data.total_contractors}
+                      </div>
+                      <div className="text-sm text-purple-700">
+                        Expected Responses: {selectedCampaign.strategy_data.expected_responses}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {selectedCampaign.strategy_data.tier_breakdown && (
+                    <div className="bg-indigo-50 p-3 rounded">
+                      <div className="text-sm font-medium text-indigo-900">Tier Breakdown</div>
+                      <div className="mt-1 space-y-1">
+                        {Object.entries(selectedCampaign.strategy_data.tier_breakdown).map(([tier, data]) => (
+                          <div key={tier} className="text-sm text-indigo-700">
+                            {tier.replace('_', ' ')}: {(data as any).count} contractors (expect {(data as any).expected})
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="bg-yellow-50 p-3 rounded">
+                    <div className="text-sm font-medium text-yellow-900">Confidence Score</div>
+                    <div className="mt-1">
+                      <div className="text-2xl font-bold text-yellow-700">
+                        {selectedCampaign.strategy_data.confidence_score}%
+                      </div>
+                      <div className="text-sm text-yellow-600">
+                        Likelihood of success
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Risk Factors and Recommendations */}
+            {selectedCampaign.strategy_data && (selectedCampaign.strategy_data.risk_factors?.length > 0 || selectedCampaign.strategy_data.recommendations?.length > 0) && (
+              <div className="space-y-4">
+                <h4 className="text-md font-semibold text-red-900 border-b border-red-200 pb-2">
+                  ⚠️ Risk Factors & Recommendations
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedCampaign.strategy_data.risk_factors?.length > 0 && (
+                    <div className="bg-red-50 p-3 rounded">
+                      <div className="text-sm font-medium text-red-900">Risk Factors</div>
+                      <div className="mt-1 space-y-1">
+                        {selectedCampaign.strategy_data.risk_factors.map((risk: string, index: number) => (
+                          <div key={index} className="text-sm text-red-700 flex items-start">
+                            <span className="text-red-500 mr-1">•</span>
+                            {risk}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedCampaign.strategy_data.recommendations?.length > 0 && (
+                    <div className="bg-green-50 p-3 rounded">
+                      <div className="text-sm font-medium text-green-900">Recommendations</div>
+                      <div className="mt-1 space-y-1">
+                        {selectedCampaign.strategy_data.recommendations.map((rec: string, index: number) => (
+                          <div key={index} className="text-sm text-green-700 flex items-start">
+                            <span className="text-green-500 mr-1">→</span>
+                            {rec}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* No Strategy Data Available */}
+            {!selectedCampaign.strategy_data && !selectedCampaign.decision_inputs && (
+              <div className="text-center py-8">
+                <div className="text-gray-500 text-sm">
+                  No strategy data available for this campaign.
+                  <br />
+                  This campaign may have been created manually or before strategy tracking was implemented.
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -829,36 +1095,78 @@ const CampaignManagement: React.FC = () => {
 
       {/* Campaigns Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        {/* Scroll indicator */}
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 text-sm text-blue-700">
+          💡 <strong>Tip:</strong> Scroll horizontally to see all campaign details. All actions are on the left for easy access.
+        </div>
+        <div className="overflow-x-auto overflow-y-visible">
+          <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '1400px' }}>
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[160px]">
+                  Actions
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
                   Campaign & Bid Card
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px]">
                   Status & Progress
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                   Contractors
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                   Performance
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Timeline
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
+                  Timeline & Internal Target
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredCampaigns.map((campaign) => (
                 <tr key={campaign.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  {/* Actions Column - Now First */}
+                  <td className="px-4 py-3 text-sm font-medium">
+                    <div className="flex flex-col space-y-1">
+                      <button 
+                        onClick={() => handleViewDetails(campaign.id)}
+                        disabled={detailLoading}
+                        className="text-blue-600 hover:text-blue-900 text-left disabled:opacity-50"
+                      >
+                        {detailLoading ? 'Loading...' : '📋 View Details'}
+                      </button>
+                      {campaign.status === 'active' && (
+                        <>
+                          <button 
+                            onClick={() => handleAddContractors(campaign.id)}
+                            className="text-green-600 hover:text-green-900 text-left"
+                          >
+                            ➕ Add Contractors
+                          </button>
+                          <button 
+                            onClick={() => handlePauseCampaign(campaign.id)}
+                            className="text-yellow-600 hover:text-yellow-900 text-left"
+                          >
+                            ⏸️ Pause
+                          </button>
+                        </>
+                      )}
+                      {campaign.status === 'paused' && (
+                        <button 
+                          onClick={() => handlePauseCampaign(campaign.id)}
+                          className="text-green-600 hover:text-green-900 text-left"
+                        >
+                          ▶️ Resume
+                        </button>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Campaign & Bid Card Column */}
+                  <td className="px-4 py-3">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-900 truncate max-w-[180px]" title={campaign.name}>
                         {campaign.name}
                       </div>
                       <div className="text-sm text-gray-500">
@@ -877,12 +1185,13 @@ const CampaignManagement: React.FC = () => {
                           {campaign.bid_card_number}
                         </button>
                         <span className="mx-1">•</span>
-                        {campaign.project_type?.replace('_', ' ')}
+                        <span className="truncate">{campaign.project_type?.replace('_', ' ')}</span>
                       </div>
                     </div>
                   </td>
                   
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  {/* Status & Progress Column */}
+                  <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(campaign.status)}`}>
                       {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
                     </span>
@@ -895,58 +1204,40 @@ const CampaignManagement: React.FC = () => {
                     <div className="text-xs text-gray-500 mt-1">{campaign.progress_percentage}% complete</div>
                   </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  {/* Contractors Column */}
+                  <td className="px-4 py-3">
                     <div className="text-sm text-gray-900">
-                      {campaign.contractors_targeted} / {campaign.max_contractors} targeted
+                      {campaign.contractors_targeted}/{campaign.max_contractors}
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {campaign.contractors_responded} responded
+                    <div className="text-xs text-gray-500">
+                      {campaign.contractors_responded} responses
                     </div>
                   </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  {/* Performance Column */}
+                  <td className="px-4 py-3">
                     <div className="text-sm text-gray-900">
-                      {campaign.bids_received} bids received
+                      {campaign.bids_received} bids
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {campaign.contractors_targeted > 0 ? Math.round((campaign.contractors_responded / campaign.contractors_targeted) * 100) : 0}% response rate
+                    <div className="text-xs text-gray-500">
+                      {campaign.contractors_targeted > 0 ? Math.round((campaign.contractors_responded / campaign.contractors_targeted) * 100) : 0}% rate
                     </div>
                   </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  {/* Timeline & Internal Target Column */}
+                  <td className="px-4 py-3">
                     <div className="text-sm text-gray-900">
                       Created: {formatDate(campaign.created_at)}
                     </div>
                     {campaign.target_completion_date && (
-                      <div className="text-sm text-gray-500">
-                        Target: {formatDate(campaign.target_completion_date)}
+                      <div className="text-xs text-gray-500">
+                        User Target: {formatDate(campaign.target_completion_date)}
                       </div>
                     )}
-                  </td>
-
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button 
-                      onClick={() => handleViewDetails(campaign.id)}
-                      disabled={detailLoading}
-                      className="text-blue-600 hover:text-blue-900 mr-3 disabled:opacity-50"
-                    >
-                      {detailLoading ? 'Loading...' : 'View Details'}
-                    </button>
-                    {campaign.status === 'active' && (
-                      <>
-                        <button 
-                          onClick={() => handleAddContractors(campaign.id)}
-                          className="text-green-600 hover:text-green-900 mr-3"
-                        >
-                          Add Contractors
-                        </button>
-                        <button 
-                          onClick={() => handlePauseCampaign(campaign.id)}
-                          className="text-yellow-600 hover:text-yellow-900"
-                        >
-                          Pause
-                        </button>
-                      </>
+                    {campaign.deadline_adjusted_timeline_hours && (
+                      <div className="text-xs text-orange-600 font-semibold">
+                        ⚡ Internal: {campaign.deadline_adjusted_timeline_hours}h target
+                      </div>
                     )}
                   </td>
                 </tr>

@@ -136,6 +136,37 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
         </Checkbox.Group>
       </Form.Item>
 
+      <Form.Item label="Service Complexity" name="service_complexity">
+        <Checkbox.Group>
+          <Space direction="vertical">
+            <Checkbox value="single-trade">
+              <Space>
+                <Tag color="blue" size="small">Single Trade</Tag>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  (Lawn care, pools, roofing)
+                </Text>
+              </Space>
+            </Checkbox>
+            <Checkbox value="multi-trade">
+              <Space>
+                <Tag color="orange" size="small">Multi Trade</Tag>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  (Kitchen, bathroom remodels)
+                </Text>
+              </Space>
+            </Checkbox>
+            <Checkbox value="complex-coordination">
+              <Space>
+                <Tag color="red" size="small">Complex</Tag>
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  (Whole house renovation)
+                </Text>
+              </Space>
+            </Checkbox>
+          </Space>
+        </Checkbox.Group>
+      </Form.Item>
+
       <Form.Item label="Categories" name="categories">
         <Select mode="multiple" placeholder="Select categories">
           <Option value="plumbing">Plumbing</Option>
@@ -217,6 +248,13 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
     <Card
       hoverable
       onClick={() => handleCardClick(card)}
+      style={{
+        borderRadius: '12px',
+        overflow: 'hidden',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        transition: 'all 0.3s ease'
+      }}
+      bodyStyle={{ padding: '20px' }}
       cover={
         card.images && card.images.length > 0 ? (
           <img
@@ -278,6 +316,23 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
                 </Tag>
               )}
               <Tag>{card.project_type}</Tag>
+              {card.service_complexity && (
+                <Tag 
+                  color={
+                    card.service_complexity === "single-trade" ? "blue" : 
+                    card.service_complexity === "multi-trade" ? "orange" : "red"
+                  }
+                >
+                  {card.service_complexity === "single-trade" && "Single"}
+                  {card.service_complexity === "multi-trade" && "Multi"}
+                  {card.service_complexity === "complex-coordination" && "Complex"}
+                </Tag>
+              )}
+              {card.primary_trade && card.primary_trade !== card.project_type && (
+                <Tag color="purple" style={{ fontSize: '11px' }}>
+                  {card.primary_trade}
+                </Tag>
+              )}
             </Space>
           </Space>
         }
@@ -318,13 +373,13 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
         </Col>
       </Row>
 
-      {/* Action Buttons */}
-      <Divider style={{ margin: "12px 0" }} />
-      <Row gutter={8}>
-        <Col span={12}>
+      {/* Action Buttons - Mobile Optimized */}
+      <Divider style={{ margin: "16px 0" }} />
+      <Row gutter={[8, 8]}>
+        <Col span={24} sm={12}>
           <Button
             type="default"
-            size="small"
+            size="large"
             icon={<MessageOutlined />}
             onClick={(e) => {
               e.stopPropagation(); // Prevent card click
@@ -332,20 +387,30 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
             }}
             block
             className="border-blue-500 text-blue-600 hover:bg-blue-50"
+            style={{ 
+              height: '48px', 
+              fontSize: '16px',
+              fontWeight: '500'
+            }}
           >
             Ask Questions
           </Button>
         </Col>
-        <Col span={12}>
+        <Col span={24} sm={12}>
           <Button
             type="primary"
-            size="small"
+            size="large"
             icon={<SendOutlined />}
             onClick={(e) => {
               e.stopPropagation(); // Prevent card click
               handleCardClick(card); // Open drawer for bid submission
             }}
             block
+            style={{ 
+              height: '48px', 
+              fontSize: '16px',
+              fontWeight: '500'
+            }}
           >
             Submit Bid
           </Button>
@@ -355,18 +420,19 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
   );
 
   return (
-    <div style={{ display: "flex", gap: 24 }}>
-      {/* Left Sidebar - Always Visible Location Filter */}
+    <div style={{ display: "flex", gap: 24, flexDirection: window.innerWidth < 768 ? 'column' : 'row' }}>
+      {/* Left Sidebar - Responsive Location Filter */}
       <div
         style={{
-          width: 280,
+          width: window.innerWidth < 768 ? '100%' : 280,
           background: "white",
-          padding: 20,
-          borderRadius: 8,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          padding: window.innerWidth < 768 ? 16 : 20,
+          borderRadius: 12,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
           height: "fit-content",
-          position: "sticky",
+          position: window.innerWidth < 768 ? 'static' : "sticky",
           top: 24,
+          marginBottom: window.innerWidth < 768 ? 20 : 0,
         }}
       >
         <Title level={4} style={{ marginBottom: 16 }}>
@@ -444,7 +510,7 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
       {/* Main Content Area */}
       <div style={{ flex: 1 }}>
         <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-          <Col flex="auto">
+          <Col xs={24} md={12} lg={14}>
             <Search
               placeholder="Search projects by title, description, or location..."
               allowClear
@@ -453,18 +519,21 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
               onSearch={handleSearch}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
+              style={{ height: '48px' }}
             />
           </Col>
-          <Col>
+          <Col xs={12} md={6} lg={5}>
             <Button
               size="large"
               icon={<FilterOutlined />}
               onClick={() => setFilterDrawerVisible(true)}
+              block
+              style={{ height: '48px', fontSize: '16px' }}
             >
-              More Filters
+              Filters
             </Button>
           </Col>
-          <Col>
+          <Col xs={12} md={6} lg={5}>
             <Select
               size="large"
               value={`${filters.sort_by}_${filters.sort_order}`}
@@ -472,7 +541,7 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
                 const [sort_by, sort_order] = value.split("_");
                 handleFilterChange({ sort_by: sort_by as any, sort_order: sort_order as any });
               }}
-              style={{ width: 200 }}
+              style={{ width: '100%', height: '48px' }}
             >
               <Option value="created_at_desc">
                 <SortDescendingOutlined /> Newest First
@@ -507,10 +576,12 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
           />
         ) : (
           <>
-            <Row gutter={[16, 16]}>
+            <Row gutter={[16, 24]}>
               {bidCards.map((card) => (
-                <Col key={card.id} xs={24} sm={12} md={8} lg={6}>
-                  {renderBidCard(card)}
+                <Col key={card.id} xs={24} sm={24} md={12} lg={8} xl={6}>
+                  <div style={{ marginBottom: '16px' }}>
+                    {renderBidCard(card)}
+                  </div>
                 </Col>
               ))}
             </Row>
@@ -530,11 +601,19 @@ export const BidCardMarketplace: React.FC<BidCardMarketplaceProps> = ({
 
         <Drawer
           title="Project Details"
-          placement="right"
-          width={800}
+          placement={window.innerWidth < 768 ? "bottom" : "right"}
+          width={window.innerWidth < 768 ? "100%" : 800}
+          height={window.innerWidth < 768 ? "90%" : undefined}
           visible={drawerVisible}
           onClose={() => setDrawerVisible(false)}
-          bodyStyle={{ padding: 0 }}
+          bodyStyle={{ 
+            padding: window.innerWidth < 768 ? 16 : 0,
+            height: window.innerWidth < 768 ? "100%" : undefined,
+            overflow: "auto"
+          }}
+          style={{
+            maxWidth: window.innerWidth < 768 ? "100vw" : undefined
+          }}
         >
           {selectedCard && (
             <ContractorBidCard

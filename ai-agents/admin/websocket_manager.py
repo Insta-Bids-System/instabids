@@ -159,7 +159,8 @@ class AdminWebSocketManager:
         sent_count = 0
         failed_connections = []
 
-        for client_id, connection in self.active_connections.items():
+        # Use list() to create a snapshot of items to avoid iteration issues
+        for client_id, connection in list(self.active_connections.items()):
             # Check subscription filter
             if target_subscription and target_subscription not in connection.subscriptions:
                 continue
@@ -171,8 +172,9 @@ class AdminWebSocketManager:
             else:
                 failed_connections.append(client_id)
 
-        # Clean up failed connections
+        # Clean up failed connections safely
         for client_id in failed_connections:
+            logger.error(f"Failed to send message to {client_id}")
             await self.disconnect(client_id)
 
         return sent_count

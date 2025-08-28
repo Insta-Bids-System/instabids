@@ -38,7 +38,7 @@ class HomeownerInfo(BaseModel):
 
 @router.get("/bid-cards/by-homeowner")
 async def search_bid_cards_by_homeowner(
-    homeowner_id: Optional[str] = Query(None, description="Homeowner UUID"),
+    user_id: Optional[str] = Query(None, description="Homeowner UUID"),
     homeowner_name: Optional[str] = Query(None, description="Homeowner name (partial match)"),
     limit: int = Query(50, description="Maximum results to return"),
     offset: int = Query(0, description="Offset for pagination")
@@ -50,9 +50,9 @@ async def search_bid_cards_by_homeowner(
     try:
         query = db.client.table("bid_cards").select("*")
         
-        # Filter by homeowner_id if provided
-        if homeowner_id:
-            query = query.eq("homeowner_id", homeowner_id)
+        # Filter by user_id if provided
+        if user_id:
+            query = query.eq("user_id", user_id)
         
         # Filter by homeowner_name if provided (case-insensitive partial match)
         if homeowner_name:
@@ -65,8 +65,8 @@ async def search_bid_cards_by_homeowner(
         
         # Get total count for pagination
         count_query = db.client.table("bid_cards").select("id", count="exact")
-        if homeowner_id:
-            count_query = count_query.eq("homeowner_id", homeowner_id)
+        if user_id:
+            count_query = count_query.eq("user_id", user_id)
         if homeowner_name:
             count_query = count_query.ilike("homeowner_name", f"%{homeowner_name}%")
         
@@ -80,7 +80,7 @@ async def search_bid_cards_by_homeowner(
             "offset": offset,
             "has_more": (offset + limit) < total_count,
             "search_params": {
-                "homeowner_id": homeowner_id,
+                "user_id": user_id,
                 "homeowner_name": homeowner_name
             }
         }
@@ -106,13 +106,13 @@ async def search_homeowners(
         # First, get unique homeowners from bid_cards
         homeowner_query = """
         SELECT DISTINCT
-            homeowner_id,
+            user_id,
             homeowner_name,
             COUNT(*) as bid_card_count,
             MIN(created_at) as first_bid_card,
             MAX(created_at) as last_bid_card
         FROM bid_cards
-        WHERE homeowner_id IS NOT NULL
+        WHERE user_id IS NOT NULL
         """
         
         conditions = []
@@ -122,7 +122,7 @@ async def search_homeowners(
             # Search across multiple fields
             conditions.append(f"""
                 (homeowner_name ILIKE '%{search_term}%' 
-                OR homeowner_id::text ILIKE '%{search_term}%')
+                OR user_id::text ILIKE '%{search_term}%')
             """)
         
         if name:
@@ -130,15 +130,15 @@ async def search_homeowners(
         
         # Use direct query (Supabase doesn't support execute_sql RPC)
         query = db.client.table("bid_cards").select(
-            "homeowner_id, homeowner_name"
-        ).not_.is_("homeowner_id", "null")
+            "user_id, homeowner_name"
+        ).not_.is_("user_id", "null")
         
         if search_term:
             # Handle UUID search separately from name search
             if is_valid_uuid(search_term):
                 # If it's a valid UUID, search both name and exact UUID match
                 query = query.or_(
-                    f"homeowner_name.ilike.%{search_term}%,homeowner_id.eq.{search_term}"
+                    f"homeowner_name.ilike.%{search_term}%,user_id.eq.{search_term}"
                 )
             else:
                 # If not UUID, only search name
@@ -152,12 +152,12 @@ async def search_homeowners(
         # Process results to get unique homeowners with counts
         homeowner_map = {}
         for row in result.data:
-            hw_id = row.get("homeowner_id")
+            hw_id = row.get("user_id")
             hw_name = row.get("homeowner_name", "Unknown")
             
             if hw_id and hw_id not in homeowner_map:
                 homeowner_map[hw_id] = {
-                    "homeowner_id": hw_id,
+                    "user_id": hw_id,
                     "homeowner_name": hw_name,
                     "bid_card_count": 0
                 }
@@ -186,8 +186,8 @@ async def search_homeowners(
             profile_map = {p["id"]: p for p in profiles.data} if profiles.data else {}
             
             for hw in homeowners:
-                if hw.get("homeowner_id") in profile_map:
-                    profile = profile_map[hw["homeowner_id"]]
+                if hw.get("user_id") in profile_map:
+                    profile = profile_map[hw["user_id"]]
                     hw["email"] = profile.get("email")
                     hw["phone"] = profile.get("phone")
                     hw["full_name"] = profile.get("full_name", hw.get("homeowner_name"))
@@ -243,7 +243,7 @@ async def unified_search(
             
             # Only add UUID search if query is a valid UUID
             if is_valid_uuid(query):
-                search_conditions.append(f"homeowner_id.eq.{query}")
+                search_conditions.append(f"user_id.eq.{query}")
             
             bid_card_query = db.client.table("bid_cards").select("*").or_(
                 ",".join(search_conditions)
@@ -257,12 +257,12 @@ async def unified_search(
         if search_type in ["all", "homeowners"]:
             # Get unique homeowners matching the query
             homeowner_query = db.client.table("bid_cards").select(
-                "homeowner_id, homeowner_name"
-            ).not_.is_("homeowner_id", "null")
+                "user_id, homeowner_name"
+            ).not_.is_("user_id", "null")
             
             if is_valid_uuid(query):
                 homeowner_query = homeowner_query.or_(
-                    f"homeowner_id.eq.{query},"
+                    f"user_id.eq.{query},"
                     f"homeowner_name.ilike.%{query}%"
                 )
             else:
@@ -273,17 +273,17 @@ async def unified_search(
             # Process to get unique homeowners with counts
             homeowner_map = {}
             for row in hw_result.data:
-                hw_id = row.get("homeowner_id")
+                hw_id = row.get("user_id")
                 hw_name = row.get("homeowner_name", "Unknown")
                 
                 if hw_id and hw_id not in homeowner_map:
                     # Get bid card count for this homeowner
                     count_result = db.client.table("bid_cards").select(
                         "id", count="exact"
-                    ).eq("homeowner_id", hw_id).execute()
+                    ).eq("user_id", hw_id).execute()
                     
                     homeowner_map[hw_id] = {
-                        "homeowner_id": hw_id,
+                        "user_id": hw_id,
                         "homeowner_name": hw_name,
                         "bid_card_count": count_result.count if hasattr(count_result, 'count') else len(count_result.data)
                     }
@@ -326,8 +326,8 @@ async def unified_search(
         raise HTTPException(status_code=500, detail=f"Unified search failed: {str(e)}")
 
 
-@router.get("/homeowner/{homeowner_id}/summary")
-async def get_homeowner_summary(homeowner_id: str):
+@router.get("/homeowner/{user_id}/summary")
+async def get_homeowner_summary(user_id: str):
     """
     Get detailed summary for a specific homeowner
     Including all bid cards, total spending, project history
@@ -335,7 +335,7 @@ async def get_homeowner_summary(homeowner_id: str):
     try:
         # Get all bid cards for this homeowner
         bid_cards_result = db.client.table("bid_cards").select("*").eq(
-            "homeowner_id", homeowner_id
+            "user_id", user_id
         ).order("created_at", desc=True).execute()
         
         bid_cards = bid_cards_result.data
@@ -371,7 +371,7 @@ async def get_homeowner_summary(homeowner_id: str):
         profile_info = None
         try:
             profile_result = db.client.table("profiles").select("*").eq(
-                "id", homeowner_id
+                "id", user_id
             ).single().execute()
             
             if profile_result.data:
@@ -385,7 +385,7 @@ async def get_homeowner_summary(homeowner_id: str):
             pass
         
         return {
-            "homeowner_id": homeowner_id,
+            "user_id": user_id,
             "homeowner_name": homeowner_name,
             "profile": profile_info,
             "statistics": {

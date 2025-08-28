@@ -304,15 +304,15 @@ class DatabaseWatcher:
         """Get database monitoring statistics"""
         try:
             # Get table row counts using tables that actually exist
-            bid_cards_result = self.db.query("bid_cards").select("id").execute()
+            bid_cards_result = self.db.table("bid_cards").select("id").execute()
             bid_cards_count = len(bid_cards_result.data) if bid_cards_result.data else 0
 
             # Use potential_contractors instead of contractor_leads (which doesn't exist)
-            contractors_result = self.db.query("potential_contractors").select("id").execute()
+            contractors_result = self.db.table("potential_contractors").select("id").execute()
             contractors_count = len(contractors_result.data) if contractors_result.data else 0
 
             # Use followup_logs for tracking outreach attempts
-            followup_result = self.db.query("followup_logs").select("id").execute()
+            followup_result = self.db.table("followup_logs").select("id").execute()
             attempts_count = len(followup_result.data) if followup_result.data else 0
 
             # Count unique campaigns from bid_cards (since outreach_campaigns doesn't exist)

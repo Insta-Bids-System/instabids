@@ -315,7 +315,7 @@ async def generate_dream_space_leonardo(request: MultiImageGenerationRequest):
         # 7. Also save as vision image
         vision_record = {
             "board_id": request.board_id,
-            "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",  # Demo user
+            "user_id": "550e8400-e29b-41d4-a716-446655440001",  # Demo user
             "image_url": generated_image_url,
             "thumbnail_url": generated_image_url,
             "source": "url",

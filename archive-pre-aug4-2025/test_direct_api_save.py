@@ -34,7 +34,7 @@ generated_image_url = "https://oaidalleapiprodscus.blob.core.windows.net/private
 # Create the exact record the API creates
 vision_image_record = {
     "board_id": "26cf972b-83e4-484c-98b6-a5d1a4affee3",
-    "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",  # Demo user (now exists)
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",  # Demo user (now exists)
     "image_url": generated_image_url,
     "thumbnail_url": generated_image_url,
     "source": "url",
@@ -55,7 +55,7 @@ vision_image_record = {
 
 print("\nTesting EXACT API record structure...")
 print(f"Board ID: {vision_image_record['board_id']}")
-print(f"Homeowner ID: {vision_image_record['homeowner_id']}")
+print(f"Homeowner ID: {vision_image_record['user_id']}")
 print(f"Category: {vision_image_record['category']}")
 print(f"Source: {vision_image_record['source']}")
 
@@ -68,7 +68,7 @@ try:
         print(f"New image ID: {vision_result.data[0]['id']}")
         print(f"Created at: {vision_result.data[0]['created_at']}")
         print(f"Category: {vision_result.data[0]['category']}")
-        print(f"Homeowner ID: {vision_result.data[0]['homeowner_id']}")
+        print(f"Homeowner ID: {vision_result.data[0]['user_id']}")
         
         # Verify it appears in the API
         print(f"\nVerifying image appears in demo API...")

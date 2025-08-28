@@ -53,7 +53,7 @@ const BoardCreator: React.FC<BoardCreatorProps> = ({ onClose, onCreate }) => {
           <h2 className="text-xl font-semibold text-gray-900">Create New Board</h2>
           <button
             type="button"
-            onClick={match.match(/onClick={[^}]+}/)[0]}
+            onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
             <X className="w-5 h-5" />

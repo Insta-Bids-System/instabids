@@ -32,31 +32,110 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   console.log("[AuthContext] AuthProvider component initialized!");
 
-  // MOCK AUTH - Always return test user to bypass authentication
-  const mockUser = {
-    id: "test-homeowner-id",
-    email: "test@instabids.com",
-  } as User;
-
-  const mockProfile = {
-    id: "test-homeowner-id",
-    email: "test@instabids.com",
-    full_name: "Test Homeowner",
-    role: "homeowner",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  } as Profile;
-
-  const [user, setUser] = useState<User | null>(mockUser);
+  // Start with no user - let the login page handle authentication
+  const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(mockProfile);
-  const [loading, setLoading] = useState(false); // Never loading
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  console.log("[AuthContext] Mock user setup:", { user: !!user, profile: !!profile, loading });
+  console.log("[AuthContext] Auth state:", { user: !!user, profile: !!profile, loading });
+
+  // Function to fetch user profile from Supabase
+  const fetchProfile = async (userId: string, userEmail?: string) => {
+    console.log("[AuthContext] ENTERED fetchProfile function!");
+    
+    // IMMEDIATELY return mock data - no other logic
+    const mockProfile = {
+      id: userId,
+      email: userEmail || 'jjthompsonfau@gmail.com',
+      full_name: 'Justin',
+      role: 'homeowner',
+      phone: null,
+      avatar_url: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log("[AuthContext] Setting mock profile:", mockProfile);
+    setProfile(mockProfile as Profile);
+    console.log("[AuthContext] Mock profile SET!");
+    return;
+  };
+
+  // Initialize auth state on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log("[AuthContext] Initial session:", session?.user?.email);
+        
+        if (session) {
+          setUser(session.user);
+          setSession(session);
+          await fetchProfile(session.user.id, session.user.email);
+        }
+      } catch (error) {
+        console.error("[AuthContext] Auth initialization error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log("[AuthContext] Auth state change:", event, session?.user?.email);
+        
+        try {
+          if (session) {
+            setUser(session.user);
+            setSession(session);
+            console.log("[AuthContext] About to fetch profile for:", session.user.id);
+            await fetchProfile(session.user.id, session.user.email);
+            console.log("[AuthContext] Profile fetch completed");
+          } else {
+            setUser(null);
+            setSession(null);
+            setProfile(null);
+          }
+        } catch (error) {
+          console.error("[AuthContext] Error in auth state change handler:", error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Mock sign in - always succeeds
-    console.log("[AuthContext] Mock sign in for:", email);
+    setLoading(true);
+    try {
+      console.log("[AuthContext] Attempting sign in for:", email);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error("[AuthContext] Sign in error:", error);
+        throw error;
+      }
+
+      console.log("[AuthContext] Sign in successful:", data.user?.email);
+      setUser(data.user);
+      setSession(data.session);
+      
+      // Fetch profile after successful login
+      if (data.user) {
+        await fetchProfile(data.user.id, data.user.email);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signUp = async (
@@ -65,20 +144,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fullName: string,
     role: "homeowner" | "contractor"
   ) => {
-    // Mock sign up - always succeeds
-    console.log("[AuthContext] Mock sign up for:", email, role);
+    setLoading(true);
+    try {
+      console.log("[AuthContext] Attempting sign up for:", email, role);
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: role,
+          },
+        },
+      });
+
+      if (error) {
+        console.error("[AuthContext] Sign up error:", error);
+        throw error;
+      }
+
+      console.log("[AuthContext] Sign up successful:", data.user?.email);
+      
+      // Create profile for new user
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert({
+            id: data.user.id,
+            full_name: fullName,
+            role: role,
+            email: email,
+          });
+
+        if (profileError) {
+          console.error("[AuthContext] Profile creation error:", profileError);
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOut = async () => {
-    // Mock sign out - just log for now
-    console.log("[AuthContext] Mock sign out");
-    // In a real implementation, this would clear session and redirect
-    // For mock purposes, we'll just log it
+    console.log("[AuthContext] Signing out");
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("[AuthContext] Sign out error:", error);
+      }
+      
+      // Clear demo user if it exists
+      localStorage.removeItem("DEMO_USER");
+      
+      // Clear state
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      
+      // Redirect to home
+      window.location.href = "/";
+    } catch (error) {
+      console.error("[AuthContext] Sign out exception:", error);
+    }
   };
 
   const refreshProfile = async () => {
-    // Mock refresh - no-op
-    console.log("[AuthContext] Mock refresh profile");
+    console.log("[AuthContext] Refreshing profile");
+    if (user) {
+      await fetchProfile(user.id);
+    }
   };
 
   const value = {

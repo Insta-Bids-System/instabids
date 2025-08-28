@@ -18,7 +18,7 @@ export interface BidCard {
   timeline_days?: number;
   created_at: string;
   updated_at: string;
-  homeowner_id: string;
+  user_id: string;
   cia_thread_id?: string;
   location_city?: string;
   location_state?: string;
@@ -201,7 +201,7 @@ export type ContactMethod = "email" | "phone" | "text" | "app";
 
 export interface Project {
   id: string;
-  homeowner_id: string;
+  user_id: string;
   title: string;
   description: string;
   project_type: string;
@@ -399,7 +399,7 @@ export type NotificationType =
 
 export interface InspirationBoard {
   id: string;
-  homeowner_id: string;
+  user_id: string;
   title: string;
   description?: string;
   project_type: string;
@@ -420,7 +420,7 @@ export interface InspirationImage {
 
 export interface GeneratedDreamSpace {
   id: string;
-  homeowner_id: string;
+  user_id: string;
   project_type: string;
   style_preferences: string[];
   generated_image_url: string;

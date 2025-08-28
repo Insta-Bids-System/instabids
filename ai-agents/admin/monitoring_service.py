@@ -62,12 +62,21 @@ class AdminMonitoringService:
 
         # Agent monitoring
         self.agent_statuses: dict[str, AgentStatus] = {}
+        
+        # Use centralized configuration for agent endpoints
+        try:
+            from config.service_urls import ServiceEndpoints
+            base = ServiceEndpoints.API_BASE
+        except ImportError:
+            import os
+            base = os.getenv("BACKEND_URL", get_backend_url()) + "/api"
+        
         self.agent_endpoints = {
-            "CIA": "http://localhost:8008/api/agents/cia/health",
-            "JAA": "http://localhost:8008/api/agents/jaa/health",
-            "CDA": "http://localhost:8008/api/agents/cda/health",
-            "EAA": "http://localhost:8008/api/agents/eaa/health",
-            "WFA": "http://localhost:8008/api/agents/wfa/health"
+            "CIA": f"{base}/agents/cia/health",
+            "JAA": f"{base}/agents/jaa/health",
+            "CDA": f"{base}/agents/cda/health",
+            "EAA": f"{base}/agents/eaa/health",
+            "WFA": f"{base}/agents/wfa/health"
         }
 
         # Metrics tracking
@@ -140,7 +149,7 @@ class AdminMonitoringService:
             async with aiohttp.ClientSession() as session:
                 try:
                     # Use the actual health endpoint we just created
-                    url = f"http://localhost:8008/api/agents/{agent_name}/health"
+                    url = f"{base}/agents/{agent_name}/health"
                     async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
                         if response.status == 200:
                             data = await response.json()
@@ -262,13 +271,13 @@ class AdminMonitoringService:
         """Collect current system metrics"""
         try:
             # Get database counts using ACTUAL tables that exist
-            bid_cards_result = self.db.query("bid_cards").select("id,status,created_at").execute()
+            bid_cards_result = self.db.table("bid_cards").select("id,status,created_at").execute()
 
             # Query followup_logs for email tracking (EAA outreach)
-            followup_logs_result = self.db.query("followup_logs").select("id,created_at,action_type").execute()
+            followup_logs_result = self.db.table("followup_logs").select("id,created_at").execute()
 
             # Query potential_contractors for contractor counts
-            contractors_result = self.db.query("potential_contractors").select("id,created_at").execute()
+            contractors_result = self.db.table("potential_contractors").select("id,created_at").execute()
 
             # Count active bid cards
             bid_cards_active = len([
@@ -288,7 +297,15 @@ class AdminMonitoringService:
             # Get real email stats from the email tracking endpoint
             try:
                 async with aiohttp.ClientSession() as session:
-                    url = "http://localhost:8008/api/email-tracking/stats"
+                    # Use same base URL from agent endpoints
+                    try:
+                        from config.service_urls import ServiceEndpoints
+                        base = ServiceEndpoints.API_BASE
+                    except ImportError:
+                        import os
+                        base = os.getenv("BACKEND_URL", get_backend_url()) + "/api"
+                    
+                    url = f"{base}/email-tracking/stats"
                     async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
                         if response.status == 200:
                             email_stats = await response.json()
@@ -297,21 +314,19 @@ class AdminMonitoringService:
                             # Fallback to counting from followup_logs
                             emails_sent_today = len([
                                 log for log in (followup_logs_result.data or [])
-                                if log.get("created_at", "").startswith(today_str) and
-                                   log.get("action_type") in ["email_sent", "email"]
+                                if log.get("created_at", "").startswith(today_str)
                             ])
             except:
                 # Fallback to counting from followup_logs
                 emails_sent_today = len([
                     log for log in (followup_logs_result.data or [])
-                    if log.get("created_at", "").startswith(today_str) and
-                       log.get("action_type") in ["email_sent", "email"]
+                    if log.get("created_at", "").startswith(today_str)
                 ])
 
             # Get real form stats from the form tracking endpoint
             try:
                 async with aiohttp.ClientSession() as session:
-                    url = "http://localhost:8008/api/form-tracking/stats"
+                    url = f"{base}/form-tracking/stats"
                     async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
                         if response.status == 200:
                             form_stats = await response.json()
@@ -414,7 +429,7 @@ class AdminMonitoringService:
         """Get recent bid cards from database"""
         try:
             # Query real bid cards from Supabase
-            response = self.db.query("bid_cards").select(
+            response = self.db.table("bid_cards").select(
                 "id, bid_card_number, project_type, status, contractor_count_needed, "
                 "budget_min, budget_max, location_city, location_state, "
                 "created_at, updated_at, bid_count, interested_contractors"
@@ -548,7 +563,7 @@ class AdminMonitoringService:
                 raise HTTPException(status_code=403, detail="Insufficient permissions")
 
             # Update campaign status in database
-            result = self.db.query("outreach_campaigns").update({
+            result = self.db.table("outreach_campaigns").update({
                 "status": "paused",
                 "updated_at": datetime.now().isoformat()
             }).eq("id", campaign_id).execute()

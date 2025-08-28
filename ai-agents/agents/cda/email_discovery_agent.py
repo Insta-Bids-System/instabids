@@ -2,6 +2,7 @@
 Email Discovery Agent for Contractor Websites
 Scrapes contractor websites to find email addresses and contact information
 """
+import asyncio
 import re
 import time
 from typing import Any, Optional
@@ -115,8 +116,8 @@ class EmailDiscoveryAgent:
 
                     results["total_processed"] += 1
 
-                    # Respectful delay between requests
-                    time.sleep(2)
+                    # Respectful delay between requests - convert to async if method becomes async
+                    time.sleep(2)  # TODO: Make this async when method is converted
 
                 except Exception as e:
                     error_msg = f"Error processing contractor {contractor_id}: {e}"
@@ -181,8 +182,8 @@ class EmailDiscoveryAgent:
                                 "emails": page_emails
                             })
 
-                        # Don't overload the server
-                        time.sleep(1)
+                        # Don't overload the server - convert to async if method becomes async
+                        time.sleep(1)  # TODO: Make this async when method is converted
 
                 except requests.exceptions.RequestException as e:
                     print(f"[EmailDiscoveryAgent] Error accessing {page_url}: {e}")

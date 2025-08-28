@@ -6,6 +6,9 @@ import {
   MessageCircle,
   Plus,
   Trash2,
+  CheckCircle,
+  TrendingUp,
+  Sparkles,
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -17,7 +20,8 @@ import AIAnalysisDisplay from "./AIAnalysisDisplay";
 import ImageCategorizer from "./ImageCategorizer";
 import { ImageUploader } from "./ImageUploader";
 import type { InspirationBoard } from "./InspirationDashboard";
-import IrisChat from "./IrisChat";
+import IrisContextPanel from "./IrisContextPanel";
+import PersistentIrisChat from "./PersistentIrisChat";
 
 interface BoardViewProps {
   board: InspirationBoard;
@@ -37,6 +41,17 @@ interface BoardImage {
   ai_analysis?: any;
 }
 
+interface BoardConversation {
+  id: string;
+  conversation_history: any[];
+  persistent_context: any;
+  confidence_score: number;
+  bid_readiness_status: string;
+  last_analysis_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -47,6 +62,8 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
   const [viewMode, setViewMode] = useState<"grid" | "columns">("columns");
   const [showIrisChat, setShowIrisChat] = useState(false);
   const [clickedImage, setClickedImage] = useState<BoardImage | null>(null);
+  const [boardConversation, setBoardConversation] = useState<BoardConversation | null>(null);
+  const [loadingConversation, setLoadingConversation] = useState(false);
 
   const loadImages = async () => {
     try {
@@ -76,14 +93,63 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
     }
   };
 
+  // Load board conversation from persistent IRIS dialog
+  const loadBoardConversation = async () => {
+    if (!board.id) return;
+    
+    try {
+      setLoadingConversation(true);
+      const response = await fetch(`/api/iris/board/${board.id}/conversation`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setBoardConversation(data);
+      }
+    } catch (error) {
+      console.error("Error loading board conversation:", error);
+    } finally {
+      setLoadingConversation(false);
+    }
+  };
+
   useEffect(() => {
     loadImages();
-  }, [loadImages]);
+    loadBoardConversation();
+  }, [board.id]);
 
   const handleUploadComplete = async (uploadedImages: any[]) => {
     // Reload images after upload
     await loadImages();
     setShowUploader(false);
+
+    // Trigger IRIS analysis for each uploaded image
+    for (const image of uploadedImages) {
+      try {
+        const response = await fetch(`/api/iris/board/${board.id}/analyze-photo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            photo_url: image.url || image.image_url,
+            photo_id: image.id,
+            photo_metadata: {
+              category: image.category || "ideal",
+              tags: image.tags || [],
+              source: image.source || "upload"
+            }
+          })
+        });
+
+        if (response.ok) {
+          const analysisResult = await response.json();
+          console.log("IRIS analysis completed:", analysisResult.message);
+        }
+      } catch (error) {
+        console.error("Error triggering IRIS analysis:", error);
+      }
+    }
+
+    // Reload conversation to show new analysis
+    await loadBoardConversation();
 
     // Update board status if it was collecting
     if (board.status === "collecting" && images.length + uploadedImages.length >= 5) {
@@ -151,7 +217,7 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
 
     try {
       const response = await fetch(
-        "http://localhost:8008/api/image-generation/generate-dream-space",
+        "/api/image-generation/generate-dream-space",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -240,13 +306,18 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
           <button
             type="button"
             onClick={() => setShowIrisChat(!showIrisChat)}
-            className={`p-2 rounded-lg transition-colors ${
+            className={`relative p-2 rounded-lg transition-colors ${
               showIrisChat
                 ? "bg-primary-100 text-primary-700"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
             <MessageCircle className="w-5 h-5" />
+            {boardConversation && boardConversation.conversation_history.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {boardConversation.conversation_history.length}
+              </span>
+            )}
           </button>
 
           {/* View Mode Toggle */}
@@ -290,8 +361,10 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
         </div>
       )}
 
-      {/* Images Section */}
-      <div className="flex-1 overflow-y-auto p-4">
+      {/* Main Content Area with Sidebar */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left: Images Section */}
+        <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -509,18 +582,53 @@ const BoardView: React.FC<BoardViewProps> = ({ board, onBack, onBoardUpdate }) =
             </div>
           </div>
         )}
+        </div>
+
+        {/* Right: IRIS Context Panel */}
+        <div className="w-96 border-l bg-gray-50 overflow-y-auto">
+          <IrisContextPanel
+            boardId={board.id}
+            boardTitle={board.title}
+            images={images}
+            boardConversation={boardConversation}
+            onCreateBidCard={async () => {
+              try {
+                const response = await fetch(`/api/iris/board/${board.id}/create-bid-card`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    user_id: user?.id
+                  })
+                });
+                
+                if (response.ok) {
+                  const result = await response.json();
+                  toast.success("Bid card created from your vision!");
+                  navigate(`/bid-cards/${result.bid_card_id}`);
+                } else {
+                  toast.error("Failed to create bid card");
+                }
+              } catch (error) {
+                console.error("Error creating bid card:", error);
+                toast.error("Failed to create bid card");
+              }
+            }}
+          />
+        </div>
       </div>
 
       {/* Iris Chat Panel */}
       {showIrisChat && (
         <div className="border-t bg-gray-50 p-4">
-          <IrisChat
+          <PersistentIrisChat
             boardId={board.id}
             boardTitle={board.title}
             images={images}
             onGenerateVision={handleGenerateVision}
             clickedImage={clickedImage}
             onImageProcessed={() => setClickedImage(null)}
+            boardConversation={boardConversation}
+            onConversationUpdate={loadBoardConversation}
           />
         </div>
       )}

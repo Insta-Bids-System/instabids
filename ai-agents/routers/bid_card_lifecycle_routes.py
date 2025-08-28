@@ -25,6 +25,7 @@ class BidCardLifecycleResponse(BaseModel):
     bids: list[dict[str, Any]]
     timeline: list[dict[str, Any]]
     metrics: dict[str, Any]
+    connection_fee: dict[str, Any]
 
 class ContractorDiscoveryData(BaseModel):
     """Contractor discovery and caching data"""
@@ -124,6 +125,13 @@ async def get_bid_card_lifecycle(
             print(f"Metrics data error: {e}")
             metrics_data = {}
 
+        # Stage 9: Get connection fee data
+        try:
+            connection_fee_data = await get_connection_fee_data(bid_card_id, database) or {}
+        except Exception as e:
+            print(f"Connection fee data error: {e}")
+            connection_fee_data = {}
+
         return BidCardLifecycleResponse(
             bid_card=bid_card,
             discovery=discovery_data,
@@ -132,7 +140,8 @@ async def get_bid_card_lifecycle(
             engagement=engagement_data,
             bids=bids_data,
             timeline=timeline_data,
-            metrics=metrics_data
+            metrics=metrics_data,
+            connection_fee=connection_fee_data
         )
 
     except Exception as e:
@@ -206,6 +215,87 @@ async def get_bid_card_timeline(
     """Get complete chronological timeline"""
     timeline = await build_timeline(bid_card_id, db)
     return {"timeline": timeline}
+
+@router.get("/{bid_card_id}/change-history")
+async def get_bid_card_change_history(
+    bid_card_id: str,
+    limit: int = 50,
+    database = Depends(get_database)
+):
+    """Get complete change history for homeowner-triggered bid card updates"""
+    try:
+        # Get change logs for this bid card
+        change_logs_result = database.client.table("bid_card_change_logs").select("*").eq("bid_card_id", bid_card_id).order("created_at", desc=True).limit(limit).execute()
+        
+        change_logs = change_logs_result.data or []
+        
+        # Enhance change logs with additional context
+        enhanced_logs = []
+        for log in change_logs:
+            enhanced_log = {
+                **log,
+                "time_ago": calculate_time_ago(log["created_at"]),
+                "change_impact": determine_change_impact(log),
+                "change_category": categorize_change(log["change_type"]),
+                "approval_required": log.get("approval_status") == "pending"
+            }
+            enhanced_logs.append(enhanced_log)
+        
+        # Calculate summary statistics
+        total_changes = len(enhanced_logs)
+        pending_approval = len([log for log in enhanced_logs if log["approval_status"] == "pending"])
+        major_changes = len([log for log in enhanced_logs if log["significance_level"] == "major"])
+        
+        # Group changes by source agent
+        agent_breakdown = {}
+        for log in enhanced_logs:
+            agent = log.get("source_agent", "unknown")
+            agent_breakdown[agent] = agent_breakdown.get(agent, 0) + 1
+        
+        return {
+            "change_logs": enhanced_logs,
+            "summary": {
+                "total_changes": total_changes,
+                "pending_approval": pending_approval,
+                "major_changes": major_changes,
+                "agent_breakdown": agent_breakdown,
+                "most_active_agent": max(agent_breakdown.items(), key=lambda x: x[1])[0] if agent_breakdown else None
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving change history: {e!s}")
+
+@router.post("/{bid_card_id}/approve-change/{change_log_id}")
+async def approve_bid_card_change(
+    bid_card_id: str,
+    change_log_id: str,
+    approval_data: dict,
+    database = Depends(get_database)
+):
+    """Approve or reject a pending bid card change"""
+    try:
+        # Update the change log with approval decision
+        update_data = {
+            "approval_status": approval_data.get("status", "approved"),  # 'approved' or 'rejected'
+            "approved_at": datetime.now().isoformat(),
+            "approved_by": approval_data.get("approved_by"),
+            "rejection_reason": approval_data.get("rejection_reason") if approval_data.get("status") == "rejected" else None
+        }
+        
+        result = database.client.table("bid_card_change_logs").update(update_data).eq("id", change_log_id).eq("bid_card_id", bid_card_id).execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Change log not found")
+        
+        return {
+            "success": True,
+            "message": f"Change {approval_data.get('status', 'approved')}",
+            "change_log": result.data[0]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing approval: {e!s}")
 
 # Helper functions for data retrieval
 
@@ -400,6 +490,7 @@ async def build_timeline(bid_card_id: str, database) -> list[dict[str, Any]]:
     bid_card = database.client.table("bid_cards").select("*").eq("id", bid_card_id).execute()
     if bid_card.data:
         timeline_events.append({
+            "id": f"bid_card_created_{bid_card_id}",
             "timestamp": bid_card.data[0]["created_at"],
             "event_type": "bid_card_created",
             "description": f"Bid card {bid_card.data[0]['bid_card_number']} created",
@@ -414,6 +505,7 @@ async def build_timeline(bid_card_id: str, database) -> list[dict[str, Any]]:
     discovery_runs = database.client.table("discovery_runs").select("*").eq("bid_card_id", bid_card_id).execute()
     for run in discovery_runs.data or []:
         timeline_events.append({
+            "id": f"discovery_run_{run['id']}",
             "timestamp": run["created_at"],
             "event_type": "contractor_discovery",
             "description": "Contractor discovery run completed",
@@ -427,6 +519,7 @@ async def build_timeline(bid_card_id: str, database) -> list[dict[str, Any]]:
     campaigns = database.client.table("outreach_campaigns").select("*").eq("bid_card_id", bid_card_id).execute()
     for campaign in campaigns.data or []:
         timeline_events.append({
+            "id": f"campaign_created_{campaign['id']}",
             "timestamp": campaign["created_at"],
             "event_type": "campaign_created",
             "description": f"Outreach campaign '{campaign['name']}' created",
@@ -438,6 +531,7 @@ async def build_timeline(bid_card_id: str, database) -> list[dict[str, Any]]:
 
         if campaign.get("completed_at"):
             timeline_events.append({
+                "id": f"campaign_completed_{campaign['id']}",
                 "timestamp": campaign["completed_at"],
                 "event_type": "campaign_completed",
                 "description": "Campaign completed",
@@ -451,6 +545,7 @@ async def build_timeline(bid_card_id: str, database) -> list[dict[str, Any]]:
     outreach = database.client.table("contractor_outreach_attempts").select("*").eq("bid_card_id", bid_card_id).execute()
     for attempt in outreach.data or []:
         timeline_events.append({
+            "id": f"outreach_{attempt['id']}",
             "timestamp": attempt["sent_at"],
             "event_type": "outreach_sent",
             "description": f"Outreach sent via {attempt['channel']}",
@@ -466,23 +561,69 @@ async def build_timeline(bid_card_id: str, database) -> list[dict[str, Any]]:
         bid_document = bid_card.data[0].get("bid_document", {})
         submitted_bids = bid_document.get("submitted_bids", [])
 
-        for bid in submitted_bids:
-            timeline_events.append({
-                "timestamp": bid["submitted_at"],
-                "event_type": "bid_submitted",
-                "description": f"Bid submitted by {bid['contractor_name']}",
-                "details": {
-                    "bid_amount": bid["bid_amount"],
-                    "contractor_name": bid["contractor_name"],
-                    "submission_method": bid.get("submission_method", "unknown"),
-                    "timeline_days": bid.get("timeline_days", 0)
-                }
-            })
+        for i, bid in enumerate(submitted_bids):
+            # Use created_at if submitted_at is not available
+            timestamp = bid.get("submitted_at") or bid.get("created_at")
+            if timestamp:
+                timeline_events.append({
+                    "id": f"bid_submitted_{bid.get('contractor_id', i)}_{timestamp}",
+                    "timestamp": timestamp,
+                    "event_type": "bid_submitted",
+                    "description": f"Bid submitted by {bid.get('contractor_name', 'Unknown Contractor')}",
+                    "details": {
+                        "bid_amount": bid.get("bid_amount", 0),
+                        "contractor_name": bid.get("contractor_name", "Unknown Contractor"),
+                        "submission_method": bid.get("submission_method", "unknown"),
+                        "timeline_days": bid.get("timeline_days", 0)
+                    }
+                })
 
     # Sort timeline by timestamp
     timeline_events.sort(key=lambda x: x["timestamp"])
 
     return timeline_events
+
+async def get_connection_fee_data(bid_card_id: str, database) -> dict[str, Any]:
+    """Get connection fee and winner selection data"""
+    try:
+        # Get connection fee data if it exists
+        connection_fee_result = database.client.table("connection_fees").select("*").eq("bid_card_id", bid_card_id).execute()
+        connection_fee = connection_fee_result.data[0] if connection_fee_result.data else None
+        
+        # Get bid card winner data
+        bid_card_result = database.client.table("bid_cards").select(
+            "winner_contractor_id, winner_selected_at, winner_bid_amount"
+        ).eq("id", bid_card_id).execute()
+        
+        bid_card_data = bid_card_result.data[0] if bid_card_result.data else {}
+        
+        return {
+            "winner_selected": bool(bid_card_data.get("winner_contractor_id")),
+            "winner_contractor_id": bid_card_data.get("winner_contractor_id"),
+            "winner_selected_at": bid_card_data.get("winner_selected_at"),
+            "winning_bid_amount": bid_card_data.get("winner_bid_amount"),
+            "connection_fee_calculated": connection_fee is not None,
+            "connection_fee_data": {
+                "fee_id": connection_fee.get("id") if connection_fee else None,
+                "base_fee_amount": connection_fee.get("base_fee_amount") if connection_fee else None,
+                "final_fee_amount": connection_fee.get("final_fee_amount") if connection_fee else None,
+                "category_adjustment": connection_fee.get("category_adjustment") if connection_fee else None,
+                "fee_status": connection_fee.get("fee_status") if connection_fee else "not_calculated",
+                "payment_processed_at": connection_fee.get("payment_processed_at") if connection_fee else None,
+                "payment_method": connection_fee.get("payment_method") if connection_fee else None,
+                "payment_transaction_id": connection_fee.get("payment_transaction_id") if connection_fee else None
+            } if connection_fee else None
+        }
+    except Exception as e:
+        print(f"Error getting connection fee data: {e}")
+        return {
+            "winner_selected": False,
+            "winner_contractor_id": None,
+            "winner_selected_at": None,
+            "winning_bid_amount": None,
+            "connection_fee_calculated": False,
+            "connection_fee_data": None
+        }
 
 async def calculate_metrics(bid_card, discovery_data, campaign_data, outreach_data, engagement_data, bids_data) -> dict[str, Any]:
     """Calculate comprehensive metrics"""
@@ -553,3 +694,56 @@ async def calculate_metrics(bid_card, discovery_data, campaign_data, outreach_da
             "created_at": bid_card["created_at"]
         }
     }
+
+def calculate_time_ago(timestamp_str: str) -> str:
+    """Calculate human-readable time ago from timestamp"""
+    try:
+        if isinstance(timestamp_str, str):
+            # Handle different timestamp formats
+            if timestamp_str.endswith('Z'):
+                timestamp_str = timestamp_str.replace('Z', '+00:00')
+            elif '+' not in timestamp_str and 'T' in timestamp_str:
+                timestamp_str += '+00:00'
+            
+            timestamp = datetime.fromisoformat(timestamp_str)
+        else:
+            timestamp = timestamp_str
+            
+        now = datetime.now()
+        diff = now - timestamp.replace(tzinfo=None)
+        
+        if diff.days > 0:
+            return f"{diff.days}d ago"
+        elif diff.seconds > 3600:
+            hours = diff.seconds // 3600
+            return f"{hours}h ago"
+        elif diff.seconds > 60:
+            minutes = diff.seconds // 60
+            return f"{minutes}m ago"
+        else:
+            return "Just now"
+    except Exception:
+        return "Unknown"
+
+def determine_change_impact(log: dict) -> str:
+    """Determine the impact level of a change"""
+    significance = log.get("significance_level", "moderate")
+    contractors_affected = log.get("contractors_notified", 0)
+    
+    if significance == "major" or contractors_affected > 10:
+        return "high"
+    elif significance == "moderate" or contractors_affected > 3:
+        return "medium"
+    else:
+        return "low"
+
+def categorize_change(change_type: str) -> str:
+    """Categorize change type for display"""
+    category_map = {
+        "budget_change": "💰 Budget",
+        "urgency_change": "⚡ Timeline", 
+        "status_change": "📊 Status",
+        "major_update": "🔄 Major Update",
+        "update": "✏️ General"
+    }
+    return category_map.get(change_type, "📝 Other")

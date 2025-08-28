@@ -22,7 +22,7 @@ print(f"Images before: {before_count}")
 # Test Iris
 iris_payload = {
     "message": "I want to see my kitchen with modern industrial style. Can you create a vision with exposed brick walls and black metal pendant lights over the island?",
-    "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",
     "board_id": "26cf972b-83e4-484c-98b6-a5d1a4affee3",
     "context": {
         "current_project": "kitchen",

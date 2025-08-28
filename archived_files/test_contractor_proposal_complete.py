@@ -74,7 +74,7 @@ def test_contractor_proposal_flow(bid_card_id):
     
     # Generate unique IDs for this test run
     test_contractor_id = str(uuid.uuid4())
-    test_homeowner_id = str(uuid.uuid4())
+    test_user_id = str(uuid.uuid4())
     
     # Track test results
     results = {
@@ -218,7 +218,7 @@ def test_contractor_proposal_flow(bid_card_id):
         params = {
             "bid_card_id": bid_card_id,
             "user_type": "homeowner",
-            "user_id": test_homeowner_id
+            "user_id": test_user_id
         }
         
         response = requests.get(

@@ -50,7 +50,7 @@ def test_iris_generation_flow():
             current_img = {
                 "id": "test-current-" + str(int(time.time())),
                 "board_id": BOARD_ID,
-                "homeowner_id": DEMO_USER_ID,
+                "user_id": DEMO_USER_ID,
                 "image_url": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800",
                 "tags": ["current", "current-state"],
                 "category": "current",
@@ -69,7 +69,7 @@ def test_iris_generation_flow():
             inspiration_img = {
                 "id": "test-inspiration-" + str(int(time.time())),
                 "board_id": BOARD_ID,
-                "homeowner_id": DEMO_USER_ID,
+                "user_id": DEMO_USER_ID,
                 "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800",
                 "tags": ["inspiration", "ideal"],
                 "category": "ideal",
@@ -94,7 +94,7 @@ def test_iris_generation_flow():
     
     iris_request = {
         "message": "Generate my dream kitchen! I want to combine the modern industrial style from my inspiration with my current space layout.",
-        "homeowner_id": DEMO_USER_ID,
+        "user_id": DEMO_USER_ID,
         "board_id": BOARD_ID,
         "conversation_context": [
             {

@@ -1,6 +1,6 @@
 import type React from "react";
 import { useEffect, useState } from "react";
-import { useWebSocket } from "../../hooks/useWebSocket";
+import { useWebSocketContext } from "../../context/WebSocketContext";
 
 interface DatabaseStats {
   monitoring_enabled: boolean;
@@ -34,13 +34,17 @@ const DatabaseViewer: React.FC<DatabaseViewerProps> = ({ databaseStats: initialS
   const [recentOperations, setRecentOperations] = useState<DatabaseOperation[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>("all");
 
-  const { lastMessage, subscribe, unsubscribe } = useWebSocket();
+  const { lastMessage, subscribe } = useWebSocketContext();
 
   // Subscribe to database operation updates
   useEffect(() => {
-    subscribe("database_operations");
-    return () => unsubscribe("database_operations");
-  }, [subscribe, unsubscribe]);
+    const unsubscribe = subscribe("database_operations", () => {});
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [subscribe]);
 
   // Handle WebSocket updates
   useEffect(() => {

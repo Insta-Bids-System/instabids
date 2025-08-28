@@ -47,7 +47,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           schema: "public",
           table: "conversations",
           filter:
-            userType === "homeowner" ? `homeowner_id=eq.${userId}` : `contractor_id=eq.${userId}`,
+            userType === "homeowner" ? `user_id=eq.${userId}` : `contractor_id=eq.${userId}`,
         },
         () => {
           fetchConversations();
@@ -73,7 +73,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         .order("last_message_at", { ascending: false, nullsFirst: false });
 
       if (userType === "homeowner") {
-        query = query.eq("homeowner_id", userId);
+        query = query.eq("user_id", userId);
       } else {
         query = query.eq("contractor_id", userId);
       }

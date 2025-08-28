@@ -12,9 +12,114 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from database_simple import db
+from utils.redis_cache import cache
 
 
 router = APIRouter(prefix="/api/contractor-management", tags=["contractor-management"])
+
+
+def get_contractor_bid_statistics(contractor_id: str, is_tier1: bool = False) -> Dict[str, Any]:
+    """Get comprehensive bid statistics for a contractor"""
+    try:
+        stats = {
+            "bids_submitted": 0,
+            "bids_won": 0,
+            "total_connection_fees": 0.0,
+            "active_bid_cards": 0
+        }
+        
+        if is_tier1:
+            # For Tier 1 contractors, check the bids table and bid_cards
+            bids_result = db.client.table("bids")\
+                .select("id, bid_card_id, status")\
+                .eq("contractor_id", contractor_id)\
+                .execute()
+            
+            if bids_result.data:
+                stats["bids_submitted"] = len(bids_result.data)
+                
+                # Count won bids (where contractor was selected)
+                for bid in bids_result.data:
+                    if bid.get("status") == "accepted" or bid.get("status") == "won":
+                        stats["bids_won"] += 1
+                
+                # Count active bid cards (status in generating, collecting_bids)
+                bid_card_ids = [bid["bid_card_id"] for bid in bids_result.data]
+                if bid_card_ids:
+                    active_cards = db.client.table("bid_cards")\
+                        .select("id")\
+                        .in_("id", bid_card_ids)\
+                        .in_("status", ["generating", "collecting_bids"])\
+                        .execute()
+                    stats["active_bid_cards"] = len(active_cards.data) if active_cards.data else 0
+            
+            # Get connection fees for Tier 1 contractors
+            fees_result = db.client.table("connection_fees")\
+                .select("fee_amount")\
+                .eq("contractor_id", contractor_id)\
+                .eq("status", "paid")\
+                .execute()
+            
+            if fees_result.data:
+                stats["total_connection_fees"] = sum(fee.get("fee_amount", 0) for fee in fees_result.data)
+        else:
+            # For Tier 2/3 contractors, check bid_cards.bid_document for submitted bids
+            # Get all bid cards this contractor has bid on through outreach attempts
+            outreach_result = db.client.table("contractor_outreach_attempts")\
+                .select("bid_card_id")\
+                .eq("contractor_lead_id", contractor_id)\
+                .execute()
+            
+            if outreach_result.data:
+                bid_card_ids = list(set([attempt["bid_card_id"] for attempt in outreach_result.data if attempt.get("bid_card_id")]))
+                
+                if bid_card_ids:
+                    # Check bid_document for submitted bids
+                    bid_cards_result = db.client.table("bid_cards")\
+                        .select("id, bid_document, status")\
+                        .in_("id", bid_card_ids)\
+                        .execute()
+                    
+                    for bid_card in bid_cards_result.data:
+                        bid_document = bid_card.get("bid_document", {})
+                        
+                        # Parse bid_document to check for this contractor's bids
+                        if isinstance(bid_document, dict):
+                            submitted_bids = bid_document.get("submitted_bids", [])
+                        elif isinstance(bid_document, str):
+                            try:
+                                import json
+                                parsed_doc = json.loads(bid_document)
+                                submitted_bids = parsed_doc.get("submitted_bids", [])
+                            except:
+                                submitted_bids = []
+                        else:
+                            submitted_bids = []
+                        
+                        # Check if this contractor has submitted a bid
+                        if isinstance(submitted_bids, list):
+                            for bid in submitted_bids:
+                                if isinstance(bid, dict) and bid.get("contractor_id") == contractor_id:
+                                    stats["bids_submitted"] += 1
+                                    
+                                    # Check if this bid was accepted
+                                    if bid.get("status") == "accepted" or bid_document.get("selected_contractor_id") == contractor_id:
+                                        stats["bids_won"] += 1
+                        
+                        # Count active bid cards
+                        if bid_card.get("status") in ["generating", "collecting_bids"]:
+                            stats["active_bid_cards"] += 1
+        
+        return stats
+        
+    except Exception as e:
+        print(f"Error getting contractor bid statistics: {e}")
+        return {
+            "bids_submitted": 0,
+            "bids_won": 0,
+            "total_connection_fees": 0.0,
+            "active_bid_cards": 0
+        }
 
 
 class ContractorSummary(BaseModel):
@@ -34,6 +139,9 @@ class ContractorSummary(BaseModel):
     last_contact: Optional[str] = None
     campaigns_participated: int
     bids_submitted: int
+    bids_won: int
+    total_connection_fees: float
+    active_bid_cards: int
     response_rate: float
     availability_status: Optional[str] = None
 
@@ -72,6 +180,9 @@ class ContractorDetail(BaseModel):
     # InstaBids activity
     campaigns_participated: int
     bids_submitted: int
+    bids_won: int
+    total_connection_fees: float
+    active_bid_cards: int
     response_rate: float
     last_contact: Optional[str] = None
     availability_status: Optional[str] = None
@@ -98,6 +209,19 @@ async def get_all_contractors(
     Tier 3: New contractors (first-time contact)
     """
     try:
+        # Try to get from cache first
+        cache_params = {
+            "tier": tier,
+            "city": city,
+            "specialty": specialty,
+            "status": status,
+            "limit": limit,
+            "offset": offset
+        }
+        cached_result = cache.get("contractors", cache_params)
+        if cached_result:
+            print(f"[CONTRACTORS] Cache hit, returning cached data")
+            return cached_result
         contractors = []
         
         # Get Tier 1 contractors (official InstaBids contractors)
@@ -136,11 +260,9 @@ async def get_all_contractors(
                 .select("campaign_id", count="exact")\
                 .eq("contractor_id", contractor["id"])\
                 .execute()
-                
-            bid_count = db.client.table("bids")\
-                .select("id", count="exact")\
-                .eq("contractor_id", contractor["id"])\
-                .execute()
+            
+            # Get comprehensive bid statistics
+            bid_stats = get_contractor_bid_statistics(contractor["id"], is_tier1=True)
             
             # Calculate response rate for Tier 1 (simplified)
             response_rate = 85.0  # Default high response rate for official contractors
@@ -167,7 +289,10 @@ async def get_all_contractors(
                 status=status,
                 last_contact=contractor.get("updated_at"),
                 campaigns_participated=campaign_count.count if campaign_count.count else 0,
-                bids_submitted=bid_count.count if bid_count.count else 0,
+                bids_submitted=bid_stats["bids_submitted"],
+                bids_won=bid_stats["bids_won"],
+                total_connection_fees=bid_stats["total_connection_fees"],
+                active_bid_cards=bid_stats["active_bid_cards"],
                 response_rate=response_rate,
                 availability_status=contractor.get("availability_status")
             )
@@ -212,8 +337,8 @@ async def get_all_contractors(
             total_outreach = len(outreach_attempts.data)
             response_rate = (response_count / total_outreach * 100) if total_outreach > 0 else 0
             
-            # Get bid count for this contractor (simplified)
-            bid_count = 0  # Most contractor leads haven't submitted bids yet
+            # Get comprehensive bid statistics for Tier 2/3
+            bid_stats = get_contractor_bid_statistics(contractor["id"], is_tier1=False)
             
             # Determine status
             status = "active"
@@ -237,7 +362,10 @@ async def get_all_contractors(
                 status=status,
                 last_contact=last_contact,
                 campaigns_participated=campaign_count,
-                bids_submitted=bid_count,
+                bids_submitted=bid_stats["bids_submitted"],
+                bids_won=bid_stats["bids_won"],
+                total_connection_fees=bid_stats["total_connection_fees"],
+                active_bid_cards=bid_stats["active_bid_cards"],
                 response_rate=round(response_rate, 1),
                 availability_status=None
             )
@@ -300,7 +428,7 @@ async def get_all_contractors(
         total_count = len(contractors)
         contractors = contractors[offset:offset + limit]
 
-        return {
+        result = {
             "contractors": [c.dict() for c in contractors],
             "total_count": total_count,
             "tier_stats": tier_stats,
@@ -311,6 +439,20 @@ async def get_all_contractors(
                 "status": status
             }
         }
+        
+        # Cache the result for 60 seconds
+        cache_params = {
+            "tier": tier,
+            "city": city,
+            "specialty": specialty,
+            "status": status,
+            "limit": limit,
+            "offset": offset
+        }
+        cache.set("contractors", result, cache_params, ttl_seconds=60)
+        print(f"[CONTRACTORS] Cached result for 60 seconds")
+        
+        return result
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving contractors: {str(e)}")
@@ -349,6 +491,9 @@ async def get_contractor_detail(contractor_id: str):
                     "date": camp_data["created_at"]
                 })
             
+            # Get detailed bid statistics for Tier 1
+            detailed_bid_stats = get_contractor_bid_statistics(contractor["id"], is_tier1=True)
+            
             return ContractorDetail(
                 id=contractor["id"],
                 company_name=contractor["company_name"],
@@ -372,7 +517,10 @@ async def get_contractor_detail(contractor_id: str):
                 review_count=None,
                 lead_score=None,
                 campaigns_participated=len(campaigns.data),
-                bids_submitted=0,  # Would need to calculate
+                bids_submitted=detailed_bid_stats["bids_submitted"],
+                bids_won=detailed_bid_stats["bids_won"],
+                total_connection_fees=detailed_bid_stats["total_connection_fees"],
+                active_bid_cards=detailed_bid_stats["active_bid_cards"],
                 response_rate=100.0,  # Tier 1 assumed high response rate
                 last_contact=contractor["updated_at"],
                 availability_status=contractor["availability_status"],
@@ -423,6 +571,9 @@ async def get_contractor_detail(contractor_id: str):
         responses = len([h for h in formatted_history if h["responded_at"]])
         response_rate = (responses / total_attempts * 100) if total_attempts > 0 else 0
         
+        # Get detailed bid statistics for Tier 2/3
+        detailed_bid_stats = get_contractor_bid_statistics(contractor["id"], is_tier1=False)
+        
         return ContractorDetail(
             id=contractor["id"],
             company_name=contractor["company_name"] or "Unknown Company",
@@ -446,7 +597,10 @@ async def get_contractor_detail(contractor_id: str):
             review_count=contractor["review_count"],
             lead_score=contractor["lead_score"],
             campaigns_participated=campaign_count,
-            bids_submitted=0,  # Would need to calculate from bids table
+            bids_submitted=detailed_bid_stats["bids_submitted"],
+            bids_won=detailed_bid_stats["bids_won"],
+            total_connection_fees=detailed_bid_stats["total_connection_fees"],
+            active_bid_cards=detailed_bid_stats["active_bid_cards"],
             response_rate=round(response_rate, 1),
             last_contact=formatted_history[0]["sent_at"] if formatted_history else None,
             availability_status=None,

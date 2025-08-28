@@ -13,7 +13,7 @@ BASE_URL = "http://localhost:8008/api/messages"
 HOMEOWNER_ID = "11111111-1111-1111-1111-111111111111"  # John Homeowner
 BID_CARD_ID = "36214de5-a068-4dcc-af99-cf33238e7472"  # Kitchen remodel project
 
-def send_targeted_message(bid_card_id: str, homeowner_id: str, contractor_id: str, content: str) -> Dict:
+def send_targeted_message(bid_card_id: str, user_id: str, contractor_id: str, content: str) -> Dict:
     """Send a message to a specific contractor conversation"""
     try:
         # First, find the conversation ID for this contractor
@@ -21,7 +21,7 @@ def send_targeted_message(bid_card_id: str, homeowner_id: str, contractor_id: st
             f"{BASE_URL}/conversations/{bid_card_id}",
             params={
                 "user_type": "homeowner",
-                "user_id": homeowner_id
+                "user_id": user_id
             }
         )
         
@@ -37,7 +37,7 @@ def send_targeted_message(bid_card_id: str, homeowner_id: str, contractor_id: st
                         f"{BASE_URL}/send",
                         json={
                             "bid_card_id": bid_card_id,
-                            "sender_id": homeowner_id,
+                            "sender_id": user_id,
                             "sender_type": "homeowner",
                             "content": content,
                             "metadata": {

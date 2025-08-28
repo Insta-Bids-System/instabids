@@ -153,7 +153,7 @@ const SignupPage: React.FC = () => {
           {!manualSignup ? (
             <button
               type="button"
-              onClick={match.match(/onClick={[^}]+}/)[0]}
+              onClick={() => _setManualSignup(true)}
               className="w-full text-sm text-gray-600 hover:text-gray-800 transition-colors"
             >
               Sign up with email instead

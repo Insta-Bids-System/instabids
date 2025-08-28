@@ -119,22 +119,31 @@ class ImagePersistenceService:
             return None
 
     async def update_image_record(self, image_id: str, new_url: str) -> bool:
-        """Update the database record with the new permanent URL"""
+        """Update the database record with the new permanent URL
+        
+        UPDATED: Now saves to unified_conversation_memory instead of legacy inspiration_images table
+        """
         try:
-            result = self.supabase.table("inspiration_images").update({
-                "image_url": new_url,
-                "thumbnail_url": new_url  # Update thumbnail too
+            # Update in unified_conversation_memory table
+            result = self.supabase.table("unified_conversation_memory").update({
+                "memory_value": {
+                    "images": [{
+                        "url": new_url,
+                        "thumbnail_url": new_url,
+                        "updated_at": datetime.now().isoformat()
+                    }]
+                }
             }).eq("id", image_id).execute()
 
             if result.data:
-                logger.info(f"Updated image record {image_id} with permanent URL")
+                logger.info(f"Updated image record {image_id} in unified memory with permanent URL")
                 return True
             else:
-                logger.error(f"Failed to update image record {image_id}")
+                logger.error(f"Failed to update image record {image_id} in unified memory")
                 return False
 
         except Exception as e:
-            logger.error(f"Error updating image record: {e}")
+            logger.error(f"Error updating image record in unified memory: {e}")
             return False
 
     async def make_image_persistent(self, image_id: str, current_url: str) -> Optional[str]:
@@ -168,10 +177,14 @@ class ImagePersistenceService:
     async def fix_all_expired_images(self) -> dict[str, Any]:
         """
         Find all images with temporary URLs and make them persistent
+        
+        UPDATED: Now queries unified_conversation_memory for photo_reference entries
         """
         try:
-            # Get all inspiration images that might have temporary URLs
-            result = self.supabase.table("inspiration_images").select("*").execute()
+            # Get all photo references from unified memory that might have temporary URLs
+            result = self.supabase.table("unified_conversation_memory").select("*").eq(
+                "memory_type", "photo_reference"
+            ).execute()
 
             if not result.data:
                 return {"success": False, "error": "No images found"}
@@ -182,7 +195,10 @@ class ImagePersistenceService:
 
             for image in result.data:
                 image_id = image.get("id")
-                current_url = image.get("image_url", "")
+                memory_value = image.get("memory_value", {})
+                # Extract image URL from memory value
+                images = memory_value.get("images", [])
+                current_url = images[0].get("url", "") if images else ""
 
                 # Check if it's an OpenAI URL (temporary)
                 if "oaidalleapiprodscus.blob.core.windows.net" in current_url:
@@ -223,6 +239,61 @@ class ImagePersistenceService:
         except Exception as e:
             logger.error(f"Error fixing expired images: {e}")
             return {"success": False, "error": str(e)}
+
+    async def save_to_unified_memory(self, 
+                                     conversation_id: str, 
+                                     image_url: str, 
+                                     image_path: str,
+                                     metadata: dict = None) -> str:
+        """
+        Save image reference to unified conversation memory system
+        This is the CORRECT way for IRIS to save images!
+        
+        Args:
+            conversation_id: The conversation this image belongs to
+            image_url: Public URL of the image (from storage)
+            image_path: Storage path of the image
+            metadata: Additional image metadata (room_type, style, etc.)
+            
+        Returns:
+            Memory ID if successful, None if failed
+        """
+        try:
+            import uuid
+            memory_id = str(uuid.uuid4())
+            
+            memory_data = {
+                "id": memory_id,
+                "tenant_id": "00000000-0000-0000-0000-000000000000",
+                "conversation_id": conversation_id,
+                "memory_scope": "conversation",
+                "memory_type": "photo_reference",
+                "memory_key": f"iris_image_{datetime.now().timestamp()}",
+                "memory_value": {
+                    "images": [{
+                        "url": image_url,
+                        "path": image_path,
+                        "thumbnail_url": image_url,  # Can be different if thumbnails generated
+                        "metadata": metadata or {},
+                        "uploaded_at": datetime.now().isoformat(),
+                        "source": "iris_agent"
+                    }]
+                },
+                "importance_score": 8  # High importance for user-uploaded images
+            }
+            
+            result = self.supabase.table("unified_conversation_memory").insert(memory_data).execute()
+            
+            if result.data:
+                logger.info(f"Saved image to unified memory: {memory_id} for conversation {conversation_id}")
+                return memory_id
+            else:
+                logger.error(f"Failed to save image to unified memory")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error saving image to unified memory: {e}")
+            return None
 
 # Initialize service instance
 image_service = ImagePersistenceService()

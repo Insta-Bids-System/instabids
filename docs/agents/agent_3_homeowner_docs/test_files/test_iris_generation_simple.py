@@ -36,7 +36,7 @@ def test_iris_with_generation():
     
     iris_request = {
         "message": "Generate my dream kitchen vision! I want the modern industrial style applied to my current layout.",
-        "homeowner_id": USER_ID,
+        "user_id": USER_ID,
         "board_id": BOARD_ID,
         "conversation_context": context_messages
     }

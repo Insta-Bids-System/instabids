@@ -13,8 +13,8 @@ import {
   FileText,
 } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
-import { BidCardMarketplace } from "@/components/bidcards/BidCardMarketplace";
-import ContractorOnboardingChat from "@/components/chat/ContractorOnboardingChat";
+import { EnhancedBidCardMarketplace } from "@/components/bidcards/EnhancedBidCardMarketplace";
+import BSAChat from "@/components/chat/BSAChat";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ContractorDashboardProps {
@@ -33,11 +33,33 @@ interface ScopeChangeNotification {
   };
 }
 
+interface BidCardChangeNotification {
+  id: string;
+  title: string;
+  message: string;
+  notification_type: "bid_card_change";
+  bid_card_id: string;
+  action_url: string;
+  created_at: string;
+  is_read: boolean;
+  channels: {
+    email: boolean;
+    in_app: boolean;
+    sms: boolean;
+  };
+}
+
 export default function ContractorDashboard({ contractorId }: ContractorDashboardProps) {
   const { signOut } = useAuth();
   const [contractorData, setContractorData] = useState<any>(null);
+  
+  // Check for group package parameter in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const groupPackageParam = urlParams.get('group_package');
+  const tabParam = urlParams.get('tab');
+  
   const [activeTab, setActiveTab] = useState<"projects" | "marketplace" | "chat" | "profile" | "notifications">(
-    "projects"
+    (tabParam as any) || "chat"  // Use tab from URL or default to chat
   );
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -45,47 +67,33 @@ export default function ContractorDashboard({ contractorId }: ContractorDashboar
   const [projects, setProjects] = useState<any[]>([]);
   const [bidCards, setBidCards] = useState<any[]>([]);
   const [scopeNotifications, setScopeNotifications] = useState<ScopeChangeNotification[]>([]);
+  const [bidCardNotifications, setBidCardNotifications] = useState<BidCardChangeNotification[]>([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const loadContractorData = async () => {
+    if (!contractorId) {
+      console.error("No contractor ID available");
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true);
     try {
-      // Load contractor data from unified contractors table (59 fields)
-      const response = await fetch(`http://localhost:8008/contractors/${contractorId}/profile`);
+      // Load contractor data from backend API
+      const response = await fetch(`/api/contractors/${contractorId}`);
       if (response.ok) {
         const data = await response.json();
         setContractorData(data);
         console.log(`Loaded contractor profile: ${data.profile_completeness}% complete with ${data.data_source}`);
       } else {
         // Try the fallback summary endpoint
-        const summaryResponse = await fetch(`http://localhost:8008/contractors/${contractorId}/profile/summary`);
+        const summaryResponse = await fetch(`/contractors/${contractorId}/profile/summary`);
         if (summaryResponse.ok) {
           const summaryData = await summaryResponse.json();
           setContractorData({
             ...summaryData,
             display_name: summaryData.display_name,
-            company_name: summaryData.display_name,
-            phone: summaryData.phone,
-            email: summaryData.email,
-            website: summaryData.website,
-            location: summaryData.location,
-            rating: summaryData.rating,
-            verified: summaryData.verified,
-            years_in_business: summaryData.years_experience,
-            license_number: summaryData.license_number,
-            specialties: summaryData.specialties,
-            emergency_services: summaryData.emergency_services,
-            free_estimates: summaryData.free_estimates,
-            profile_image_url: summaryData.profile_image,
-            data_source: summaryData.data_source
-          });
-          console.log("Loaded contractor profile summary from unified table");
-        } else {
-          // Ultimate fallback for demo purposes
-          console.log("API failed, using demo contractor data");
-          setContractorData({
-            company_name: "Demo Construction LLC",
-            business_name: "Demo Construction LLC", 
+            company_name: summaryData.display_name, 
             phone: "(555) 123-4567",
             business_phone: "(555) 123-4567",
             website_url: "https://democonstruction.com",
@@ -130,7 +138,7 @@ export default function ContractorDashboard({ contractorId }: ContractorDashboar
 
     try {
       // Load projects and bid cards from the backend API
-      const response = await fetch(`http://localhost:8008/contractors/${contractorId}/projects`);
+      const response = await fetch(`/contractors/${contractorId}/projects`);
       if (response.ok) {
         const data = await response.json();
         setProjects(data.projects || []);
@@ -147,15 +155,12 @@ export default function ContractorDashboard({ contractorId }: ContractorDashboar
 
     try {
       // Load scope change notifications from the intelligent messaging API
-      const response = await fetch(`http://localhost:8008/api/intelligent-messages/scope-change-notifications/${contractorId}`);
+      const response = await fetch(`/api/intelligent-messages/scope-change-notifications/${contractorId}`);
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.notifications) {
           setScopeNotifications(data.notifications);
-          // Count unread notifications
-          const unreadCount = data.notifications.filter((notification: ScopeChangeNotification) => !notification.is_read).length;
-          setUnreadNotifications(unreadCount);
-          console.log(`Loaded ${data.notifications.length} scope change notifications, ${unreadCount} unread`);
+          console.log(`Loaded ${data.notifications.length} scope change notifications`);
         }
       }
     } catch (error) {
@@ -164,14 +169,49 @@ export default function ContractorDashboard({ contractorId }: ContractorDashboar
     }
   };
 
+  const loadBidCardNotifications = async () => {
+    if (!contractorId) return;
+
+    try {
+      // Load bid card change notifications from our new notification system
+      const response = await fetch(`/api/notifications/contractor/${contractorId}/bid-card-changes`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.notifications) {
+          setBidCardNotifications(data.notifications);
+          console.log(`Loaded ${data.notifications.length} bid card change notifications`);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading bid card notifications:", error);
+      // Don't show error since notifications are optional
+    }
+  };
+
+  const updateNotificationCounts = () => {
+    const scopeUnread = scopeNotifications.filter(n => !n.is_read).length;
+    const bidCardUnread = bidCardNotifications.filter(n => !n.is_read).length;
+    const totalUnread = scopeUnread + bidCardUnread;
+    setUnreadNotifications(totalUnread);
+    console.log(`Notification counts: ${scopeUnread} scope, ${bidCardUnread} bid card, ${totalUnread} total unread`);
+  };
+
   useEffect(() => {
     setMounted(true);
     if (contractorId) {
       loadContractorData();
       loadProjects();
-      loadScopeNotifications();
+      // Temporarily disabled to stop infinite loop
+      // loadScopeNotifications();
+      // loadBidCardNotifications();
     }
   }, [contractorId]);
+
+  // Update notification counts when notifications change
+  // Temporarily disabled to stop infinite loop
+  // useEffect(() => {
+  //   updateNotificationCounts();
+  // }, [scopeNotifications, bidCardNotifications]);
 
   const handleLogout = async () => {
     try {
@@ -221,6 +261,87 @@ export default function ContractorDashboard({ contractorId }: ContractorDashboar
           {!notification.is_read && (
             <div className="flex-shrink-0">
               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Component for displaying bid card change notifications
+  const BidCardChangeMessage = ({ notification }: { notification: BidCardChangeNotification }) => {
+    const handleViewBidCard = () => {
+      // Navigate to bid card details
+      console.log("View bid card for notification:", notification.id);
+      // TODO: Navigate to bid card details view
+      window.open(`/bid-cards/${notification.bid_card_id}`, '_blank');
+    };
+
+    const markAsRead = async () => {
+      if (notification.is_read) return;
+      
+      try {
+        const response = await fetch(`/api/notifications/${notification.id}/mark-read`, {
+          method: 'POST',
+        });
+        
+        if (response.ok) {
+          // Update the notification state locally
+          setBidCardNotifications(prev => 
+            prev.map(n => n.id === notification.id ? {...n, is_read: true} : n)
+          );
+        }
+      } catch (error) {
+        console.error("Error marking notification as read:", error);
+      }
+    };
+
+    return (
+      <div 
+        className={`border-l-4 p-4 my-4 rounded-r-lg cursor-pointer transition-colors ${
+          notification.is_read 
+            ? 'bg-gray-50 border-gray-400 hover:bg-gray-100' 
+            : 'bg-green-50 border-green-500 hover:bg-green-100'
+        }`}
+        onClick={markAsRead}
+      >
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <Bell className={`w-5 h-5 ${notification.is_read ? 'text-gray-600' : 'text-green-600'}`} />
+          </div>
+          <div className="ml-3 flex-grow">
+            <p className={`text-sm font-medium ${notification.is_read ? 'text-gray-800' : 'text-green-800'}`}>
+              {notification.title}
+            </p>
+            <div className={`mt-1 text-sm ${notification.is_read ? 'text-gray-700' : 'text-green-700'}`}>
+              {notification.message.split('\n').slice(0, 3).map((line, index) => (
+                <p key={index}>{line}</p>
+              ))}
+              {notification.message.split('\n').length > 3 && (
+                <p className="text-xs mt-1 italic">... click to read more</p>
+              )}
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              {new Date(notification.created_at).toLocaleDateString()} at{" "}
+              {new Date(notification.created_at).toLocaleTimeString()}
+            </div>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewBidCard();
+              }}
+              className={`mt-2 px-3 py-1 text-xs rounded transition-colors ${
+                notification.is_read
+                  ? 'bg-gray-500 text-white hover:bg-gray-600'
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              }`}
+            >
+              View Project Details
+            </button>
+          </div>
+          {!notification.is_read && (
+            <div className="flex-shrink-0">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
             </div>
           )}
         </div>
@@ -293,7 +414,7 @@ export default function ContractorDashboard({ contractorId }: ContractorDashboar
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
-              My Projects
+              My Bids
             </button>
             <button
               type="button"
@@ -315,7 +436,7 @@ export default function ContractorDashboard({ contractorId }: ContractorDashboar
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
-              CoIA Assistant
+              BSA - Bidding Agent
             </button>
             <button
               type="button"
@@ -351,14 +472,14 @@ export default function ContractorDashboard({ contractorId }: ContractorDashboar
         {activeTab === "projects" && (
           <>
             <div className="mb-8 flex justify-between items-center">
-              <h1 className="text-3xl font-bold text-gray-900">My Projects</h1>
+              <h1 className="text-3xl font-bold text-gray-900">My Bids</h1>
               <button
                 type="button"
                 onClick={() => setActiveTab("chat")}
                 className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
               >
                 <Plus className="w-5 h-5" />
-                New Project Discussion
+              Get Bidding Help
               </button>
             </div>
 
@@ -418,7 +539,60 @@ export default function ContractorDashboard({ contractorId }: ContractorDashboar
                                   )}
                                 </div>
                               </div>
+
+                              {/* Service Complexity & Trade Information */}
+                              <div className="flex items-center gap-2 mb-3">
+                                {bidCard.service_complexity && (
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    bidCard.service_complexity === "single-trade" 
+                                      ? "bg-blue-100 text-blue-800" 
+                                      : bidCard.service_complexity === "multi-trade" 
+                                      ? "bg-orange-100 text-orange-800" 
+                                      : "bg-red-100 text-red-800"
+                                  }`}>
+                                    {bidCard.service_complexity === "single-trade" && "Single Trade"}
+                                    {bidCard.service_complexity === "multi-trade" && "Multi Trade"}
+                                    {bidCard.service_complexity === "complex-coordination" && "Complex Project"}
+                                  </span>
+                                )}
+                                {bidCard.trade_count && (
+                                  <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
+                                    {bidCard.trade_count} {bidCard.trade_count === 1 ? "Trade" : "Trades"}
+                                  </span>
+                                )}
+                                {bidCard.primary_trade && bidCard.primary_trade !== bidCard.project_type && (
+                                  <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+                                    {bidCard.primary_trade}
+                                  </span>
+                                )}
+                                {bidCard.group_bid_eligible && (
+                                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                    Group Eligible
+                                  </span>
+                                )}
+                              </div>
+
                               <p className="text-gray-600 text-sm mb-4">{bidCard.description}</p>
+                              
+                              {/* Secondary Trades Information */}
+                              {bidCard.secondary_trades && bidCard.secondary_trades.length > 0 && (
+                                <div className="mb-4">
+                                  <p className="text-xs text-gray-500 mb-1">Additional trades needed:</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {bidCard.secondary_trades.slice(0, 3).map((trade, index) => (
+                                      <span key={index} className="px-2 py-1 bg-gray-50 text-gray-600 rounded text-xs">
+                                        {trade}
+                                      </span>
+                                    ))}
+                                    {bidCard.secondary_trades.length > 3 && (
+                                      <span className="px-2 py-1 bg-gray-50 text-gray-600 rounded text-xs">
+                                        +{bidCard.secondary_trades.length - 3} more
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="flex items-center justify-between">
                                 <span className="text-primary-600 font-medium">
                                   {bidCard.budget_range}
@@ -477,27 +651,28 @@ export default function ContractorDashboard({ contractorId }: ContractorDashboar
               </p>
             </div>
 
-            <BidCardMarketplace contractorId={contractorId} userType="contractor" />
+            <EnhancedBidCardMarketplace contractorId={contractorId} userType="contractor" />
           </div>
         )}
 
-        {/* CoIA Chat Tab */}
+        {/* BSA Chat Tab */}
         {activeTab === "chat" && (
           <div>
             <div className="mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">CoIA Assistant</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">BSA - Bid Submission Agent</h1>
               <p className="text-gray-600">
-                Your Contractor Onboarding & Intelligence Agent with voice capabilities
+                Your AI-powered bidding assistant that helps create professional, winning proposals
               </p>
             </div>
 
             <div className="max-w-4xl mx-auto">
-              <ContractorOnboardingChat
-                sessionId={sessionId}
-                onComplete={(contractorId) => {
-                  console.log("Contractor onboarding completed:", contractorId);
-                  // Optionally refresh contractor data or redirect
-                  loadContractorData();
+              <BSAChat
+                contractorId={contractorId || ""}
+                groupPackageId={groupPackageParam || undefined}
+                onComplete={(data) => {
+                  console.log("BSA conversation completed:", data);
+                  // Removed loadContractorData() call to prevent infinite reload loop
+                  // loadContractorData();
                 }}
               />
             </div>
@@ -510,25 +685,57 @@ export default function ContractorDashboard({ contractorId }: ContractorDashboar
             <div className="mb-6">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Notifications</h1>
               <p className="text-gray-600">
-                Project updates and scope changes from homeowners
+                Project updates, scope changes, and bid card modifications from homeowners
               </p>
             </div>
 
-            {scopeNotifications.length === 0 ? (
+            {scopeNotifications.length === 0 && bidCardNotifications.length === 0 ? (
               <div className="bg-white rounded-lg shadow p-12 text-center">
                 <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">
                   No notifications yet
                 </h2>
                 <p className="text-gray-600">
-                  You'll be notified when homeowners make changes to project scope
+                  You'll be notified when homeowners make changes to projects or bid cards you've engaged with
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {scopeNotifications.map((notification) => (
-                  <ScopeChangeMessage key={notification.id} notification={notification} />
-                ))}
+              <div className="space-y-6">
+                {/* Bid Card Change Notifications */}
+                {bidCardNotifications.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <Bell className="w-5 h-5 mr-2 text-green-600" />
+                      Project Updates ({bidCardNotifications.length})
+                    </h3>
+                    <div className="space-y-4">
+                      {bidCardNotifications
+                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                        .map((notification) => (
+                          <BidCardChangeMessage key={notification.id} notification={notification} />
+                        ))
+                      }
+                    </div>
+                  </div>
+                )}
+
+                {/* Scope Change Notifications */}
+                {scopeNotifications.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <FileText className="w-5 h-5 mr-2 text-blue-600" />
+                      Scope Changes ({scopeNotifications.length})
+                    </h3>
+                    <div className="space-y-4">
+                      {scopeNotifications
+                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                        .map((notification) => (
+                          <ScopeChangeMessage key={notification.id} notification={notification} />
+                        ))
+                      }
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

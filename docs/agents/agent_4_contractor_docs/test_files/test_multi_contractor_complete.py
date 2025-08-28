@@ -43,14 +43,14 @@ def send_message(bid_card_id: str, sender_id: str, sender_type: str, content: st
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-def get_all_conversations(bid_card_id: str, homeowner_id: str) -> List[Dict]:
+def get_all_conversations(bid_card_id: str, user_id: str) -> List[Dict]:
     """Get all conversations for a homeowner on a specific bid card"""
     try:
         response = requests.get(
             f"{BASE_URL}/conversations/{bid_card_id}",
             params={
                 "user_type": "homeowner",
-                "user_id": homeowner_id
+                "user_id": user_id
             }
         )
         result = response.json()

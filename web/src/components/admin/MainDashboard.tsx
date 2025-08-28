@@ -1,7 +1,7 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
-import { useWebSocket } from "../../hooks/useWebSocket";
+import { useWebSocketContext } from "../../context/WebSocketContext";
 import type {
   AdminDashboardData,
   AgentHealthStatus,
@@ -18,6 +18,9 @@ import SystemMetrics from "./SystemMetrics";
 import EnhancedSearchPanel from "./EnhancedSearchPanel";
 import ContractorManagement from "./ContractorManagement";
 import CampaignManagement from "./CampaignManagement";
+import EnhancedAgentMonitoring from "./EnhancedAgentMonitoring";
+import ConnectionFeesManagement from "./ConnectionFeesManagement";
+// import SubmittedProposalsTab from "./SubmittedProposalsTab";
 
 interface DatabaseStats {
   total_tables: number;
@@ -89,12 +92,8 @@ const MainDashboard: React.FC = () => {
   const { adminUser, logout, session } = useAdminAuth();
   const {
     isConnected,
-    lastMessage,
-    error: wsError,
-  } = useWebSocket({
-    autoConnect: true,
-    debug: true,
-  });
+    lastMessage
+  } = useWebSocketContext();
 
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -229,6 +228,8 @@ const MainDashboard: React.FC = () => {
   const tabs = [
     { id: "overview", name: "Overview", icon: "📊" },
     { id: "bid-cards", name: "Bid Cards", icon: "📋" },
+    { id: "submitted-proposals", name: "Submitted Proposals", icon: "📝" },
+    { id: "connection-fees", name: "Connection Fees", icon: "💳" },
     { id: "campaigns", name: "Campaigns", icon: "🎯" },
     { id: "search", name: "Search", icon: "🔍" },
     { id: "agents", name: "Agents", icon: "🤖" },
@@ -360,12 +361,21 @@ const MainDashboard: React.FC = () => {
 
           {selectedTab === "bid-cards" && <BidCardMonitor />}
 
+          {selectedTab === "submitted-proposals" && (
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Submitted Proposals</h3>
+              <p>This section is temporarily disabled for troubleshooting.</p>
+            </div>
+          )}
+
+          {selectedTab === "connection-fees" && <ConnectionFeesManagement />}
+
           {selectedTab === "campaigns" && <CampaignManagement />}
 
           {selectedTab === "search" && <EnhancedSearchPanel />}
 
           {selectedTab === "agents" && (
-            <AgentStatusPanel agentStatuses={dashboardData.agent_statuses} />
+            <EnhancedAgentMonitoring />
           )}
 
           {selectedTab === "contractors" && (

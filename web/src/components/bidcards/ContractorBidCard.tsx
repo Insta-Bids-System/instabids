@@ -40,7 +40,7 @@ import {
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useBidCard } from "../../contexts/BidCardContext";
 import {
   checkExistingConversation,
@@ -82,25 +82,7 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
   const [attachments, setAttachments] = useState<any[]>([]);
   const [uploadLoading, setUploadLoading] = useState(false);
 
-  useEffect(() => {
-    if (bidCard.has_bid) {
-      loadMessages();
-    }
-    checkForExistingConversation();
-  }, [bidCard.has_bid, checkForExistingConversation, loadMessages]);
-
-  const checkForExistingConversation = async () => {
-    try {
-      // Assuming contractor_id is available from props or context
-      const contractor_id = "22222222-2222-2222-2222-222222222222"; // TODO: Get from auth/props
-      const conversation = await checkExistingConversation(bidCard.id, contractor_id);
-      setHasExistingConversation(!!conversation);
-    } catch (error) {
-      console.error("Error checking for conversation:", error);
-    }
-  };
-
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     try {
       const contractor_id = "22222222-2222-2222-2222-222222222222"; // TODO: Get from auth/props
 
@@ -123,7 +105,25 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
       console.error("Failed to load messages:", error);
       setMessages([]);
     }
-  };
+  }, [bidCard.id]);
+
+  const checkForExistingConversation = useCallback(async () => {
+    try {
+      // Assuming contractor_id is available from props or context
+      const contractor_id = "22222222-2222-2222-2222-222222222222"; // TODO: Get from auth/props
+      const conversation = await checkExistingConversation(bidCard.id, contractor_id);
+      setHasExistingConversation(!!conversation);
+    } catch (error) {
+      console.error("Error checking for conversation:", error);
+    }
+  }, [bidCard.id]);
+
+  useEffect(() => {
+    if (bidCard.has_bid) {
+      loadMessages();
+    }
+    checkForExistingConversation();
+  }, [bidCard.has_bid, checkForExistingConversation, loadMessages]);
 
   const _calculateDaysUntilStart = () => {
     const start = dayjs(bidCard.timeline.start_date);
@@ -225,7 +225,7 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
       const result = await startBidCardConversation(
         bidCard.id,
         contractor_id,
-        bidCard.homeowner_id,
+        bidCard.user_id,
         initialMessage ||
           "Hi! I'm interested in your project and have some questions about the requirements."
       );
@@ -313,16 +313,15 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
           { required: true, message: "Please enter your bid amount" },
           {
             type: "number",
-            min: bidCard.budget_range.min * 0.8,
-            max: bidCard.budget_range.max * 1.2,
-            message: `Bid should be within reasonable range of budget`,
+            min: 1,
+            message: "Please enter a valid bid amount",
           },
         ]}
       >
         <InputNumber
           prefix="$"
           style={{ width: "100%" }}
-          placeholder={`Budget: $${bidCard.budget_range.min.toLocaleString()} - $${bidCard.budget_range.max.toLocaleString()}`}
+          placeholder="Enter your bid amount"
         />
       </Form.Item>
 
@@ -488,18 +487,18 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
       >
         <Space direction="vertical" style={{ width: "100%" }}>
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Text type="secondary">Bid Amount</Text>
               <Title level={4}>${bidCard.my_bid.amount.toLocaleString()}</Title>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Text type="secondary">Timeline</Text>
               <Text strong display="block">
                 {dayjs(bidCard.my_bid.timeline.start_date).format("MMM D")} -
                 {dayjs(bidCard.my_bid.timeline.end_date).format("MMM D, YYYY")}
               </Text>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={24} md={8}>
               <Text type="secondary">Status</Text>
               <Tag
                 color={
@@ -551,6 +550,23 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
                 </Tag>
               )}
               <Tag>{bidCard.project_type}</Tag>
+              {bidCard.service_complexity && (
+                <Tag 
+                  color={
+                    bidCard.service_complexity === "single-trade" ? "blue" : 
+                    bidCard.service_complexity === "multi-trade" ? "orange" : "red"
+                  }
+                >
+                  {bidCard.service_complexity === "single-trade" && "Single Trade"}
+                  {bidCard.service_complexity === "multi-trade" && "Multi Trade"}
+                  {bidCard.service_complexity === "complex-coordination" && "Complex"}
+                </Tag>
+              )}
+              {bidCard.primary_trade && (
+                <Tag color="purple">
+                  {bidCard.primary_trade}
+                </Tag>
+              )}
             </Space>
           </Space>
         }
@@ -582,7 +598,7 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
         <Paragraph>{bidCard.description}</Paragraph>
 
         <Row gutter={[16, 16]}>
-          <Col span={8}>
+          <Col xs={24} sm={12} md={6}>
             <Card size="small" bordered={false}>
               <Space direction="vertical" align="center" style={{ width: "100%" }}>
                 <DollarOutlined style={{ fontSize: 24, color: "#52c41a" }} />
@@ -594,7 +610,7 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
               </Space>
             </Card>
           </Col>
-          <Col span={8}>
+          <Col xs={24} sm={12} md={6}>
             <Card size="small" bordered={false}>
               <Space direction="vertical" align="center" style={{ width: "100%" }}>
                 <CalendarOutlined style={{ fontSize: 24, color: "#1890ff" }} />
@@ -607,7 +623,7 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
               </Space>
             </Card>
           </Col>
-          <Col span={8}>
+          <Col xs={24} sm={12} md={6}>
             <Card size="small" bordered={false}>
               <Space direction="vertical" align="center" style={{ width: "100%" }}>
                 <EnvironmentOutlined style={{ fontSize: 24, color: "#fa8c16" }} />
@@ -619,6 +635,28 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
               </Space>
             </Card>
           </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card size="small" bordered={false}>
+              <Space direction="vertical" align="center" style={{ width: "100%" }}>
+                <TeamOutlined style={{ fontSize: 24, color: "#722ed1" }} />
+                <Text type="secondary">Service Complexity</Text>
+                <Text strong>
+                  {bidCard.service_complexity === "single-trade" && "Single Trade"}
+                  {bidCard.service_complexity === "multi-trade" && "Multi Trade"}
+                  {bidCard.service_complexity === "complex-coordination" && "Complex"}
+                  {!bidCard.service_complexity && "Not specified"}
+                </Text>
+                {bidCard.trade_count && (
+                  <Tag color="purple">{bidCard.trade_count} trade{bidCard.trade_count !== 1 ? 's' : ''}</Tag>
+                )}
+                {bidCard.secondary_trades && bidCard.secondary_trades.length > 0 && (
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    +{bidCard.secondary_trades.length} secondary trade{bidCard.secondary_trades.length !== 1 ? 's' : ''}
+                  </Text>
+                )}
+              </Space>
+            </Card>
+          </Col>
         </Row>
 
         <Divider />
@@ -626,26 +664,34 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
         <Space direction="vertical" style={{ width: "100%" }}>
           <Text strong>Requirements:</Text>
           <Space wrap>
-            {bidCard.requirements.map((req, index) => (
-              <Tag key={index}>{req}</Tag>
-            ))}
+            {bidCard.requirements && bidCard.requirements.length > 0 ? (
+              bidCard.requirements.map((req, index) => (
+                <Tag key={index}>{req}</Tag>
+              ))
+            ) : (
+              <Text type="secondary">No specific requirements listed</Text>
+            )}
           </Space>
 
           <Text strong>Categories:</Text>
           <Space wrap>
-            {bidCard.categories.map((cat, index) => (
-              <Tag key={index} color="blue">
-                {cat}
-              </Tag>
-            ))}
+            {bidCard.categories && bidCard.categories.length > 0 ? (
+              bidCard.categories.map((cat, index) => (
+                <Tag key={index} color="blue">
+                  {cat}
+                </Tag>
+              ))
+            ) : (
+              <Text type="secondary">No categories specified</Text>
+            )}
           </Space>
         </Space>
 
         <Divider />
 
-        <Row gutter={16} align="middle">
-          <Col span={12}>
-            <Space>
+        <Row gutter={[16, 16]} align="middle">
+          <Col xs={24} md={12}>
+            <Space wrap>
               <TeamOutlined />
               <Text>{bidCard.bid_count} bids submitted</Text>
               {bidCard.bid_deadline && (
@@ -658,48 +704,75 @@ export const ContractorBidCard: React.FC<ContractorBidCardProps> = ({
               )}
             </Space>
           </Col>
-          <Col span={12} style={{ textAlign: "right" }}>
-            <Space>
-              {/* Messaging Button */}
-              {hasExistingConversation ? (
-                <Button
-                  icon={<MessageOutlined />}
-                  onClick={() => setMessageModalVisible(true)}
-                  className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                >
-                  Continue Chat
-                </Button>
-              ) : (
-                <Button
-                  icon={<MessageOutlined />}
-                  loading={isLoadingConversation}
-                  onClick={() => handleStartConversation()}
-                  className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                >
-                  Ask Questions
-                </Button>
-              )}
-
-              {/* Bid Submission Button */}
-              {!bidCard.has_bid && bidCard.can_bid ? (
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={<SendOutlined />}
-                  onClick={() => setBidModalVisible(true)}
-                >
-                  Submit Bid
-                </Button>
-              ) : bidCard.has_bid ? (
-                <Tag color="success" icon={<CheckCircleOutlined />}>
-                  Bid Submitted
-                </Tag>
-              ) : (
-                <Tooltip title="You cannot bid on this project">
-                  <Button disabled>Cannot Bid</Button>
-                </Tooltip>
-              )}
-            </Space>
+          <Col xs={24} md={12}>
+            <Row gutter={[8, 8]} justify={window.innerWidth < 768 ? "center" : "end"}>
+              <Col xs={24} sm={12} md={12}>
+                {/* Messaging Button */}
+                {hasExistingConversation ? (
+                  <Button
+                    icon={<MessageOutlined />}
+                    onClick={() => setMessageModalVisible(true)}
+                    className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                    block={window.innerWidth < 768}
+                    style={{ 
+                      height: window.innerWidth < 768 ? '48px' : 'auto',
+                      fontSize: window.innerWidth < 768 ? '16px' : '14px'
+                    }}
+                  >
+                    Continue Chat
+                  </Button>
+                ) : (
+                  <Button
+                    icon={<MessageOutlined />}
+                    loading={isLoadingConversation}
+                    onClick={() => setMessageModalVisible(true)}
+                    className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                    block={window.innerWidth < 768}
+                    style={{ 
+                      height: window.innerWidth < 768 ? '48px' : 'auto',
+                      fontSize: window.innerWidth < 768 ? '16px' : '14px'
+                    }}
+                  >
+                    Ask Questions
+                  </Button>
+                )}
+              </Col>
+              <Col xs={24} sm={12} md={12}>
+                {/* Bid Submission Button */}
+                {!bidCard.has_bid && bidCard.can_bid ? (
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<SendOutlined />}
+                    onClick={() => setBidModalVisible(true)}
+                    block={window.innerWidth < 768}
+                    style={{ 
+                      height: window.innerWidth < 768 ? '48px' : 'auto',
+                      fontSize: window.innerWidth < 768 ? '16px' : '14px'
+                    }}
+                  >
+                    Submit Bid
+                  </Button>
+                ) : bidCard.has_bid ? (
+                  <Tag color="success" icon={<CheckCircleOutlined />} style={{ width: '100%', textAlign: 'center', padding: '8px' }}>
+                    Bid Submitted
+                  </Tag>
+                ) : (
+                  <Tooltip title="You cannot bid on this project">
+                    <Button 
+                      disabled 
+                      block={window.innerWidth < 768}
+                      style={{ 
+                        height: window.innerWidth < 768 ? '48px' : 'auto',
+                        fontSize: window.innerWidth < 768 ? '16px' : '14px'
+                      }}
+                    >
+                      Cannot Bid
+                    </Button>
+                  </Tooltip>
+                )}
+              </Col>
+            </Row>
           </Col>
         </Row>
 

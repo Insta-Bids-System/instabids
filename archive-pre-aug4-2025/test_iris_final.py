@@ -11,7 +11,7 @@ url = "http://localhost:8008/api/iris/chat"
 
 payload = {
     "message": "Can you generate a vision of my kitchen with modern white cabinets?",
-    "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",
     "board_id": "26cf972b-83e4-484c-98b6-a5d1a4affee3"
 }
 
@@ -53,7 +53,7 @@ print("=" * 50)
 
 payload2 = {
     "message": "What did I just ask you to generate?",
-    "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",
     "board_id": "26cf972b-83e4-484c-98b6-a5d1a4affee3"
 }
 

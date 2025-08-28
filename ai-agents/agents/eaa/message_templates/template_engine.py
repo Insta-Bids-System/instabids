@@ -95,11 +95,56 @@ class TemplateEngine:
         budget_max = bid_card_data.get("budget_max", 15000)
         scope_summary = bid_card_data.get("scope_summary", "quality work needed")
 
+        # NEW: Extract deadline information for template context
+        deadline_context = ""
+        deadline_urgency_modifier = ""
+        
+        # Check for exact deadline fields from the date extraction system
+        project_completion_deadline = bid_card_data.get("project_completion_deadline")
+        bid_collection_deadline = bid_card_data.get("bid_collection_deadline") 
+        deadline_hard = bid_card_data.get("deadline_hard", False)
+        deadline_context_raw = bid_card_data.get("deadline_context", "")
+        
+        if project_completion_deadline:
+            from datetime import datetime
+            try:
+                if isinstance(project_completion_deadline, str):
+                    deadline_date = datetime.fromisoformat(project_completion_deadline.replace('Z', '+00:00'))
+                else:
+                    deadline_date = project_completion_deadline
+                    
+                days_remaining = (deadline_date - datetime.now()).days
+                
+                # Create deadline context for contractor messages
+                if deadline_hard:
+                    deadline_urgency_modifier = "FIRM DEADLINE - "
+                    deadline_context = f"This project has a firm deadline of {deadline_date.strftime('%B %d')}."
+                else:
+                    deadline_context = f"The homeowner is hoping to complete this by {deadline_date.strftime('%B %d')}."
+                
+                # Add urgency context based on days remaining
+                if days_remaining <= 3:
+                    deadline_context += " This is an urgent timeline requiring immediate attention."
+                elif days_remaining <= 7:
+                    deadline_context += " Time is of the essence for this project."
+                elif days_remaining <= 14:
+                    deadline_context += " Please respond promptly to meet this timeline."
+                    
+                # If we have deadline context from CIA, include that too
+                if deadline_context_raw:
+                    deadline_context += f" Context: {deadline_context_raw}"
+                    
+            except Exception as e:
+                print(f"[TemplateEngine] Error parsing deadline: {e}")
+
         # Generate urgency-specific content
         urgency_prefix, urgency_text = self._get_urgency_content(urgency)
 
-        # Create bid card link (mock for now)
-        bid_card_link = f"https://instabids.com/bid/{bid_card_data.get('id', 'demo')}"
+        # Create bid card link to external landing page
+        # Using the bid card ID as a public token for now
+        # In production, bid cards should have a separate public_token field
+        bid_card_id = bid_card_data.get('id', 'demo')
+        bid_card_link = f"https://instabids.com/join?bid={bid_card_id}&src=email"
 
         template_vars = {
             "contractor_name": contractor_name,
@@ -112,6 +157,8 @@ class TemplateEngine:
             "urgency_level": urgency,
             "urgency_prefix": urgency_prefix,
             "urgency_text": urgency_text,
+            "deadline_context": deadline_context,
+            "deadline_urgency_modifier": deadline_urgency_modifier,
             "bid_card_link": bid_card_link,
             "current_date": datetime.now().strftime("%B %d, %Y"),
             "timeline": self._get_timeline_text(urgency)
@@ -287,7 +334,7 @@ class TemplateEngine:
         """Load email templates for different project types"""
         return {
             "kitchen_urgent_email": {
-                "subject": "{urgency_prefix}Kitchen Remodel Project in {location} - ${budget_min}-${budget_max}",
+                "subject": "{deadline_urgency_modifier}{urgency_prefix}Kitchen Remodel Project in {location} - ${budget_min}-${budget_max}",
                 "html_body": """
                 <html>
                 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -309,6 +356,8 @@ class TemplateEngine:
                     </div>
 
                     <p>{urgency_text}</p>
+                    
+                    {deadline_context}
 
                     <p>This homeowner is pre-qualified and ready to hire the right contractor. <strong>Would you be interested in submitting a competitive bid?</strong></p>
 
@@ -344,6 +393,8 @@ Project Details:
 
 {urgency_text}
 
+{deadline_context}
+
 This homeowner is pre-qualified and ready to hire. Would you be interested in submitting a bid?
 
 View full project details: {bid_card_link}
@@ -354,7 +405,7 @@ Connecting quality contractors with ready-to-hire homeowners
                 """
             },
             "kitchen_standard_email": {
-                "subject": "Kitchen Remodel Project in {location} - ${budget_min}-${budget_max}",
+                "subject": "{deadline_urgency_modifier}Kitchen Remodel Project in {location} - ${budget_min}-${budget_max}",
                 "html_body": """
                 <html>
                 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -376,6 +427,8 @@ Connecting quality contractors with ready-to-hire homeowners
 
                     <p><strong>Project Description:</strong><br>
                     {scope_summary}</p>
+
+                    {deadline_context}
 
                     <p>The homeowner has already completed their project planning and is ready to review competitive bids from qualified contractors like yourself.</p>
 
@@ -406,6 +459,8 @@ Project Overview:
 Project Description:
 {scope_summary}
 
+{deadline_context}
+
 The homeowner is ready to review competitive bids from qualified contractors.
 
 View complete project details: {bid_card_link}
@@ -417,7 +472,7 @@ The Instabids Team
                 """
             },
             "bathroom_standard_email": {
-                "subject": "Bathroom Renovation Project - {location} - ${budget_min}-${budget_max}",
+                "subject": "{deadline_urgency_modifier}Bathroom Renovation Project - {location} - ${budget_min}-${budget_max}",
                 "html_body": """
                 <html>
                 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">

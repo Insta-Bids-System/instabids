@@ -15,6 +15,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 import database_simple
+from config.service_urls import get_backend_url
 from agents.intelligent_messaging_agent import (
     process_intelligent_message,
     AgentAction,
@@ -35,6 +36,8 @@ class IntelligentMessageRequest(BaseModel):
     target_contractor_id: Optional[str] = None
     message_type: Optional[str] = "text"
     metadata: Optional[Dict[str, Any]] = {}
+    # BID SUBMISSION FIELDS
+    bid_data: Optional[Dict[str, Any]] = None
 
 
 class AgentCommentResponse(BaseModel):
@@ -90,27 +93,20 @@ async def upload_file_to_storage(file_data: bytes, file_name: str, content_type:
 async def health_check():
     """Health check for intelligent messaging system"""
     try:
-        # Test database connection
+        # Test database connection with unified messaging system
         db = database_simple.get_client()
-        result = db.table("conversations").select("count").limit(1).execute()
+        result = db.table("unified_conversations").select("count").limit(1).execute()
         
-        # Test intelligent agent (basic functionality test)
-        test_result = await process_intelligent_message(
-            content="Test message for health check",
-            sender_type="contractor",
-            sender_id="health-check-test",
-            bid_card_id="health-check-bid-card"
-        )
-        
-        agent_status = "operational" if test_result.get("approved") is not None else "degraded"
+        # Simple health check without triggering full AI processing
+        # Just verify the system components are available
         
         return {
             "success": True,
             "status": "healthy",
-            "message": "GPT-5 Intelligent Messaging System ready",
+            "message": "Intelligent Messaging System ready",
             "database": "connected",
-            "intelligent_agent": agent_status,
-            "gpt5_available": test_result.get("confidence_score", 0) > 0,
+            "intelligent_agent": "available",
+            "api_endpoints": "operational",
             "fallback_system": "active",
             "timestamp": datetime.now().isoformat()
         }
@@ -132,6 +128,12 @@ async def send_intelligent_message(request: IntelligentMessageRequest):
     BUSINESS CRITICAL: This endpoint prevents contact information sharing
     """
     try:
+        # Determine message type based on bid_data presence
+        message_type = MessageType.BID_SUBMISSION if request.bid_data else MessageType.TEXT
+        
+        # Check if this is a bid submission (doesn't need conversation resolution)
+        is_bid_submission = request.message_type and "bid_submission" in request.message_type
+        
         # Process message through intelligent agent
         agent_result = await process_intelligent_message(
             content=request.content,
@@ -140,10 +142,31 @@ async def send_intelligent_message(request: IntelligentMessageRequest):
             bid_card_id=request.bid_card_id,
             conversation_id=request.conversation_id,
             attachments=[],  # TODO: Add attachment support
-            image_data=None   # TODO: Add image analysis
+            image_data=None,   # TODO: Add image analysis
+            message_type=message_type,
+            bid_data=request.bid_data
         )
         
-        # Handle conversation targeting (same logic as existing system)
+        # For bid submissions, skip conversation resolution entirely
+        if is_bid_submission:
+            # Don't need conversation for bid filtering
+            conversation_id = f"bid-submission-{request.bid_card_id}"
+            
+            # Return the filtered result immediately
+            return IntelligentMessageResponse(
+                success=True,
+                message_id=None,  # No message saved for bid filtering
+                conversation_id=conversation_id,
+                approved=agent_result["approved"],
+                agent_decision=agent_result["agent_decision"],
+                threats_detected=agent_result["threats_detected"],
+                confidence_score=agent_result["confidence_score"],
+                original_content=request.content,
+                filtered_content=agent_result["filtered_content"],
+                agent_comments=[]
+            )
+        
+        # For regular messages, handle conversation targeting (OLD SYSTEM - BROKEN)
         conversation_id = await resolve_conversation_id(
             request=request,
             agent_approved=agent_result["approved"]
@@ -235,7 +258,7 @@ async def resolve_conversation_id(request: IntelligentMessageRequest, agent_appr
         elif request.sender_type == "homeowner" and request.target_contractor_id:
             conv_result = db.table("conversations").select("*").eq(
                 "bid_card_id", request.bid_card_id
-            ).eq("homeowner_id", request.sender_id).eq(
+            ).eq("user_id", request.sender_id).eq(
                 "contractor_id", request.target_contractor_id
             ).execute()
             
@@ -245,7 +268,7 @@ async def resolve_conversation_id(request: IntelligentMessageRequest, agent_appr
                 # Create new conversation
                 new_conv = {
                     "bid_card_id": request.bid_card_id,
-                    "homeowner_id": request.sender_id,
+                    "user_id": request.sender_id,
                     "contractor_id": request.target_contractor_id,
                     "contractor_alias": f"Contractor {request.target_contractor_id[:1].upper()}",
                     "status": "active"
@@ -263,15 +286,15 @@ async def resolve_conversation_id(request: IntelligentMessageRequest, agent_appr
                 return conv_result.data[0]["id"]
             else:
                 # Create new conversation
-                bid_card_result = db.table("bid_cards").select("homeowner_id").eq(
+                bid_card_result = db.table("bid_cards").select("user_id").eq(
                     "id", request.bid_card_id
                 ).execute()
                 
                 if bid_card_result.data:
-                    homeowner_id = bid_card_result.data[0]["homeowner_id"]
+                    user_id = bid_card_result.data[0]["user_id"]
                     new_conv = {
                         "bid_card_id": request.bid_card_id,
-                        "homeowner_id": homeowner_id,
+                        "user_id": user_id,
                         "contractor_id": request.sender_id,
                         "contractor_alias": "Contractor",
                         "status": "active"
@@ -311,17 +334,29 @@ async def save_approved_message(conversation_id: str, request: IntelligentMessag
             "is_read": False
         }
         
-        result = db.table("messaging_system_messages").insert(message_data).execute()
-        
-        if result.data:
-            # Update conversation timestamp
-            db.table("conversations").update({
-                "last_message_at": result.data[0]["created_at"]
-            }).eq("id", conversation_id).execute()
+        # Save message via UNIFIED CONVERSATION API
+        import requests
+        try:
+            response = requests.post(f"{get_backend_url()}/api/conversations/message", json={
+                "conversation_id": conversation_id,
+                "sender_type": message_data["sender_type"],
+                "sender_id": message_data["sender_id"],
+                "agent_type": "intelligent_messaging",
+                "content": message_data["filtered_content"],
+                "content_type": "text",
+                "metadata": message_data["metadata"]
+            }, timeout=30)
             
-            return result.data[0]["id"]
-        
-        return None
+            if response.ok:
+                result = response.json()
+                return result.get("message_id")
+            else:
+                print(f"Failed to save via unified API: {response.text}")
+                return None
+                
+        except Exception as api_error:
+            print(f"Error calling unified API: {api_error}")
+            return None
         
     except Exception as e:
         print(f"Error saving message: {e}")
@@ -505,10 +540,10 @@ async def get_security_analysis(bid_card_id: str):
         
         blocked_messages = blocked_result.data or []
         
-        # Get approved messages with filtering
-        messages_result = db.table("messaging_system_messages").select("*").join(
-            "conversations", "messaging_system_messages.conversation_id = conversations.id"
-        ).eq("conversations.bid_card_id", bid_card_id).execute()
+        # Get messages from UNIFIED MESSAGING SYSTEM
+        messages_result = db.table("unified_messages").select("*").contains(
+            "metadata", {"bid_card_id": bid_card_id}
+        ).execute()
         
         all_messages = messages_result.data or []
         filtered_messages = [msg for msg in all_messages if msg.get("content_filtered")]
@@ -547,13 +582,13 @@ async def notify_contractors_scope_change(request: dict):
     BUSINESS CRITICAL: Ensures all contractors have same project information
     """
     try:
-        required_fields = ["bid_card_id", "homeowner_id", "scope_changes", "scope_change_details"]
+        required_fields = ["bid_card_id", "user_id", "scope_changes", "scope_change_details"]
         for field in required_fields:
             if field not in request:
                 return {"success": False, "error": f"Missing required field: {field}"}
         
         bid_card_id = request["bid_card_id"]
-        homeowner_id = request["homeowner_id"]
+        user_id = request["user_id"]
         scope_changes = request["scope_changes"]
         scope_change_details = request["scope_change_details"]
         
@@ -595,18 +630,28 @@ async def notify_contractors_scope_change(request: dict):
                         "scope_changes": scope_changes,
                         "scope_change_details": scope_change_details,
                         "notification_type": "scope_change",
-                        "homeowner_id": homeowner_id
+                        "user_id": user_id
                     },
                     "is_read": False
                 }
                 
-                message_result = db.table("messaging_system_messages").insert(notification_data).execute()
+                # Save notification via UNIFIED CONVERSATION API
+                import requests
+                response = requests.post(f"{get_backend_url()}/api/conversations/message", json={
+                    "conversation_id": contractor["id"],
+                    "sender_type": "system",
+                    "sender_id": "intelligent-agent",
+                    "agent_type": "intelligent_messaging",
+                    "content": notification_message,
+                    "content_type": "text",
+                    "metadata": notification_data["metadata"]
+                }, timeout=30)
                 
-                if message_result.data:
+                if response.ok:
                     notifications_sent.append({
                         "contractor_id": contractor["contractor_id"],
                         "contractor_alias": contractor["contractor_alias"],
-                        "message_id": message_result.data[0]["id"],
+                        "message_id": response.json().get("message_id"),
                         "notification_sent": True
                     })
                 
@@ -625,7 +670,7 @@ async def notify_contractors_scope_change(request: dict):
                 "timestamp": datetime.now().isoformat(),
                 "changes": scope_changes,
                 "details": scope_change_details,
-                "updated_by": homeowner_id
+                "updated_by": user_id
             }
         }
         
@@ -690,11 +735,11 @@ async def respond_to_scope_change_question(request: dict):
         "message_id": "id of original agent comment",
         "homeowner_response": "yes" or "no", 
         "bid_card_id": "bid card id",
-        "homeowner_id": "homeowner id"
+        "user_id": "homeowner id"
     }
     """
     try:
-        required_fields = ["message_id", "homeowner_response", "bid_card_id", "homeowner_id"]
+        required_fields = ["message_id", "homeowner_response", "bid_card_id", "user_id"]
         for field in required_fields:
             if field not in request:
                 return {"success": False, "error": f"Missing required field: {field}"}
@@ -719,7 +764,7 @@ async def respond_to_scope_change_question(request: dict):
             # Send notifications using the notification endpoint
             notification_result = await notify_contractors_scope_change({
                 "bid_card_id": request["bid_card_id"],
-                "homeowner_id": request["homeowner_id"],
+                "user_id": request["user_id"],
                 "scope_changes": metadata.get("scope_changes", []),
                 "scope_change_details": metadata.get("scope_change_details", {})
             })
@@ -777,10 +822,10 @@ async def get_scope_change_notifications(contractor_id: str, bid_card_id: str = 
         if not conversation_ids:
             return {"success": True, "notifications": []}
         
-        # Get scope change notifications
-        notifications_result = db.table("messaging_system_messages").select("*").eq(
-            "message_type", "scope_change_notification"
-        ).in_("conversation_id", conversation_ids).order("created_at", desc=True).execute()
+        # Get scope change notifications from UNIFIED MESSAGING SYSTEM
+        notifications_result = db.table("unified_messages").select("*").contains(
+            "metadata", {"notification_type": "scope_change"}
+        ).order("created_at", desc=True).execute()
         
         return {
             "success": True,

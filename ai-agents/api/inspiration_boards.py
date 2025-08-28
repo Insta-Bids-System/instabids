@@ -28,7 +28,7 @@ class InspirationBoardCreate(BaseModel):
     title: str
     description: Optional[str] = None
     room_type: Optional[str] = None
-    homeowner_id: str
+    user_id: str
     status: str = "collecting"
     is_demo: bool = False
 
@@ -37,14 +37,14 @@ class InspirationBoardResponse(BaseModel):
     title: str
     description: Optional[str]
     room_type: Optional[str]
-    homeowner_id: str
+    user_id: str
     status: str
     created_at: str
     updated_at: str
     image_count: int = 0
 
 @router.get("/api/inspiration/boards", response_model=list[InspirationBoardResponse])
-async def get_inspiration_boards(homeowner_id: str):
+async def get_inspiration_boards(user_id: str):
     """
     Get all inspiration boards for a homeowner
     """
@@ -53,7 +53,7 @@ async def get_inspiration_boards(homeowner_id: str):
         result = supabase.table("inspiration_boards").select("""
             *,
             inspiration_images(count)
-        """).eq("homeowner_id", homeowner_id).order("created_at", desc=True).execute()
+        """).eq("user_id", user_id).order("created_at", desc=True).execute()
 
         if result.data is None:
             return []
@@ -71,7 +71,7 @@ async def get_inspiration_boards(homeowner_id: str):
                 title=board["title"],
                 description=board.get("description"),
                 room_type=board.get("room_type"),
-                homeowner_id=board["homeowner_id"],
+                user_id=board["user_id"],
                 status=board["status"],
                 created_at=board["created_at"],
                 updated_at=board["updated_at"],
@@ -95,7 +95,7 @@ async def create_inspiration_board(board_data: InspirationBoardCreate):
 
         new_board = {
             "id": board_id,
-            "homeowner_id": board_data.homeowner_id,
+            "user_id": board_data.user_id,
             "title": board_data.title,
             "description": board_data.description,
             "room_type": board_data.room_type,
@@ -117,7 +117,7 @@ async def create_inspiration_board(board_data: InspirationBoardCreate):
             title=created_board["title"],
             description=created_board.get("description"),
             room_type=created_board.get("room_type"),
-            homeowner_id=created_board["homeowner_id"],
+            user_id=created_board["user_id"],
             status=created_board["status"],
             created_at=created_board["created_at"],
             updated_at=created_board["updated_at"],
@@ -153,7 +153,7 @@ async def get_inspiration_board(board_id: str):
             title=board["title"],
             description=board.get("description"),
             room_type=board.get("room_type"),
-            homeowner_id=board["homeowner_id"],
+            user_id=board["user_id"],
             status=board["status"],
             created_at=board["created_at"],
             updated_at=board["updated_at"],

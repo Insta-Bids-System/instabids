@@ -21,7 +21,7 @@ def test_iris_flow():
     
     iris_request = {
         "message": "Generate my dream kitchen with modern industrial style! I want exposed brick walls and pendant lighting over an island.",
-        "homeowner_id": USER_ID,
+        "user_id": USER_ID,
         "board_id": BOARD_ID,
         "conversation_context": []
     }

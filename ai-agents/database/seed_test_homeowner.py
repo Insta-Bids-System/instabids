@@ -92,7 +92,7 @@ def create_test_homeowner():
                 # Create a sample project for the test user
                 sample_project = {
                     "id": str(uuid.uuid4()),
-                    "homeowner_id": user_id,
+                    "user_id": user_id,
                     "title": "Kitchen Renovation",
                     "description": "Complete kitchen remodel including cabinets, countertops, and appliances",
                     "status": "draft",

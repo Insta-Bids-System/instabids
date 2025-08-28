@@ -1,5 +1,6 @@
 import type React from "react";
 import { useState } from "react";
+import LLMCostDashboard from "./LLMCostDashboard";
 
 interface SystemMetricsData {
   bid_cards_active: number;
@@ -8,8 +9,8 @@ interface SystemMetricsData {
   emails_sent_today: number;
   forms_filled_today: number;
   database_operations_today: number;
-  average_response_time: number;
-  error_rate: number;
+  average_response_time?: number;
+  error_rate?: number;
   uptime_seconds: number;
 }
 
@@ -55,16 +56,19 @@ const SystemMetrics: React.FC<SystemMetricsProps> = ({ metrics, websocketStats, 
     return `${minutes}m`;
   };
 
-  const formatResponseTime = (time: number): string => {
+  const formatResponseTime = (time: number | undefined): string => {
+    if (time === undefined || time === null || isNaN(time)) return "N/A";
     if (time < 1) return `${Math.round(time * 1000)}ms`;
     return `${time.toFixed(2)}s`;
   };
 
-  const formatPercentage = (rate: number): string => {
+  const formatPercentage = (rate: number | undefined): string => {
+    if (rate === undefined || rate === null || isNaN(rate)) return "N/A";
     return `${(rate * 100).toFixed(2)}%`;
   };
 
-  const getPerformanceColor = (value: number, thresholds: { good: number; warning: number }) => {
+  const getPerformanceColor = (value: number | undefined, thresholds: { good: number; warning: number }) => {
+    if (value === undefined || value === null || isNaN(value)) return "text-gray-500";
     if (value <= thresholds.good) return "text-green-600";
     if (value <= thresholds.warning) return "text-yellow-600";
     return "text-red-600";
@@ -75,6 +79,7 @@ const SystemMetrics: React.FC<SystemMetricsProps> = ({ metrics, websocketStats, 
     { id: "performance", label: "Performance", icon: "⚡" },
     { id: "websockets", label: "WebSockets", icon: "🔗" },
     { id: "authentication", label: "Auth", icon: "🔐" },
+    { id: "costs", label: "LLM Costs", icon: "💰" },
   ];
 
   return (
@@ -284,16 +289,18 @@ const SystemMetrics: React.FC<SystemMetricsProps> = ({ metrics, websocketStats, 
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">
-                    {metrics.error_rate < 0.01 ? "🟢" : metrics.error_rate < 0.05 ? "🟡" : "🔴"}
+                    {metrics.error_rate === undefined || metrics.error_rate === null ? "⚪" :
+                     metrics.error_rate < 0.01 ? "🟢" : metrics.error_rate < 0.05 ? "🟡" : "🔴"}
                   </div>
                   <p className="text-sm font-medium">Reliability</p>
                   <p className="text-xs text-gray-600">
-                    {formatPercentage(1 - metrics.error_rate)} uptime
+                    {metrics.error_rate !== undefined ? formatPercentage(1 - metrics.error_rate) : "N/A"} uptime
                   </p>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">
-                    {metrics.average_response_time < 1
+                    {metrics.average_response_time === undefined || metrics.average_response_time === null ? "⚪" :
+                     metrics.average_response_time < 1
                       ? "🟢"
                       : metrics.average_response_time < 3
                         ? "🟡"
@@ -433,6 +440,13 @@ const SystemMetrics: React.FC<SystemMetricsProps> = ({ metrics, websocketStats, 
                 </div>
               </div>
             </div>
+          </div>
+        )}
+        
+        {/* LLM Costs Tab */}
+        {selectedMetric === "costs" && (
+          <div className="overflow-hidden">
+            <LLMCostDashboard />
           </div>
         )}
       </div>

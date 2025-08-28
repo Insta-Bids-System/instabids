@@ -17,17 +17,19 @@ except ImportError:
     from database import SupabaseDB
     db = SupabaseDB()
 
-router = APIRouter(prefix="/api/contractor-proposals", tags=["contractor-proposals"])
+router = APIRouter(tags=["contractor-proposals"])
 
 
 class ContractorProposal(BaseModel):
     bid_card_id: str
     contractor_id: str
-    contractor_name: str
+    contractor_name: Optional[str] = None
     contractor_company: Optional[str] = None
-    bid_amount: float
-    timeline_days: int
-    proposal_text: str
+    amount: float  # Changed from bid_amount to match frontend
+    timeline_start: str  # Added to match frontend format
+    timeline_end: str    # Added to match frontend format  
+    proposal: str        # Changed from proposal_text to match frontend
+    technical_approach: Optional[str] = None  # Added to match frontend
     attachments: Optional[list[dict[str, Any]]] = None
 
 
@@ -46,16 +48,40 @@ async def submit_proposal(proposal: ContractorProposal):
                 "message": "You have already submitted a proposal for this project"
             }
 
+        # Calculate timeline days from start/end dates
+        from datetime import datetime
+        try:
+            start_date = datetime.fromisoformat(proposal.timeline_start.replace('Z', '+00:00'))
+            end_date = datetime.fromisoformat(proposal.timeline_end.replace('Z', '+00:00'))
+            timeline_days = (end_date - start_date).days
+        except:
+            timeline_days = 30  # Default fallback
+        
+        # Get contractor name if not provided
+        contractor_name = proposal.contractor_name
+        if not contractor_name:
+            # Try to get contractor name from contractors table
+            contractor_result = db.client.table("contractors").select("company_name").eq("id", proposal.contractor_id).execute()
+            if contractor_result.data:
+                contractor_name = contractor_result.data[0].get("company_name", f"Contractor {proposal.contractor_id[:8]}")
+            else:
+                contractor_name = f"Contractor {proposal.contractor_id[:8]}"
+
+        # Combine proposal and technical approach
+        combined_proposal = proposal.proposal
+        if proposal.technical_approach:
+            combined_proposal += f"\n\nTechnical Approach:\n{proposal.technical_approach}"
+
         # Create proposal record
         proposal_data = {
             "id": str(uuid.uuid4()),
             "bid_card_id": proposal.bid_card_id,
             "contractor_id": proposal.contractor_id,
-            "contractor_name": proposal.contractor_name,
+            "contractor_name": contractor_name,
             "contractor_company": proposal.contractor_company,
-            "bid_amount": proposal.bid_amount,
-            "timeline_days": proposal.timeline_days,
-            "proposal_text": proposal.proposal_text,
+            "bid_amount": proposal.amount,  # Changed to use amount field
+            "timeline_days": timeline_days,
+            "proposal_text": combined_proposal,  # Combined proposal + technical approach
             "attachments": proposal.attachments or [],
             "status": "pending",
             "created_at": datetime.utcnow().isoformat(),
@@ -65,62 +91,138 @@ async def submit_proposal(proposal: ContractorProposal):
         result = db.client.table("contractor_proposals").insert(proposal_data).execute()
 
         if result.data:
+            # CREATE HOMEOWNER NOTIFICATION FOR NEW BID
+            try:
+                # Get bid card info for project type
+                bid_card_result = db.client.table("bid_cards").select("project_type, user_id").eq(
+                    "id", proposal.bid_card_id
+                ).execute()
+                
+                if bid_card_result.data:
+                    bid_card = bid_card_result.data[0]
+                    project_type = bid_card.get("project_type", "project")
+                    user_id = bid_card.get("user_id", "11111111-1111-1111-1111-111111111111")
+                    
+                    # Create notification for homeowner
+                    notification_data = {
+                        "id": str(uuid.uuid4()),
+                        "user_id": user_id,
+                        "notification_type": "bid_received",
+                        "title": f"New bid received from {contractor_name}",
+                        "message": f"You received a ${proposal.amount:,.2f} bid for your {project_type} project. Timeline: {timeline_days} days.",
+                        "action_url": f"/bid-cards/{proposal.bid_card_id}",
+                        "contractor_id": proposal.contractor_id,
+                        "bid_card_id": proposal.bid_card_id,
+                        "is_read": False,
+                        "is_archived": False,
+                        "channels": {
+                            "email": True,
+                            "in_app": True,
+                            "sms": False
+                        },
+                        "delivered_channels": {
+                            "in_app": True
+                        },
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                    
+                    # Use service role key for notification insertion to bypass RLS
+                    from supabase import create_client
+                    import os
+                    
+                    service_url = os.getenv("SUPABASE_URL")
+                    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+                    
+                    if service_url and service_key:
+                        service_client = create_client(service_url, service_key)
+                        notification_result = service_client.table("notifications").insert(notification_data).execute()
+                    else:
+                        print(f"⚠️ Missing service credentials - URL: {bool(service_url)}, Key: {bool(service_key)}")
+                        notification_result = None
+                    
+                    if notification_result and notification_result.data:
+                        print(f"✅ Created homeowner notification for bid from {contractor_name}")
+                    else:
+                        print(f"⚠️ Failed to create homeowner notification")
+                        
+            except Exception as notification_error:
+                print(f"⚠️ Error creating homeowner notification: {notification_error}")
+                # Don't fail the whole proposal submission if notification creation fails
+            
             # AUTO-CREATE CONVERSATION WITH ALIAS ASSIGNMENT
             try:
-                # For now, use a test homeowner_id since bid_cards doesn't have homeowner_id column
+                # For now, use a test user_id since bid_cards doesn't have user_id column
                 # In production, this should come from the authenticated user or a proper relationship
-                homeowner_id = "11111111-1111-1111-1111-111111111111"  # Test homeowner ID
+                user_id = "11111111-1111-1111-1111-111111111111"  # Test homeowner ID
 
-                if homeowner_id:
+                if user_id:
 
+                    # Use the unified messaging system to create conversation
                     # Check if conversation already exists for this contractor and bid card
-                    existing_conv = db.client.table("conversations").select("*").eq(
-                        "bid_card_id", proposal.bid_card_id
-                    ).eq("contractor_id", proposal.contractor_id).execute()
+                    existing_conv = db.client.table("unified_conversations").select("*").eq(
+                        "entity_id", proposal.bid_card_id
+                    ).eq("entity_type", "bid_card").execute()
 
-                    if not existing_conv.data:
-                        # Count existing conversations for this bid card to determine next alias
-                        conv_count_result = db.client.table("conversations").select("contractor_alias").eq(
-                            "bid_card_id", proposal.bid_card_id
-                        ).execute()
+                    # Look for existing participant for this contractor
+                    if existing_conv.data:
+                        conv_id = existing_conv.data[0]["id"]
+                        existing_participant = db.client.table("unified_conversation_participants").select("*").eq(
+                            "conversation_id", conv_id
+                        ).eq("participant_id", proposal.contractor_id).execute()
+                    else:
+                        existing_participant = None
 
-                        # Assign next available alias (A, B, C, D, etc.)
-                        alias_letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
-                        used_aliases = [conv.get("contractor_alias", "").replace("Contractor ", "")
-                                      for conv in (conv_count_result.data or [])
-                                      if conv.get("contractor_alias", "").startswith("Contractor ")]
-
-                        # Find next available alias
-                        next_alias = None
-                        for letter in alias_letters:
-                            if letter not in used_aliases:
-                                next_alias = letter
-                                break
-
-                        if next_alias:
-                            # Create new conversation with alias
+                    if not existing_participant or not existing_participant.data:
+                        # Create new unified conversation if it doesn't exist
+                        if not existing_conv.data:
                             conversation_data = {
                                 "id": str(uuid.uuid4()),
-                                "bid_card_id": proposal.bid_card_id,
-                                "homeowner_id": homeowner_id,
-                                "contractor_id": proposal.contractor_id,
-                                "contractor_alias": f"Contractor {next_alias}",
+                                "tenant_id": "11111111-1111-1111-1111-111111111111",  # Default tenant
+                                "created_by": proposal.contractor_id,
+                                "conversation_type": "bid_card_messaging",
+                                "entity_id": proposal.bid_card_id,
+                                "entity_type": "bid_card",
+                                "title": f"Bid Card Discussion - {contractor_name}",
                                 "status": "active",
-                                "homeowner_unread_count": 0,
-                                "contractor_unread_count": 0
+                                "metadata": {
+                                    "bid_card_id": proposal.bid_card_id,
+                                    "contractor_id": proposal.contractor_id,
+                                    "contractor_name": contractor_name,
+                                    "user_id": user_id
+                                },
+                                "created_at": datetime.utcnow().isoformat(),
+                                "updated_at": datetime.utcnow().isoformat()
                             }
-
-                            conv_result = db.client.table("conversations").insert(conversation_data).execute()
+                            conv_result = db.client.table("unified_conversations").insert(conversation_data).execute()
                             if conv_result.data:
-                                print(f"✅ Auto-created conversation with alias 'Contractor {next_alias}' for bid submission")
+                                conv_id = conversation_data["id"]
+                                print(f"✅ Created unified conversation for bid card {proposal.bid_card_id}")
                             else:
-                                print(f"⚠️ Failed to create conversation for contractor {proposal.contractor_id}")
+                                print(f"⚠️ Failed to create unified conversation")
+                                conv_id = None
                         else:
-                            print(f"⚠️ No available aliases for bid card {proposal.bid_card_id} (too many contractors)")
+                            conv_id = existing_conv.data[0]["id"]
+
+                        # Add contractor as participant if conversation was created/exists
+                        if conv_id:
+                            participant_data = {
+                                "id": str(uuid.uuid4()),
+                                "tenant_id": "11111111-1111-1111-1111-111111111111",  # Default tenant
+                                "conversation_id": conv_id,
+                                "participant_id": proposal.contractor_id,
+                                "participant_type": "contractor",
+                                "role": "participant",
+                                "joined_at": datetime.utcnow().isoformat()
+                            }
+                            participant_result = db.client.table("unified_conversation_participants").insert(participant_data).execute()
+                            if participant_result.data:
+                                print(f"✅ Auto-created unified conversation and added contractor {contractor_name} as participant")
+                            else:
+                                print(f"⚠️ Failed to add contractor {proposal.contractor_id} as participant")
                     else:
                         print(f"ℹ️ Conversation already exists for contractor {proposal.contractor_id}")
                 else:
-                    print(f"⚠️ Could not find homeowner_id for bid card {proposal.bid_card_id}")
+                    print(f"⚠️ Could not find user_id for bid card {proposal.bid_card_id}")
 
             except Exception as conv_error:
                 print(f"⚠️ Error creating conversation: {conv_error}")
@@ -133,18 +235,19 @@ async def submit_proposal(proposal: ContractorProposal):
             bid_card = {"data": bid_card_result.data[0] if bid_card_result.data else None}
 
             if bid_card["data"]:
-                current_bids = bid_card["data"].get("bid_document", {}).get("submitted_bids", [])
+                bid_doc = bid_card["data"].get("bid_document") or {}
+                current_bids = bid_doc.get("submitted_bids", [])
                 current_bids.append({
                     "contractor_id": proposal.contractor_id,
-                    "contractor_name": proposal.contractor_name,
-                    "bid_amount": proposal.bid_amount,
-                    "timeline_days": proposal.timeline_days,
+                    "contractor_name": contractor_name,
+                    "bid_amount": proposal.amount,
+                    "timeline_days": timeline_days,
                     "created_at": datetime.utcnow().isoformat()
                 })
 
                 update_data = {
                     "bid_document": {
-                        **bid_card["data"].get("bid_document", {}),
+                        **(bid_card["data"].get("bid_document") or {}),
                         "submitted_bids": current_bids,
                         "bids_received_count": len(current_bids)
                     },
@@ -167,17 +270,39 @@ async def submit_proposal(proposal: ContractorProposal):
             await EventTracker.track_event(
                 bid_card_id=proposal.bid_card_id,
                 event_type="bid_submitted",
-                description=f"Bid submitted by {proposal.contractor_name}",
+                description=f"Bid submitted by {contractor_name}",
                 details={
                     "contractor_id": proposal.contractor_id,
-                    "contractor_name": proposal.contractor_name,
-                    "bid_amount": proposal.bid_amount,
-                    "timeline_days": proposal.timeline_days,
+                    "contractor_name": contractor_name,
+                    "bid_amount": proposal.amount,
+                    "timeline_days": timeline_days,
                     "submission_method": "api"
                 },
                 created_by=proposal.contractor_id,
                 created_by_type="contractor"
             )
+            
+            # Track in My Bids system
+            try:
+                from services.my_bids_tracker import my_bids_tracker
+                import asyncio
+                # Track proposal submission in My Bids
+                asyncio.create_task(my_bids_tracker.track_bid_interaction(
+                    contractor_id=proposal.contractor_id,
+                    bid_card_id=proposal.bid_card_id,
+                    interaction_type='proposal_submitted',
+                    details={
+                        'proposal_id': proposal_data["id"],
+                        'bid_amount': proposal.amount,
+                        'timeline_days': timeline_days,
+                        'has_technical_approach': bool(proposal.technical_approach),
+                        'has_attachments': bool(proposal.attachments)
+                    }
+                ))
+                print(f"Tracked My Bids interaction for contractor {proposal.contractor_id} proposal submission")
+            except Exception as tracking_error:
+                print(f"Failed to track My Bids interaction: {tracking_error}")
+                # Don't fail the proposal submission if tracking fails
 
             return {
                 "success": True,
@@ -317,7 +442,7 @@ async def upload_proposal_attachment(
 
 
 @router.put("/{proposal_id}/status")
-async def update_proposal_status(proposal_id: str, status: str, homeowner_id: str):
+async def update_proposal_status(proposal_id: str, status: str, user_id: str):
     """Update the status of a proposal (accept/reject)"""
     try:
         if status not in ["accepted", "rejected"]:

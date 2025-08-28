@@ -15,15 +15,17 @@ const LoginPage: React.FC = () => {
   // Redirect based on profile role after successful login
   useEffect(() => {
     console.log("LoginPage useEffect:", { user: !!user, profile, loading });
-    if (user && profile && !loading) {
-      console.log("Profile role:", profile.role);
-      if (profile.role === "contractor") {
-        console.log("Redirecting to contractor dashboard");
-        navigate("/contractor/dashboard");
-      } else if (profile.role === "homeowner") {
-        console.log("Redirecting to homeowner dashboard");
-        navigate("/dashboard");
-      }
+    
+    // Clear any demo user data to prevent auto-redirect
+    localStorage.removeItem("DEMO_USER");
+    
+    // Normal auth redirect logic - navigate immediately if user is authenticated
+    if (user && !loading) {
+      console.log("User authenticated, navigating to dashboard");
+      // Default to homeowner dashboard if profile is not loaded yet
+      const targetPath = profile?.role === "contractor" ? "/contractor/dashboard" : "/dashboard";
+      console.log("Navigating to:", targetPath);
+      navigate(targetPath);
     }
   }, [user, profile, loading, navigate]);
 

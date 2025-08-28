@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/image-generation", tags=["image-generation"])
 # Load environment variables to ensure they're available
 
 from dotenv import load_dotenv
+from config.service_urls import get_backend_url
 
 
 # Load from the correct .env file location
@@ -82,8 +83,8 @@ async def generate_dream_space(request: GenerateDreamSpaceRequest):
         except Exception as db_error:
             print(f"Database error: {db_error} - Using demo image URLs")
             # Fallback to demo URLs if database fails
-            ideal_url = "http://localhost:8008/test-images/inspiration/kitchen-modern-1.webp"
-            current_url = "http://localhost:8008/test-images/current-state/kitchen-outdated-2.webp"
+            ideal_url = f"{get_backend_url()}/test-images/inspiration/kitchen-modern-1.webp"
+            current_url = f"{get_backend_url()}/test-images/current-state/kitchen-outdated-2.webp"
 
             # Create mock data for analysis
             ideal_image = type("obj", (object,), {
@@ -162,10 +163,10 @@ async def generate_dream_space(request: GenerateDreamSpaceRequest):
         # 5. Store generated image record in database (with fallback for development)
 
         try:
-            # Remove homeowner_id since it's causing foreign key constraint
+            # Remove user_id since it's causing foreign key constraint
             generation_record = {
                 "board_id": request.board_id,
-                # "homeowner_id": ideal_image.data['homeowner_id'],  # Removed - causing FK error
+                # "user_id": ideal_image.data['user_id'],  # Removed - causing FK error
                 "ideal_image_id": request.ideal_image_id,
                 "current_image_id": request.current_image_id,
                 "generated_image_url": generated_image_url,
@@ -201,7 +202,7 @@ async def generate_dream_space(request: GenerateDreamSpaceRequest):
         try:
             vision_image_record = {
                 "board_id": request.board_id,
-                "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",  # Demo user (now exists)
+                "user_id": "550e8400-e29b-41d4-a716-446655440001",  # Demo user (now exists)
                 "image_url": generated_image_url,
                 "thumbnail_url": generated_image_url,
                 "source": "url",

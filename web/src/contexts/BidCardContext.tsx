@@ -79,7 +79,7 @@ export const BidCardProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         const response = await apiService.post("/api/bid-cards", {
           ...bidCard,
-          homeowner_id: user?.id,
+          user_id: user?.id,
         });
         const newBidCard = response.data;
         setBidCards((prev) => [...prev, newBidCard]);
@@ -247,7 +247,8 @@ export const BidCardProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const response = await apiService.post("/api/contractor-proposals/submit", {
             bid_card_id: bid.bid_card_id,
             contractor_id: user?.id || "22222222-2222-2222-2222-222222222222",
-            contractor_name: user?.name || "Contractor",
+            contractor_name: user?.name || user?.full_name || "Contractor",
+            contractor_company: user?.full_name || null,  // Use full_name as company name
             bid_amount: bid.amount,
             timeline_days: Math.ceil((new Date(bid.timeline.end_date).getTime() - new Date(bid.timeline.start_date).getTime()) / (1000 * 60 * 60 * 24)),
             proposal_text: bid.proposal,

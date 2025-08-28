@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from supabase import Client, create_client
+from config.service_urls import get_backend_url
 
 
 # Load environment variables
@@ -48,7 +49,7 @@ else:
 
 class IrisChatRequest(BaseModel):
     message: str
-    homeowner_id: str
+    user_id: str
     board_id: Optional[str] = None
     conversation_context: Optional[list[dict]] = None
     image_uploads: Optional[list[str]] = None  # Image IDs if uploading
@@ -66,12 +67,12 @@ async def iris_chat(request: IrisChatRequest):
     """
     try:
         # 1. Get or create board for this conversation
-        board_id = await get_or_create_board(request.homeowner_id, request.board_id, request.message)
+        board_id = await get_or_create_board(request.user_id, request.board_id, request.message)
         created_board = not request.board_id
 
         # 2. Load full context for this homeowner and board
         context = await build_conversation_context(
-            homeowner_id=request.homeowner_id,
+            user_id=request.user_id,
             board_id=board_id,
             conversation_context=request.conversation_context or []
         )
@@ -85,7 +86,7 @@ async def iris_chat(request: IrisChatRequest):
 
         # 4. Save conversation to database
         await save_conversation_turn(
-            homeowner_id=request.homeowner_id,
+            user_id=request.user_id,
             board_id=board_id,
             user_message=request.message,
             assistant_response=gpt_response["response"]
@@ -128,7 +129,7 @@ async def iris_generate_dream_space(request: IrisChatRequest):
     try:
         # 1. Build context from board
         context = await build_conversation_context(
-            homeowner_id=request.homeowner_id,
+            user_id=request.user_id,
             board_id=request.board_id,
             conversation_context=request.conversation_context or []
         )
@@ -173,7 +174,7 @@ Should I proceed with generating your dream {context['board']['room_type']}?"""
 
                 # Call the new Leonardo.ai endpoint instead of DALL-E
                 response = requests.post(
-                    "http://localhost:8008/api/leonardo/generate-dream-space",
+                    f"{get_backend_url()}/api/leonardo/generate-dream-space",
                     json=generation_payload,
                     timeout=60  # Give Leonardo more time for generation
                 )
@@ -183,7 +184,7 @@ Should I proceed with generating your dream {context['board']['room_type']}?"""
 
                     # 5. Save conversation about the generation
                     await save_conversation_turn(
-                        homeowner_id=request.homeowner_id,
+                        user_id=request.user_id,
                         board_id=request.board_id,
                         user_message=request.message,
                         assistant_response=f"I've generated your dream {context['board']['room_type']} visualization! The image combines your current space with the inspiration elements you love. You can see it in your vision board."
@@ -221,12 +222,12 @@ Should I proceed with generating your dream {context['board']['room_type']}?"""
         logger.error(f"Dream generation error: {e!s}")
         raise HTTPException(status_code=500, detail=str(e))
 
-async def get_or_create_board(homeowner_id: str, board_id: Optional[str], message: str) -> str:
+async def get_or_create_board(user_id: str, board_id: Optional[str], message: str) -> str:
     """Get existing board or create new one based on conversation"""
 
     if board_id:
         # Verify board exists and belongs to homeowner
-        result = supabase.table("inspiration_boards").select("*").eq("id", board_id).eq("homeowner_id", homeowner_id).execute()
+        result = supabase.table("inspiration_boards").select("*").eq("id", board_id).eq("user_id", user_id).execute()
         if result.data:
             return board_id
 
@@ -235,7 +236,7 @@ async def get_or_create_board(homeowner_id: str, board_id: Optional[str], messag
 
     new_board = {
         "id": str(uuid.uuid4()),
-        "homeowner_id": homeowner_id,
+        "user_id": user_id,
         "title": topic["title"],
         "description": topic["description"],
         "room_type": topic["room_type"],
@@ -315,7 +316,7 @@ def determine_board_topic_fallback(message: str) -> dict[str, str]:
             "room_type": "general"
         }
 
-async def build_conversation_context(homeowner_id: str, board_id: str, conversation_context: list[dict]) -> dict[str, Any]:
+async def build_conversation_context(user_id: str, board_id: str, conversation_context: list[dict]) -> dict[str, Any]:
     """Build complete context for GPT-5 including board images, history, AND cross-project memory"""
 
     # Get current board details
@@ -331,29 +332,29 @@ async def build_conversation_context(homeowner_id: str, board_id: str, conversat
     history = history_result.data or []
 
     # ✨ NEW: Get ALL boards for this homeowner (cross-project memory)
-    all_boards_result = supabase.table("inspiration_boards").select("*").eq("homeowner_id", homeowner_id).order("created_at", desc=True).execute()
+    all_boards_result = supabase.table("inspiration_boards").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
     all_boards = all_boards_result.data or []
 
     # ✨ NEW: Get recent conversations from ALL boards (cross-project conversations)
-    all_conversations_result = supabase.table("inspiration_conversations").select("*").eq("homeowner_id", homeowner_id).order("created_at", desc=True).limit(50).execute()
+    all_conversations_result = supabase.table("inspiration_conversations").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(50).execute()
     all_conversations = all_conversations_result.data or []
 
     # ✨ NEW: Get user memories if available (preferences, budget, style)
     try:
-        user_memories_result = supabase.table("user_memories").select("*").eq("user_id", homeowner_id).execute()
+        user_memories_result = supabase.table("user_memories").select("*").eq("user_id", user_id).execute()
         user_memories = user_memories_result.data or []
     except:
         user_memories = []  # Table might not exist yet
 
     # ✨ NEW: Get project summaries for cross-project intelligence
     try:
-        project_summaries_result = supabase.table("project_summaries").select("*").eq("homeowner_id", homeowner_id).execute()
+        project_summaries_result = supabase.table("project_summaries").select("*").eq("user_id", user_id).execute()
         project_summaries = project_summaries_result.data or []
     except:
         project_summaries = []  # Table might not exist yet
 
     return {
-        "homeowner_id": homeowner_id,
+        "user_id": user_id,
         "board": board,
         "images": images,
         "conversation_history": history,
@@ -443,7 +444,7 @@ def build_iris_system_prompt(context: dict[str, Any]) -> str:
     return f"""You are Iris, an expert interior design and home renovation assistant powered by GPT-5 (2025-08-07). You have COMPLETE MEMORY of every conversation, every project, every preference, and every detail about this homeowner. You provide a premium, personalized experience with unlimited context awareness.
 
 PREMIUM MEMORY & PERSONALIZATION:
-- COMPLETE HOMEOWNER PROFILE: Remember everything about {context['homeowner_id']} across ALL projects
+- COMPLETE HOMEOWNER PROFILE: Remember everything about {context['user_id']} across ALL projects
 - FULL PROJECT HISTORY: Access to all previous conversations, decisions, and preferences
 - CROSS-PROJECT AWARENESS: Connect insights from kitchen projects to bathroom projects, etc.
 - STYLE EVOLUTION: Track how their taste develops and changes over time
@@ -453,7 +454,7 @@ PREMIUM MEMORY & PERSONALIZATION:
 - FAMILY CONTEXT: Remember family size, lifestyle, pets, accessibility needs
 
 CURRENT PROJECT CONTEXT:
-- Homeowner ID: {context['homeowner_id']}
+- Homeowner ID: {context['user_id']}
 - Current Board: "{board.get('title', 'Unknown')}" ({board.get('room_type', 'general')})
 - Project Description: {board.get('description', 'Design project')}
 - Images Uploaded: {len(images)} images with full analysis
@@ -679,7 +680,7 @@ async def attempt_image_generation(board_id: str, current_image: dict, inspirati
 
         # Make API call to the Leonardo.ai endpoint
         response = requests.post(
-            "http://localhost:8008/api/leonardo/generate-dream-space",
+            f"{get_backend_url()}/api/leonardo/generate-dream-space",
             json=generation_payload,
             timeout=90  # Give Leonardo more time for multi-reference generation
         )
@@ -706,12 +707,12 @@ async def attempt_image_generation(board_id: str, current_image: dict, inspirati
             "response": "I had trouble creating the visualization, but I can still help you plan your renovation. Based on your current space and inspiration, what specific changes are you most excited about?"
         }
 
-async def save_conversation_turn(homeowner_id: str, board_id: str, user_message: str, assistant_response: str):
+async def save_conversation_turn(user_id: str, board_id: str, user_message: str, assistant_response: str):
     """Save conversation turn to database"""
 
     conversation_data = {
         "id": str(uuid.uuid4()),
-        "homeowner_id": homeowner_id,
+        "user_id": user_id,
         "board_id": board_id,
         "user_message": user_message,
         "assistant_response": assistant_response,

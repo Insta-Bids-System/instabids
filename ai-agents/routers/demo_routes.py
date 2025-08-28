@@ -45,30 +45,30 @@ async def get_real_preview_test():
 
 # Inspiration Demo Endpoints
 @router.get("/api/demo/inspiration/boards")
-async def get_demo_boards(homeowner_id: str = Query(...)):
+async def get_demo_boards(user_id: str = Query(...)):
     """Get demo inspiration boards for a homeowner - checks real data first, then demo data"""
     boards = []
 
     # First try to get real boards from database
     if db:
         try:
-            result = db.client.table("inspiration_boards").select("*").eq("homeowner_id", homeowner_id).execute()
+            result = db.client.table("inspiration_boards").select("*").eq("user_id", user_id).execute()
             if result.data:
-                print(f"[DEMO_ROUTES] Found {len(result.data)} real boards for homeowner {homeowner_id}")
+                print(f"[DEMO_ROUTES] Found {len(result.data)} real boards for homeowner {user_id}")
                 boards.extend(result.data)
         except Exception as e:
             print(f"[DEMO_ROUTES] Error getting real boards: {e}")
 
     # If no real boards found, add demo board
     if not boards:
-        print(f"[DEMO_ROUTES] No real boards found, returning demo board for homeowner {homeowner_id}")
+        print(f"[DEMO_ROUTES] No real boards found, returning demo board for homeowner {user_id}")
         boards = [
             {
                 "id": "26cf972b-83e4-484c-98b6-a5d1a4affee3",
                 "title": "My Dream Kitchen Transformation",
                 "description": "Transform my compact kitchen into a modern industrial space",
                 "room_type": "kitchen",
-                "homeowner_id": homeowner_id,
+                "user_id": user_id,
                 "status": "organizing",
                 "created_at": "2025-07-31T16:25:18.134Z",
                 "updated_at": "2025-07-31T16:25:18.134Z",
@@ -102,7 +102,7 @@ async def get_demo_images(board_id: str = Query(...)):
             {
                 "id": "demo-current-1",
                 "board_id": board_id,
-                "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+                "user_id": "550e8400-e29b-41d4-a716-446655440001",
                 "image_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400",
                 "thumbnail_url": "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=200",
                 "source": "url",
@@ -119,7 +119,7 @@ async def get_demo_images(board_id: str = Query(...)):
             {
                 "id": "demo-inspiration-1",
                 "board_id": board_id,
-                "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+                "user_id": "550e8400-e29b-41d4-a716-446655440001",
                 "image_url": "https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=400",
                 "thumbnail_url": "https://images.unsplash.com/photo-1565182999561-18d7dc61c393?w=200",
                 "source": "url",

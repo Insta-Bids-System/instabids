@@ -25,7 +25,7 @@ print("User: Can you create a vision for my kitchen with modern farmhouse style?
 
 iris_payload = {
     "message": "Can you create a vision for my kitchen with modern farmhouse style? I'd love to see white shiplap walls and black metal fixtures",
-    "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",
     "board_id": "26cf972b-83e4-484c-98b6-a5d1a4affee3",
     "context": {
         "current_project": "kitchen",

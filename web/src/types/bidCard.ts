@@ -4,7 +4,7 @@
 export interface BidCard {
   id: string;
   project_id: string;
-  homeowner_id: string;
+  user_id: string;
 
   // Core bid card data
   title: string;
@@ -36,6 +36,12 @@ export interface BidCard {
   categories: string[];
   requirements: string[];
   preferred_schedule: string[];
+
+  // Service complexity classification
+  service_complexity?: "single-trade" | "multi-trade" | "complex-coordination";
+  trade_count?: number;
+  primary_trade?: string;
+  secondary_trades?: string[];
 
   // Media attachments
   images: BidCardImage[];
@@ -226,7 +232,7 @@ export interface ContractorBidCardView extends BidCard {
   match_score?: number;
 }
 
-export interface MarketplaceBidCardView extends Omit<BidCard, "homeowner_id"> {
+export interface MarketplaceBidCardView extends Omit<BidCard, "user_id"> {
   homeowner_verified: boolean;
   response_time_hours?: number;
   success_rate?: number;

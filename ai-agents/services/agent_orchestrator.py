@@ -13,7 +13,13 @@ from database_simple import db
 
 # Import the actual agents
 from agents.eaa.agent import ExternalAcquisitionAgent
-from agents.wfa.agent import WebsiteFormAutomationAgent
+try:
+    from agents.wfa.agent import WebsiteFormAutomationAgent
+    WFA_AVAILABLE = True
+except ImportError:
+    print("WFA agent not available - Playwright dependency missing")
+    WebsiteFormAutomationAgent = None
+    WFA_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +31,12 @@ class AgentOrchestrator:
         """Initialize the orchestrator with agent instances"""
         try:
             self.eaa = ExternalAcquisitionAgent()
-            self.wfa = WebsiteFormAutomationAgent()
-            logger.info("Agent Orchestrator initialized successfully")
+            if WFA_AVAILABLE:
+                self.wfa = WebsiteFormAutomationAgent()
+                logger.info("Agent Orchestrator initialized with EAA and WFA")
+            else:
+                self.wfa = None
+                logger.info("Agent Orchestrator initialized with EAA only (WFA disabled)")
         except Exception as e:
             logger.error(f"Failed to initialize agents: {e}")
             self.eaa = None

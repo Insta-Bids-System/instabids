@@ -13,7 +13,7 @@ def test_messaging_links():
     # Test data
     test_bid_card_id = "11111111-1111-1111-1111-111111111111"
     test_contractor_id = "22222222-2222-2222-2222-222222222222"
-    test_homeowner_id = "33333333-3333-3333-3333-333333333333"
+    test_user_id = "33333333-3333-3333-3333-333333333333"
     
     print("Testing Messaging System Links to Bid Cards and Contractors")
     print("=" * 70)

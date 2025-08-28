@@ -3,11 +3,14 @@ Image Upload API Router
 Handles image uploads for contractor-homeowner communications
 """
 
+import os
 import uuid
 from datetime import datetime
 from typing import Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from config.service_urls import get_backend_url
 
 
 try:
@@ -96,7 +99,7 @@ async def upload_conversation_image(
                 new_conv = {
                     "id": str(uuid.uuid4()),
                     "bid_card_id": bid_card_id,
-                    "homeowner_id": sender_id if sender_type == "homeowner" else "11111111-1111-1111-1111-111111111111",
+                    "user_id": sender_id if sender_type == "homeowner" else "11111111-1111-1111-1111-111111111111",
                     "contractor_id": contractor_id,
                     "contractor_alias": f"Contractor {contractor_id[0].upper()}",
                     "status": "active",
@@ -129,10 +132,34 @@ async def upload_conversation_image(
             "created_at": datetime.utcnow().isoformat()
         }
 
-        # Save message to the messaging_system_messages table
-        result = db.client.table("messaging_system_messages").insert(message_data).execute()
+        # Save message via UNIFIED MESSAGING SYSTEM
+        import requests
+        try:
+            response = requests.post(f"{get_backend_url()}/api/conversations/message", json={
+                "conversation_id": actual_conversation_id,
+                "sender_type": sender_type,
+                "sender_id": sender_id,
+                "agent_type": None,
+                "content": message or f"Shared an image: {file.filename}",
+                "content_type": "text",
+                "metadata": {
+                    "attachments": message_data["attachments"],
+                    "upload_type": "image",
+                    "processed_by": "image_upload_api"
+                }
+            }, timeout=30)
+            
+            if response.ok:
+                result_data = response.json()
+                message_id = result_data.get("message_id")
+            else:
+                raise Exception(f"Unified API failed: {response.text}")
+                
+        except Exception as api_error:
+            print(f"Image upload API error: {api_error}")
+            return {"success": False, "error": str(api_error)}
 
-        if result.data:
+        if message_id:
             # Update conversation's last message timestamp and increment unread count
             unread_field = "contractor_unread_count" if sender_type == "homeowner" else "homeowner_unread_count"
             
@@ -252,6 +279,109 @@ async def upload_bid_card_image(
 
     except Exception as e:
         print(f"Error uploading bid card image: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error uploading image: {e!s}"
+        )
+
+
+@router.post("/upload/potential-bid-card")
+async def upload_potential_bid_card_image(
+    potential_bid_card_id: str = Form(...),
+    conversation_id: str = Form(...),
+    user_id: str = Form(...),
+    description: Optional[str] = Form(None),
+    file: UploadFile = File(...)
+):
+    """Upload an image for a potential bid card during CIA conversation"""
+    try:
+        # Validate file type
+        if file.content_type not in ALLOWED_MIME_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File type {file.content_type} not allowed. Allowed types: {', '.join(ALLOWED_MIME_TYPES)}"
+            )
+
+        # Validate file size
+        file_content = await file.read()
+        if len(file_content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File size too large. Maximum size: {MAX_FILE_SIZE / (1024*1024):.1f}MB"
+            )
+
+        # Generate unique filename
+        file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+        unique_filename = f"potential_bid_card/{potential_bid_card_id}/{uuid4()}.{file_extension}"
+        
+        # Upload to Supabase storage
+        from supabase import create_client
+        url = os.getenv('SUPABASE_URL')
+        key = os.getenv('SUPABASE_ANON_KEY')
+        supabase = create_client(url, key)
+        
+        upload_result = supabase.storage.from_("project-images").upload(
+            unique_filename,
+            file_content,
+            {"content-type": file.content_type}
+        )
+        
+        if upload_result.error:
+            raise Exception(f"Storage upload failed: {upload_result.error}")
+        
+        # Get public URL
+        public_url = supabase.storage.from_("project-images").get_public_url(unique_filename)
+        image_url = public_url.public_url if hasattr(public_url, 'public_url') else str(public_url)
+
+        # Update potential bid card with new image
+        potential_bid_card = db.client.table("potential_bid_cards").select("*").eq("id", potential_bid_card_id).single().execute()
+
+        if potential_bid_card.data:
+            # Get existing photo_ids or initialize as empty array
+            photo_ids = potential_bid_card.data.get("photo_ids", [])
+            
+            # Add new image info
+            new_image_info = {
+                "id": str(uuid4()),
+                "url": image_url,
+                "filename": file.filename,
+                "description": description,
+                "uploaded_by": user_id,
+                "uploaded_at": datetime.utcnow().isoformat(),
+                "conversation_id": conversation_id
+            }
+            
+            photo_ids.append(new_image_info)
+            
+            # Update the potential bid card
+            update_result = db.client.table("potential_bid_cards").update({
+                "photo_ids": photo_ids,
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("id", potential_bid_card_id).execute()
+            
+            if not update_result.data:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to update potential bid card with image"
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Potential bid card not found"
+            )
+
+        return {
+            "success": True,
+            "image_url": image_url,
+            "image_id": new_image_info["id"],
+            "potential_bid_card_id": potential_bid_card_id,
+            "total_images": len(photo_ids)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error uploading potential bid card image: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error uploading image: {e!s}"

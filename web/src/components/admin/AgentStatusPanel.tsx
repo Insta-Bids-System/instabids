@@ -1,7 +1,7 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useAdminAuth } from "../../hooks/useAdminAuth";
-import { useWebSocket } from "../../hooks/useWebSocket";
+import { useWebSocketContext } from "../../context/WebSocketContext";
 
 interface AgentStatus {
   status: string;
@@ -21,14 +21,18 @@ const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({ agentStatuses: init
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [isRestarting, setIsRestarting] = useState<string | null>(null);
 
-  const { lastMessage, subscribe, unsubscribe } = useWebSocket();
+  const { lastMessage, subscribe } = useWebSocketContext();
   const { session, checkPermission } = useAdminAuth();
 
   // Subscribe to agent status updates
   useEffect(() => {
-    subscribe("agent_status");
-    return () => unsubscribe("agent_status");
-  }, [subscribe, unsubscribe]);
+    const unsubscribe = subscribe("agent_status", () => {});
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [subscribe]);
 
   // Handle WebSocket updates
   useEffect(() => {
@@ -132,7 +136,7 @@ const AgentStatusPanel: React.FC<AgentStatusPanelProps> = ({ agentStatuses: init
     setIsRestarting(agentName);
 
     try {
-      const response = await fetch(`http://localhost:8008/api/admin/restart-agent`, {
+      const response = await fetch(`/api/admin/restart-agent`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -6,18 +6,6 @@ User request: Store this fact about the InstaBids deepagents system: The supabas
 
 IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
 
-User request: I am the Supabase Expert agent for InstaBids. I have complete knowledge of the database with 60 tables. Key facts I know: 
-1. The bid_cards table has a JSONB column called bid_document that stores actual contractor bids
-2. There are 15 tables in the bid card ecosystem managing the complete lifecycle
-3. The deepagents_memory table stores my persistent knowledge
-4. The system uses 8 AI agents (CIA, JAA, CDA, EAA, WFA, HMA, CMA, COIA)
-5. Contractor tiers: Tier 1 (90% response), Tier 2 (50% response), Tier 3 (20-33% response)
-6. The messaging system has 15+ regex filters and contractor aliasing
-
----
-
-IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
-
 User request: SYSTEM UPDATE: Successfully built complete Multi-Agent Orchestrator using deepagents framework by hwchase17. Key achievements:
 
 1. FRAMEWORK: Using actual deepagents (from deepagents import create_deep_agent) - NOT custom
@@ -26,18 +14,6 @@ User request: SYSTEM UPDATE: Successfully built complete Multi-Agent Orchestrato
 4. DATABASE: 60 tables, 116 bid cards, bid_document is JSONB storing actual bids
 5. MEMORY: 5 entries saved to deepagents_memory table in Supabase with verified IDs
 6. AGENT: Supabase Expert fully operational, can an
-
----
-
-IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
-
-User request: CRITICAL SYSTEM UPDATE: I have successfully built a Multi-Agent Orchestrator using the deepagents framework by hwchase17 with the following components:
-
-1. FRAMEWORK: Using actual deepagents framework (from deepagents import create_deep_agent) - NOT custom implementation
-2. MODEL: OpenAI o3 model EXCLUSIVELY via custom OpenAIo3Model wrapper with bind_tools() for LangChain compatibility
-3. MEMORY: Persistent storage in Supabase deepagents_memory table - verified working with 3 saved entries
-4. SUPABASE EXPERT: Sub-agent using SubAgent dictionary format {'name': 'supabase-expert', ...}
-5. DAT
 
 ---
 
@@ -111,3 +87,298 @@ InstaBids is a complex multi-agent system with 6 specialized agents:
 4. Agent 4 (IRIS AI) - OpenAI integration for intelligent responses and automation
 5. Agent 5 (Messaging) - LangGraph-based message filtering, contractor aliasing
 6. Agent 6 (Central Coordinator) - Orchestrates inter-agent com
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: What do you know about InstaBids? Tell me about the 6 agents, database tables, and system architecture.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Search your memory for ALL information about InstaBids. List everything you know about: the number of tables, agent names, the deepagents framework, bid cards, contractors, and any other technical details you have stored.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Tell me EXACTLY how many tables are in the InstaBids database. Not a general description - the specific number.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: How many AI agents are in InstaBids? List them ALL by name.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: CRITICAL UPDATE - Store this complete InstaBids system information:
+
+## COMPLETE INSTABIDS SYSTEM - 60 TABLES, 11 AI AGENTS
+
+### 11 ACTUAL AI AGENTS (Not development agents):
+1. **CIA** - Customer Intelligence Agent (Claude Opus 4 for extraction)
+2. **JAA** - Job Assessment Agent (Bid card generation)
+3. **CDA** - Contractor Discovery Agent (3-tier contractor sourcing)
+4. **EAA** - Email Automation Agent (Multi-channel outreach)
+5. **WFA** - Web Form Automation Agent (Playwright form filling)
+6. **COIA** - Contractor Onboarding Intelligence Agent
+7. **CJA** - Contractor Job Agent
+8. **IRIS*
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Now tell me: How many tables are in InstaBids and how many AI agents?
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: What do you already know about the InstaBids system, Agent 1 (Frontend Flow), and the current state of the contractor messaging system?
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: What do you know about InstaBids and Agent 1?
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: INSTABIDS SYSTEM OVERVIEW: InstaBids is a multi-agent AI platform for home improvement projects. It connects homeowners with contractors through intelligent bid card management. The system has 6 specialized agents:
+
+Agent 1 (Frontend Flow) - Homeowner chat interface, bid card UI, contractor messaging
+Agent 2 (Backend Core) - Contractor discovery, outreach automation, admin dashboard  
+Agent 3 (Homeowner UX) - Dashboards, Iris AI assistant
+Agent 4 (Contractor UX) - Contractor portal, bidding interface
+Agent 5 (Marketing) - Growth, referrals
+Agent 6 (QA) - Testing, cleanup, GitHub integration
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: AGENT 1 SPECIFIC KNOWLEDGE - BID CARD SYSTEM: 
+The bid card UI components are in web/src/components/bidcards/. Key components:
+- HomeownerBidCard: For homeowners to create/edit bid cards
+- ContractorBidCard: For contractors to view and submit bids
+- BidCardMarketplace: Public browsing of available projects
+- HomeownerProjectWorkspaceFixed: Main workspace with tabs (Overview, Contractors, Documents)
+- ContractorCommunicationHub: Messaging interface between homeowners and contractors
+
+BID CARD LIFECYCLE: 
+1. CIA agent conversation creates bid card (status: generated)
+2. CDA discovers contract
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: CRITICAL ISSUES & FIXES I'VE DISCOVERED:
+
+1. HOMEOWNER ID MISMATCH BUG: 
+- Frontend was using "test-homeowner-id" but backend expects UUID "11111111-1111-1111-1111-111111111111"
+- Fixed in HomeownerProjectWorkspaceFixed.tsx line 243
+- This was preventing messages from persisting to database
+
+2. API ENDPOINT ISSUES:
+- ContractorCommunicationHub.tsx had wrong API call format (query vs path params)
+- Fixed from ?bid_card_id=${id} to /${id} format
+- Image upload endpoint is /api/images/upload/conversation (not /api/image-upload/)
+
+3. DOCKER CONTAINER SETUP:
+- Frontend: instabids-instabids-front
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: COMPLETE FILE STRUCTURE FOR AGENT 1:
+
+Frontend Components (web/src/components/):
+- homeowner/ContractorCommunicationHub.tsx - Main messaging interface
+- HomeownerProjectWorkspaceFixed.tsx - Bid card workspace with tabs
+- bidcards/HomeownerBidCard.tsx - Create/edit bid cards
+- bidcards/ContractorBidCard.tsx - Contractor view of bid cards
+- bidcards/BidCardMarketplace.tsx - Browse available projects
+- ImageUploadButton.tsx - Component for image uploads in messages
+
+Backend APIs (ai-agents/routers/):
+- messaging_api.py - Main messaging endpoints
+- image_upload_api.py - Image upload endpoints (
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: IMPORTANT COORDINATION RULES FROM CLAUDE.md:
+
+1. BACKEND RUNS IN DOCKER - Never restart with python main.py! Port 8008 is already in use by Docker container. If you see port in use error, backend is RUNNING (good!)
+
+2. USE EXISTING ROUTER SYSTEM - Add endpoints to existing routers in ai-agents/routers/ or directly to main.py. Never create competing processes or new FastAPI apps.
+
+3. DOCKER CONTAINER NAMES:
+- instabids-instabids-frontend-1 (port 5173)
+- instabids-instabids-backend-1 (port 8008)
+- instabids-supabase-1 (port 5432)
+- instabids-mailhog-1 (port 8080)
+
+4. TESTING REQUIREMENTS - Ne
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Store new InstaBids contractor management system implementation:
+
+CONTRACTOR MANAGEMENT SYSTEM - COMPLETE IMPLEMENTATION (August 2025)
+
+BACKEND API:
+- File: ai-agents/routers/contractor_management_api.py
+- Purpose: Complete contractor management API with 3-tier classification
+- Key Features:
+  - GET /api/contractor-management/contractors - List all contractors with tier filtering
+  - GET /api/contractor-management/contractors/{id} - Detailed contractor info
+  - POST /api/contractor-management/contractors/{id}/assign-to-campaign - Manual assignment
+  - GET /api/contractor-management/dashboar
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: CONTRACTOR MANAGEMENT SYSTEM - NEW IMPLEMENTATION:
+
+FILES CREATED:
+1. ai-agents/routers/contractor_management_api.py - Complete 3-tier contractor API
+2. web/src/components/admin/ContractorManagement.tsx - React contractor dashboard
+
+FILES MODIFIED:
+1. web/src/components/admin/MainDashboard.tsx - Replaced Database tab with Contractors tab
+2. ai-agents/main.py - Added contractor_management_router integration
+
+KEY FEATURES:
+- 3-tier contractor classification (Official/Previous/New)
+- Real-time contractor listing with search/filters
+- Manual campaign assignment capability
+- Detailed contractor 
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: AGENT 3 HOMEOWNER UX - COMPLETE SYSTEM UPDATE & BRAIN DUMP
+
+AGENT IDENTITY:
+- I am Agent 3 (Homeowner UX) specializing in the Iris AI system and homeowner dashboard
+- Primary responsibility: Iris design assistant and homeowner-facing interfaces
+- Status: Active and fully operational with GPT-5 integration complete
+
+IRIS AI SYSTEM - COMPLETE TECHNICAL OVERVIEW:
+
+1. CORE ARCHITECTURE:
+- Main File: C:\Users\Not John Or Justin\Documents\instabids\ai-agents\api\iris_chat_gpt5.py
+- Model: GPT-5 (2025-08-07) with FULL VISION CAPABILITIES 
+- Backend Integration: Router imported in main.py (line 36)
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Store this critical InstaBids contractor ecosystem knowledge:
+
+CONTRACTOR SYSTEM ARCHITECTURE - COMPLETE 14-TABLE ECOSYSTEM
+
+Core Problem Solved: User reported "only shows 34 contractors, should show all contractors" - Fixed by removing mysterious status=qualified filter and fixing tier stats calculation.
+
+CURRENT STATE (August 8, 2025):
+- Total contractors in system: 109 (9 Tier 1 + 0 Tier 2 + 100 Tier 3)
+- Admin dashboard contractor management fully operational
+- 3-tier classification system working correctly
+- All 14 contractor-related tables identified and mapped
+
+UNIFIED CONTRACTOR TAB
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: CONTRACTOR ECOSYSTEM KNOWLEDGE - InstaBids Platform
+
+Key Discovery: InstaBids has 14 interconnected tables managing complete contractor lifecycle from discovery to project completion.
+
+CONTRACTOR TABLE UNIFICATION PLAN:
+- Current: contractors table (17 fields) + contractor_leads table (49 fields) = separate systems
+- Future: Unified contractors table with all 66 fields for rich contractor profiles
+- Impact: Enables complete contractor management dashboard with manual campaign control
+
+14-TABLE CONTRACTOR ECOSYSTEM:
+1. contractors - Core authenticated contractor users
+2. contractor_leads - D
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: DATABASE UNIFICATION COMPLETE: InstaBids Contractor System Enhancement
+
+## Major Achievement: Unified Contractors Table (17 → 59 Fields)
+
+### What Was Accomplished (August 8, 2025):
+
+**1. Database Migration Executed Successfully:**
+- Expanded contractors table from 17 to 59 fields (+247% field count)
+- Added all 42 unique fields from contractor_leads table
+- Preserved all existing data and relationships
+- Zero breaking changes for existing code
+
+**2. New Unified Fields Added:**
+- Business Information: business_name, business_phone, business_email, website_url, business_address, business_cit
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Remove the following false information from memory: All references to "deepagents framework", "OpenAI o3 model", "Multi-Agent Orchestrator", "Database Owner Agent", and "Supabase Expert agent". These were attempted but never actually worked - the Database Owner Agent was completely non-functional and has been deleted from the system. The actual system uses 6 development agents (Agent 1-6) and 11 AI agents (CIA, JAA, CDA, EAA, WFA, COIA, CJA, IRIS, Messaging Agent, Vision Agent, Inspiration Boards Agent). There is no deepagents framework in use.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: Delete all stored memories about "deepagents framework" and "OpenAI o3 model". These were failed attempts that never worked. The system uses GPT-4 and Claude, not o3.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: What is the current state of the InstaBids system? Tell me about the agents, database tables, current architecture, recent builds, Docker setup, frontend/backend status, messaging system, bid cards, contractor management - everything you know about the current system as of 2025.
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: I am the Supabase Expert agent for InstaBids. I have complete knowledge of the database with 60 tables. Key facts I know: 
+1. The bid_cards table has a JSONB column called bid_document that stores actual contractor bids
+2. There are 15 tables in the bid card ecosystem managing the complete lifecycle
+3. The deepagents_memory table stores my persistent knowledge
+4. The system uses 8 AI agents (CIA, JAA, CDA, EAA, WFA, HMA, CMA, COIA)
+5. Contractor tiers: Tier 1 (90% response), Tier 2 (50% response), Tier 3 (20-33% response)
+6. The messaging system has 15+ regex filters and contractor aliasing
+
+---
+
+IMPORTANT MCP MODE INSTRUCTION: If users ask you to read and then store a file or document, your response MUST show a detailed description of the file or document that you've read. Don't just reply with a vague comment like 'I've read the X file, what do you want me to do next?' Instead, provide a comprehensive description including key points, structure, and relevant content details.
+
+User request: CRITICAL SYSTEM UPDATE: I have successfully built a Multi-Agent Orchestrator using the deepagents framework by hwchase17 with the following components:
+
+1. FRAMEWORK: Using actual deepagents framework (from deepagents import create_deep_agent) - NOT custom implementation
+2. MODEL: OpenAI o3 model EXCLUSIVELY via custom OpenAIo3Model wrapper with bind_tools() for LangChain compatibility
+3. MEMORY: Persistent storage in Supabase deepagents_memory table - verified working with 3 saved entries
+4. SUPABASE EXPERT: Sub-agent using SubAgent dictionary format {'name': 'supabase-expert', ...}
+5. DAT

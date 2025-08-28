@@ -54,7 +54,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
     const checkExistingSession = async () => {
       try {
         // Try to get current session from backend
-        const response = await fetch(`http://localhost:8008/api/admin/session`, {
+        const response = await fetch(`/api/admin/session`, {
           method: "GET",
           credentials: "include", // Include cookies
           headers: {
@@ -86,7 +86,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`http://localhost:8008/api/admin/login`, {
+      const response = await fetch(`/api/admin/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -132,7 +132,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async (): Promise<void> => {
     try {
       if (session) {
-        await fetch(`http://localhost:8008/api/admin/logout`, {
+        await fetch(`/api/admin/logout`, {
           method: "POST",
           credentials: "include",
           headers: {
@@ -160,7 +160,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
     if (!session) return false;
 
     try {
-      const response = await fetch(`http://localhost:8008/api/admin/refresh-session`, {
+      const response = await fetch(`/api/admin/refresh-session`, {
         method: "POST",
         credentials: "include",
         headers: {

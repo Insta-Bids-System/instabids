@@ -10,7 +10,7 @@ def test_messaging_with_debug():
     
     # Test data
     bid_card_id = "36214de5-a068-4dcc-af99-cf33238e7472"  # Real UUID from database
-    homeowner_id = "11111111-1111-1111-1111-111111111111"  # Test UUID
+    user_id = "11111111-1111-1111-1111-111111111111"  # Test UUID
     contractor_id = "22222222-2222-2222-2222-222222222222"  # Test UUID
     
     try:
@@ -24,7 +24,7 @@ def test_messaging_with_debug():
         message_data = {
             "bid_card_id": bid_card_id,
             "sender_type": "homeowner",
-            "sender_id": homeowner_id,
+            "sender_id": user_id,
             "content": "Hi, I'm interested in your project. Call me at 555-123-4567",
             "message_type": "text"
         }
@@ -50,7 +50,7 @@ def test_messaging_with_debug():
         print("3. Checking if conversation exists...")
         try:
             conversation_response = requests.get(
-                f"{BASE_URL}/api/messages/conversations/{bid_card_id}?user_type=homeowner&user_id={homeowner_id}"
+                f"{BASE_URL}/api/messages/conversations/{bid_card_id}?user_type=homeowner&user_id={user_id}"
             )
             print(f"   Conversation Status: {conversation_response.status_code}")
             if conversation_response.status_code == 200:

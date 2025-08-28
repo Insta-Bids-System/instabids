@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Bot, Loader2, Send, TrendingUp, User } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import ChatBidCardAttachment from "./ChatBidCardAttachment";
 
 interface ContractorOnboardingChatProps {
   sessionId: string;
@@ -18,6 +19,7 @@ interface Message {
   profileData?: any;
   stage?: string;
   isStreaming?: boolean;
+  bidCards?: any[];
 }
 
 interface ProfileProgress {
@@ -53,6 +55,7 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [contractorLeadId, setContractorLeadId] = useState<string | null>(null);
   const [profileProgress, setProfileProgress] = useState<ProfileProgress>({
     completeness: 0,
     stage: "welcome",
@@ -69,7 +72,7 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [scrollToBottom]);
+  }, [messages.length]); // Only trigger on new messages, not content changes
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -85,9 +88,10 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
     setInputMessage("");
     setIsLoading(true);
 
+    // Create streaming assistant message
+    const assistantMessageId = (Date.now() + 1).toString();
+
     try {
-      // Create streaming assistant message
-      const assistantMessageId = (Date.now() + 1).toString();
       const assistantMessage: Message = {
         id: assistantMessageId,
         role: "assistant",
@@ -99,18 +103,26 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
       setMessages((prev) => [...prev, assistantMessage]);
       setStreamingMessageId(assistantMessageId);
 
-      // Call the real COIA backend endpoint
-      const response = await fetch("http://localhost:8008/chat/message", {
+      // Call the working COIA backend endpoint
+      const requestBody = {
+        session_id: sessionId,
+        contractor_lead_id: contractorLeadId,
+        message: userMessage.content,
+        context: {
+          current_stage: profileProgress.stage,
+          profile_data: profileProgress.collectedData,
+        },
+      };
+      
+      console.log("Sending COIA request with contractorLeadId:", contractorLeadId);
+      console.log("Request body:", requestBody);
+      
+      const response = await fetch("/api/coia/landing", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          message: userMessage.content,
-          session_id: sessionId,
-          current_stage: profileProgress.stage,
-          profile_data: profileProgress.collectedData,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -118,6 +130,12 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
       }
 
       const data = await response.json();
+      console.log("COIA API Response:", data);
+      
+      // Store contractor_lead_id for state persistence
+      if (data.contractor_lead_id && !contractorLeadId) {
+        setContractorLeadId(data.contractor_lead_id);
+      }
 
       // Update profile progress
       if (data.profile_progress) {
@@ -127,28 +145,28 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
         }));
       }
 
-      // Simulate streaming response (in real implementation, use SSE or WebSocket)
+      // Get bid cards from API response
+      const bidCards = data.bid_cards || data.bidCards;
+
+      // Show response immediately without streaming to prevent render loops
       const fullResponse = data.response || "I understand. Let me help you with that.";
-      let currentText = "";
+      console.log("Using response:", fullResponse);
 
-      for (let i = 0; i <= fullResponse.length; i++) {
-        currentText = fullResponse.slice(0, i);
-
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessageId
-              ? { ...msg, content: currentText, stage: data.stage, profileData: data.profile_data }
-              : msg
-          )
+      // Update message with complete response in a single update
+      setMessages((prev) => {
+        return prev.map((msg) => 
+          msg.id === assistantMessageId 
+            ? { 
+                ...msg, 
+                content: fullResponse,
+                isStreaming: false,
+                stage: data.stage, 
+                profileData: data.profile_data, 
+                bidCards: bidCards 
+              } 
+            : msg
         );
-
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      }
-
-      // Mark streaming as complete
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === assistantMessageId ? { ...msg, isStreaming: false } : msg))
-      );
+      });
 
       setStreamingMessageId(null);
 
@@ -160,28 +178,10 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
       }
     } catch (error) {
       console.error("Error sending message:", error);
-
-      // Mock response for development (remove when backend is ready)
-      const mockResponse = generateMockCoIAResponse(inputMessage, profileProgress);
-
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMessageId
-            ? {
-                ...msg,
-                content: mockResponse.response,
-                isStreaming: false,
-                stage: mockResponse.stage,
-              }
-            : msg
-        )
-      );
-
-      setProfileProgress((prev) => ({
-        ...prev,
-        ...mockResponse.profileUpdate,
-      }));
-
+      
+      // Remove the assistant message that was added but failed
+      setMessages((prev) => prev.filter((msg) => msg.id !== assistantMessageId));
+      
       setStreamingMessageId(null);
     } finally {
       setIsLoading(false);
@@ -245,15 +245,60 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
         },
       };
     } else if (currentProgress.stage === "differentiators") {
+      const numProjects = Math.floor(Math.random() * 15) + 5;
       return {
-        response: `Excellent! Your profile is now complete. Based on what you've told me, I found **${Math.floor(Math.random() * 15) + 5} active projects** that match your expertise and service area.\n\nYou're all set to start browsing projects and submitting bids. Welcome to InstaBids! 🎉\n\nRedirecting you to your contractor dashboard...`,
+        response: `Excellent! Your profile is now complete. Based on what you've told me, I found **${numProjects} active projects** that match your expertise and service area.\n\nHere are some matching projects to get you started:`,
         stage: "completed",
         profileUpdate: {
           collectedData: { ...currentProgress.collectedData, differentiators: input },
           completeness: 1.0,
           stage: "completed",
-          matchingProjects: Math.floor(Math.random() * 15) + 5,
+          matchingProjects: numProjects,
         },
+        bidCards: [
+          {
+            id: "sample-1",
+            bid_card_number: "BC-DEMO-001",
+            title: "Kitchen Renovation Project",
+            description: "Complete kitchen remodel including cabinets, countertops, flooring, and appliances. Looking for experienced contractor with references.",
+            project_type: "Kitchen Remodel",
+            location_city: "Miami",
+            location_state: "FL",
+            budget_min: 15000,
+            budget_max: 25000,
+            urgency_level: "standard",
+            timeline: {
+              start_date: "2025-03-01",
+              duration: "4-6 weeks"
+            },
+            bids_received_count: 2,
+            contractor_count_needed: 4,
+            group_buying_eligible: false,
+            status: "collecting_bids",
+            created_at: new Date().toISOString()
+          },
+          {
+            id: "sample-2",
+            bid_card_number: "BC-DEMO-002", 
+            title: "Bathroom Emergency Repair",
+            description: "Urgent bathroom leak repair needed. Water damage visible behind shower tiles. Need immediate response.",
+            project_type: "Plumbing",
+            location_city: "Fort Lauderdale",
+            location_state: "FL",
+            budget_min: 3000,
+            budget_max: 8000,
+            urgency_level: "emergency",
+            timeline: {
+              start_date: "ASAP",
+              duration: "1-2 weeks"
+            },
+            bids_received_count: 1,
+            contractor_count_needed: 3,
+            group_buying_eligible: false,
+            status: "collecting_bids",
+            created_at: new Date().toISOString()
+          }
+        ],
       };
     }
 
@@ -265,16 +310,16 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-[600px] bg-white/5 backdrop-blur-sm">
+    <div className="flex flex-col h-full min-h-[600px] bg-gray-900 rounded-2xl">
       {/* Profile Progress Bar */}
-      <div className="p-4 border-b border-white/10">
+      <div className="p-4 border-b border-gray-700">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-white/70">Profile Setup Progress</span>
           <span className="text-sm text-white/70">
             {Math.round(profileProgress.completeness * 100)}% Complete
           </span>
         </div>
-        <div className="w-full bg-white/10 rounded-full h-2">
+        <div className="w-full bg-gray-700 rounded-full h-2">
           <motion.div
             className="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full"
             initial={{ width: 0 }}
@@ -320,7 +365,7 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
                   className={`rounded-2xl px-4 py-3 ${
                     message.role === "user"
                       ? "bg-blue-600 text-white ml-auto"
-                      : "bg-white/10 text-white"
+                      : "bg-gray-800 text-white"
                   } ${message.role === "user" ? "max-w-fit ml-auto" : ""}`}
                 >
                   <div className="whitespace-pre-wrap">
@@ -334,6 +379,20 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
                     )}
                   </div>
                 </div>
+
+                {/* Display bid cards if available */}
+                {message.bidCards && message.bidCards.length > 0 && (
+                  <div className="mt-3">
+                    <ChatBidCardAttachment 
+                      bidCards={message.bidCards}
+                      onCardClick={(card) => {
+                        // Handle bid card click - open contractor portal or bidding interface
+                        const bidUrl = `/contractor/submit-proposal?bid=${card.bid_card_number}`;
+                        window.open(bidUrl, "_blank");
+                      }}
+                    />
+                  </div>
+                )}
 
                 <div className="text-xs text-white/50 mt-1">
                   {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -353,7 +412,7 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
               <Bot className="w-4 h-4 text-white" />
             </div>
             <div className="flex-1">
-              <div className="bg-white/10 rounded-2xl px-4 py-3 text-white">
+              <div className="bg-gray-800 rounded-2xl px-4 py-3 text-white">
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>CoIA is thinking...</span>
@@ -367,7 +426,7 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 border-t border-gray-700">
         <div className="flex gap-3 items-end">
           <div className="flex-1">
             <input
@@ -378,7 +437,7 @@ const ContractorOnboardingChat: React.FC<ContractorOnboardingChatProps> = ({
               onKeyPress={handleKeyPress}
               placeholder="Type your response..."
               disabled={isLoading}
-              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50"
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50"
             />
           </div>
 

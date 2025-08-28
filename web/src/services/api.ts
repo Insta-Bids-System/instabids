@@ -1,6 +1,8 @@
 // API service for connecting to the Instabids backend
-const API_BASE_URL = "http://localhost:8008"; // Updated port to match actual API server
-console.log("FORCED API_BASE_URL:", API_BASE_URL);
+import { circuitBreakerManager } from '../utils/circuitBreaker';
+
+const API_BASE_URL = ""; // Use relative URLs to go through Vite proxy
+console.log("FORCED API_BASE_URL:", API_BASE_URL || "Using Vite proxy");
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -80,32 +82,79 @@ class ApiService {
     return { data: response.data };
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  private async request<T>(endpoint: string, options: RequestInit = {}, retries = 3): Promise<ApiResponse<T>> {
+    // Use circuit breaker for resilience
+    const circuitBreakerName = `api-${endpoint.split('/')[1] || 'default'}`;
+    
     try {
-      const url = `${API_BASE_URL}${endpoint}`;
-      console.log(`[API] Making request to: ${url}`);
+      return await circuitBreakerManager.execute(
+        circuitBreakerName,
+        async () => {
+          let lastError: Error | null = null;
+          
+          // Retry logic with exponential backoff
+          for (let attempt = 0; attempt < retries; attempt++) {
+            try {
+              const url = `${API_BASE_URL}${endpoint}`;
+              console.log(`[API] Attempt ${attempt + 1}/${retries} to: ${url}`);
 
-      const response = await fetch(url, {
-        headers: {
-          "Content-Type": "application/json",
-          ...options.headers,
+              const response = await fetch(url, {
+                headers: {
+                  "Content-Type": "application/json",
+                  ...options.headers,
+                },
+                ...options,
+              });
+
+              if (!response.ok) {
+                // Don't retry on client errors (4xx), only server errors (5xx)
+                if (response.status >= 400 && response.status < 500) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                // Server error - will retry
+                lastError = new Error(`HTTP error! status: ${response.status}`);
+                if (attempt < retries - 1) {
+                  const delay = Math.min(1000 * Math.pow(2, attempt), 5000); // Max 5 second delay
+                  console.log(`[API] Server error, retrying in ${delay}ms...`);
+                  await new Promise(resolve => setTimeout(resolve, delay));
+                  continue;
+                }
+              }
+
+              const data = await response.json();
+              console.log(`[API] Success on attempt ${attempt + 1}:`, data);
+
+              return {
+                success: true,
+                data,
+              };
+            } catch (error) {
+              lastError = error instanceof Error ? error : new Error("Unknown error");
+              console.error(`[API] Error on attempt ${attempt + 1} for ${endpoint}:`, error);
+              
+              // If it's a connection error and we have retries left, wait and retry
+              if (attempt < retries - 1 && error instanceof TypeError && error.message.includes('fetch')) {
+                const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+                console.log(`[API] Connection failed, retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+              }
+            }
+          }
+          
+          // All retries failed
+          console.error(`[API] All ${retries} attempts failed for ${endpoint}`);
+          throw lastError || new Error("All retries failed");
         },
-        ...options,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log(`[API] Response:`, data);
-
-      return {
-        success: true,
-        data,
-      };
+        {
+          failureThreshold: 3,
+          resetTimeout: 30000, // 30 seconds
+          successThreshold: 2,
+          timeout: 15000 // 15 seconds
+        }
+      );
     } catch (error) {
-      console.error(`[API] Error in ${endpoint}:`, error);
+      console.error(`[API] Circuit breaker error for ${endpoint}:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -118,7 +167,7 @@ class ApiService {
     return this.request("/");
   }
 
-  // Chat with CIA agent
+  // Chat with CIA agent - DEPRECATED: Use SSE streaming instead
   async sendChatMessage(
     message: string,
     images: string[] = [],
@@ -126,18 +175,10 @@ class ApiService {
     sessionId?: string,
     projectId?: string
   ): Promise<ApiResponse<ChatResponse>> {
-    const payload: ChatMessage & { project_id?: string } = {
-      message,
-      images,
-      user_id: userId,
-      session_id: sessionId,
-      project_id: projectId,
-    };
-
-    return this.request<ChatResponse>("/api/cia/chat", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    // Redirect to streaming endpoint - no fallbacks allowed
+    throw new Error(
+      "sendChatMessage is deprecated. Use SSE streaming endpoint /ai/chat/stream with useSSEChatStream hook. No fallback responses allowed."
+    );
   }
 
   // Chat with contractor onboarding agent (COIA) - Authenticated version

@@ -42,7 +42,7 @@ def test_complete_homeowner_and_iris_flow():
         iris_url = "http://localhost:8008/api/iris/chat"
         iris_payload = {
             "message": "Hi Iris! I'm renovating my bathroom and need design inspiration. I like modern style with white and gray colors. Can you generate some bathroom designs with a floating vanity and good lighting?",
-            "homeowner_id": user_id,
+            "user_id": user_id,
             "board_id": None,
             "conversation_context": []
         }

@@ -28,7 +28,7 @@ interface WebSocketHookReturn {
 
 export const useWebSocket = (options: WebSocketHookOptions = {}): WebSocketHookReturn => {
   const {
-    autoConnect = true,
+    autoConnect = false,
     reconnectAttempts = 5,
     reconnectDelay = 3000,
     debug = false,
@@ -73,7 +73,10 @@ export const useWebSocket = (options: WebSocketHookOptions = {}): WebSocketHookR
     setError(null);
 
     try {
-      const wsUrl = `ws://localhost:8008/ws/admin`;
+      // Build proper WebSocket URL to backend
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = import.meta.env.DEV ? window.location.host : window.location.host;
+      const wsUrl = `${protocol}//${host}/ws/admin`;
       log("Connecting to WebSocket", wsUrl);
 
       wsRef.current = new WebSocket(wsUrl);

@@ -27,6 +27,11 @@ interface BidCard {
     state: string;
     zip_code: string;
   };
+  // Date flow fields
+  bid_collection_deadline?: string | null;
+  project_completion_deadline?: string | null;
+  deadline_hard?: boolean;
+  deadline_context?: string | null;
 }
 
 const BidCardTable: React.FC = () => {
@@ -43,7 +48,7 @@ const BidCardTable: React.FC = () => {
   const fetchBidCards = async () => {
     try {
       // Try direct Supabase query first
-      const response = await fetch("http://localhost:8008/api/bid-cards/search", {
+      const response = await fetch("/api/bid-cards/search", {
         credentials: "include",
       });
 
@@ -111,6 +116,30 @@ const BidCardTable: React.FC = () => {
       default:
         return "text-gray-600";
     }
+  };
+
+  const formatDeadline = (deadline: string | null | undefined): string => {
+    if (!deadline) return "No deadline";
+    const deadlineDate = new Date(deadline);
+    const now = new Date();
+    const daysRemaining = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysRemaining < 0) return "Past due";
+    if (daysRemaining === 0) return "Due today";
+    if (daysRemaining === 1) return "Due tomorrow";
+    return `${daysRemaining} days`;
+  };
+
+  const getDeadlineColor = (deadline: string | null | undefined, isHard: boolean): string => {
+    if (!deadline) return "text-gray-400";
+    const deadlineDate = new Date(deadline);
+    const now = new Date();
+    const daysRemaining = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysRemaining < 0) return "text-red-800 font-bold";
+    if (daysRemaining <= 3) return isHard ? "text-red-600 font-bold" : "text-orange-600 font-semibold";
+    if (daysRemaining <= 7) return isHard ? "text-orange-600 font-semibold" : "text-yellow-600";
+    return "text-gray-600";
   };
 
   if (loading) {
@@ -186,6 +215,9 @@ const BidCardTable: React.FC = () => {
                 Urgency
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Deadline
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Created
               </th>
             </tr>
@@ -242,6 +274,17 @@ const BidCardTable: React.FC = () => {
                   <span className={`text-sm ${getUrgencyColor(bidCard)}`}>
                     {bidCard.urgency_level ? bidCard.urgency_level.toUpperCase() : "NOT SET"}
                   </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className={`text-sm ${getDeadlineColor(bidCard.project_completion_deadline, bidCard.deadline_hard || false)}`}>
+                    {formatDeadline(bidCard.project_completion_deadline)}
+                    {bidCard.deadline_hard && (
+                      <span className="ml-1 px-1 py-0.5 text-xs bg-red-100 text-red-800 rounded">FIRM</span>
+                    )}
+                  </div>
+                  {bidCard.deadline_context && (
+                    <div className="text-xs text-gray-500 mt-1">{bidCard.deadline_context}</div>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(bidCard.created_at).toLocaleDateString()}

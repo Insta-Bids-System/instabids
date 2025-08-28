@@ -28,6 +28,11 @@ class CampaignRequest:
     urgency_level: str
     bids_needed: int = 4  # Default business requirement
     channels: list[str] = None  # Will be auto-selected if not provided
+    # NEW: Exact date fields
+    project_completion_deadline: datetime = None
+    bid_collection_deadline: datetime = None
+    deadline_hard: bool = False
+    deadline_context: str = None
 
 
 class EnhancedCampaignOrchestrator:
@@ -62,7 +67,7 @@ class EnhancedCampaignOrchestrator:
 
         This is the main entry point that:
         1. Analyzes contractor availability by tier
-        2. Calculates optimal outreach strategy
+        2. Calculates optimal outreach strategy (with date override if provided)
         3. Selects specific contractors
         4. Creates campaign with check-in schedule
         5. Starts execution with monitoring
@@ -72,6 +77,27 @@ class EnhancedCampaignOrchestrator:
             print(f"Project: {request.project_type}")
             print(f"Timeline: {request.timeline_hours} hours")
             print(f"Bids Needed: {request.bids_needed}")
+            
+            # NEW: Check for exact dates and override timeline if provided
+            timeline_hours = request.timeline_hours
+            
+            if request.project_completion_deadline:
+                print(f"Exact deadline provided: {request.project_completion_deadline}")
+                days_remaining = (request.project_completion_deadline - datetime.now()).days
+                
+                # Simple override logic based on deadline proximity
+                if days_remaining <= 3:
+                    timeline_hours = 6  # Rush mode: 6 hours
+                    print(f"Rush mode activated: {days_remaining} days remaining, using 6 hours")
+                elif days_remaining <= 7:
+                    timeline_hours = 24  # Fast track: 1 day
+                    print(f"Fast track activated: {days_remaining} days remaining, using 24 hours")
+                elif days_remaining <= 14:
+                    timeline_hours = 72  # Normal: 3 days
+                    print(f"Normal timeline: {days_remaining} days remaining, using 72 hours")
+                else:
+                    timeline_hours = 120  # Relaxed: 5 days
+                    print(f"Relaxed timeline: {days_remaining} days remaining, using 120 hours")
 
             # Step 1: Analyze contractor availability
             tier_availability = await self._analyze_contractor_availability(
@@ -79,10 +105,10 @@ class EnhancedCampaignOrchestrator:
                 request.location
             )
 
-            # Step 2: Calculate outreach strategy
+            # Step 2: Calculate outreach strategy (using potentially overridden timeline)
             strategy = self.timing_calculator.calculate_outreach_strategy(
                 bids_needed=request.bids_needed,
-                timeline_hours=request.timeline_hours,
+                timeline_hours=timeline_hours,
                 tier1_available=tier_availability["tier_1"],
                 tier2_available=tier_availability["tier_2"],
                 tier3_available=tier_availability["tier_3"],

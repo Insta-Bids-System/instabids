@@ -27,7 +27,7 @@ board_data = {
     "title": "My Actual Backyard - Turf Transformation",
     "description": "Transform my real backyard with patchy grass to artificial turf",
     "room_type": "outdoor_backyard",
-    "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",
     "status": "collecting"
 }
 

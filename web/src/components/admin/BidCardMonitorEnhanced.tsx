@@ -1,7 +1,7 @@
 import { Download, Filter, RefreshCw } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { useWebSocket } from "../../hooks/useWebSocket";
+import { useWebSocketContext } from "../../context/WebSocketContext";
 import { AdminBidCardEnhanced } from "./AdminBidCardEnhanced";
 
 export interface EnhancedBidCard {
@@ -55,14 +55,14 @@ const BidCardMonitorEnhanced: React.FC = () => {
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
   const [sortBy, setSortBy] = useState<"recent" | "urgency" | "progress">("recent");
 
-  const { lastMessage, subscribe, unsubscribe } = useWebSocket();
+  const { lastMessage, subscribe } = useWebSocketContext();
 
   // Load enhanced bid cards data
   useEffect(() => {
     const loadBidCards = async () => {
       try {
         const response = await fetch(
-          "http://localhost:8008/api/admin/bid-cards-enhanced?limit=50",
+          "/api/admin/bid-cards-enhanced?limit=50",
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("admin_session_id")}`,
@@ -85,9 +85,9 @@ const BidCardMonitorEnhanced: React.FC = () => {
 
     loadBidCards();
 
-    // Refresh every 30 seconds
-    const interval = setInterval(loadBidCards, 30000);
-    return () => clearInterval(interval);
+    // Polling disabled for performance - use manual refresh instead
+    // const interval = setInterval(loadBidCards, 30000);
+    // return () => clearInterval(interval);
   }, []);
 
   // Handle WebSocket updates

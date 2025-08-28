@@ -98,7 +98,7 @@ def test_complete_flow():
             print("   [OK] My Vision: AI-generated dream kitchen combining both")
 
             print("\n6. TESTING DEMO BOARDS API...")
-            boards_resp = requests.get(f"{BASE_URL}/api/demo/inspiration/boards?homeowner_id=550e8400-e29b-41d4-a716-446655440001", timeout=5)
+            boards_resp = requests.get(f"{BASE_URL}/api/demo/inspiration/boards?user_id=550e8400-e29b-41d4-a716-446655440001", timeout=5)
             if boards_resp.status_code == 200:
                 boards = boards_resp.json()
                 print(f"   [OK] Found {len(boards)} boards with real images")

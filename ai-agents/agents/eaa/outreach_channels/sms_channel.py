@@ -6,6 +6,7 @@ import os
 import uuid
 from datetime import datetime
 from typing import Any, Optional
+from config.service_urls import get_backend_url
 
 
 try:
@@ -99,7 +100,7 @@ class SMSChannel:
                 from_=self.from_number,
                 to=to_phone,
                 # Add webhook URL for delivery tracking
-                status_callback=f"{os.getenv('BASE_URL', 'http://localhost:8008')}/api/eaa/webhook/sms-status"
+                status_callback=f"{os.getenv('BASE_URL', get_backend_url())}/api/eaa/webhook/sms-status"
             )
 
             return {

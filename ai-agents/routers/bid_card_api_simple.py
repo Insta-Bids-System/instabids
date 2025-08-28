@@ -5,11 +5,77 @@ This version works without authentication
 
 from datetime import datetime
 from typing import Any, Optional
+import base64
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
 from database_simple import db
+from config.service_urls import get_backend_url
+
+
+# File analysis helper functions
+async def analyze_file_for_contact_info(file_data: bytes, filename: str, content_type: str) -> dict:
+    """Analyze uploaded file for contact information using intelligent messaging agent"""
+    try:
+        # Import the analyzer class directly
+        from agents.intelligent_messaging_agent import GPT5SecurityAnalyzer
+        
+        # Initialize analyzer
+        analyzer = GPT5SecurityAnalyzer()
+        
+        # Convert file data to base64 for analysis
+        file_base64 = base64.b64encode(file_data).decode('utf-8')
+        
+        # Determine file type and analyze accordingly
+        if content_type and content_type.startswith('image/'):
+            # Analyze image content
+            image_format = content_type.split('/')[-1]
+            return await analyzer.analyze_image_content(file_base64, image_format)
+            
+        elif filename.lower().endswith('.pdf') or (content_type and 'pdf' in content_type):
+            # Analyze PDF content
+            return await analyzer.analyze_pdf_content(file_base64, filename)
+            
+        else:
+            # For other file types, assume they may contain contact info
+            return {
+                "contact_info_detected": True,
+                "confidence": 0.6,
+                "explanation": f"File type {content_type or 'unknown'} requires manual review",
+                "phones": [],
+                "emails": [],
+                "addresses": [],
+                "social_handles": []
+            }
+            
+    except Exception as e:
+        print(f"File analysis error: {e}")
+        # Conservative approach - flag for review if analysis fails
+        return {
+            "contact_info_detected": True,
+            "confidence": 0.5,
+            "explanation": f"File analysis failed: {str(e)} - flagged for safety",
+            "phones": [],
+            "emails": [],
+            "addresses": [],
+            "social_handles": []
+        }
+
+def get_detected_contact_types(analysis: dict) -> list:
+    """Extract detected contact types from analysis results"""
+    contact_types = []
+    
+    if analysis.get("phones"):
+        contact_types.append("phone")
+    if analysis.get("emails"):
+        contact_types.append("email")
+    if analysis.get("addresses"):
+        contact_types.append("address")
+    if analysis.get("social_handles"):
+        contact_types.append("social")
+        
+    return contact_types
 
 
 router = APIRouter(tags=["bid-cards"])
@@ -94,7 +160,7 @@ async def search_bid_cards(
 
                 async with httpx.AsyncClient() as client:
                     response = await client.get(
-                        "http://localhost:8008/api/contractor-jobs/search",
+                        f"{get_backend_url()}/api/contractor-jobs/search",
                         params=contractor_params
                     )
 
@@ -200,8 +266,18 @@ async def search_bid_cards(
                 "project_type": card.get("project_type", "general"),
                 "categories": card.get("categories", []),
                 "bid_count": card.get("bid_count", 0),
+                # Date flow fields
+                "bid_collection_deadline": card.get("bid_collection_deadline"),
+                "project_completion_deadline": card.get("project_completion_deadline"),
+                "deadline_hard": card.get("deadline_hard", False),
+                "deadline_context": card.get("deadline_context"),
                 "created_at": card.get("created_at"),
                 "is_urgent": False,
+                # Service complexity classification fields
+                "service_complexity": card.get("service_complexity", "single-trade"),
+                "trade_count": card.get("trade_count", 1),
+                "primary_trade": card.get("primary_trade", "general"),
+                "secondary_trades": card.get("secondary_trades", []),
                 "is_featured": False,
                 "group_bid_eligible": card.get("group_bid_eligible", False)
             }
@@ -255,7 +331,7 @@ async def create_test_bid_cards():
         if not project_response.data:
             # Create a test project
             project_data = {
-                "homeowner_id": "test-homeowner-id",
+                "user_id": "test-homeowner-id",
                 "title": "Test Project",
                 "status": "active"
             }
@@ -267,7 +343,7 @@ async def create_test_bid_cards():
         sample_cards = [
             {
                 "project_id": project_id,
-                "homeowner_id": "test-homeowner-id",
+                "user_id": "test-homeowner-id",
                 "title": "Kitchen Renovation - Modern Update",
                 "description": "Complete kitchen renovation including new cabinets, countertops, and appliances. Looking for experienced contractors.",
                 "status": "active",
@@ -285,7 +361,7 @@ async def create_test_bid_cards():
             },
             {
                 "project_id": project_id,
-                "homeowner_id": "test-homeowner-id",
+                "user_id": "test-homeowner-id",
                 "title": "Bathroom Remodel - Master Suite",
                 "description": "Master bathroom remodel with new fixtures, tiling, and modern design.",
                 "status": "collecting_bids",
@@ -303,7 +379,7 @@ async def create_test_bid_cards():
             },
             {
                 "project_id": project_id,
-                "homeowner_id": "test-homeowner-id",
+                "user_id": "test-homeowner-id",
                 "title": "Roof Replacement - Urgent",
                 "description": "Need immediate roof replacement due to storm damage. Insurance claim approved.",
                 "status": "active",
@@ -331,9 +407,9 @@ async def create_test_bid_cards():
         print(f"Error creating test data: {e!s}")
         return {"error": str(e)}
 
-@router.get("/homeowner/{user_id}")
-async def get_homeowner_bid_cards(user_id: str):
-    """Get all bid cards for a specific homeowner"""
+@router.get("/user/{user_id}")
+async def get_user_bid_cards(user_id: str):
+    """Get all bid cards for a specific user"""
     try:
         # Use the same database connection pattern as the search endpoint
         supabase_client = db.client
@@ -379,7 +455,12 @@ async def get_homeowner_bid_cards(user_id: str):
                 "timeline_urgency": all_extracted_data.get("timeline_urgency", ""),
                 "material_preferences": all_extracted_data.get("material_preferences", []),
                 "special_requirements": all_extracted_data.get("special_requirements", []),
-                "images": all_extracted_data.get("images", [])
+                "images": all_extracted_data.get("images", []),
+                # Service complexity classification fields
+                "service_complexity": card.get("service_complexity", "single-trade"),
+                "trade_count": card.get("trade_count", 1),
+                "primary_trade": card.get("primary_trade", "general"),
+                "secondary_trades": card.get("secondary_trades", [])
             }
             bid_cards.append(bid_card)
 
@@ -436,15 +517,118 @@ async def submit_contractor_bid(bid_data: BidSubmissionRequest):
             raise HTTPException(status_code=500, detail="Failed to submit bid")
 
         bid_id = bid_response.data[0]["id"]
+        
+        # Process ALL bid fields through intelligent messaging agent for contact filtering
+        # Run filtering in background to avoid timeout
+        import asyncio
+        import threading
+        
+        def filter_bid_content_async(bid_id_local, bid_data_local, supabase_client_local):
+            """Filter bid content in background thread"""
+            try:
+                import requests
+                filtered_proposal = bid_data_local.proposal
+                filtered_approach = bid_data_local.approach
+                filtered_warranty = bid_data_local.warranty_details
+                
+                # Filter proposal field
+                print(f"[FILTERING] Starting GPT-4o filtering for bid {bid_id_local}")
+                print(f"[FILTERING] Original proposal: {bid_data_local.proposal[:100]}...")
+                
+                proposal_response = requests.post(f"{get_backend_url()}/api/intelligent-messages/send", json={
+                    "content": bid_data_local.proposal,
+                    "sender_type": "contractor",
+                    "sender_id": bid_data_local.contractor_id,
+                    "bid_card_id": bid_data_local.bid_card_id,
+                    "message_type": "bid_submission_proposal"
+                }, timeout=300)  # Give it 5 minutes for GPT-4o processing
+                
+                if proposal_response.ok:
+                    proposal_result = proposal_response.json()
+                    if proposal_result.get('approved'):
+                        filtered_proposal = proposal_result.get('filtered_content', bid_data_local.proposal)
+                        print(f"[FILTERING] ✅ Proposal filtered successfully")
+                        print(f"[FILTERING] Filtered proposal: {filtered_proposal[:100]}...")
+                    else:
+                        filtered_proposal = "Proposal contains restricted content - please contact through platform"
+                        print(f"[FILTERING] 🚫 Proposal blocked due to contact info")
+                else:
+                    print(f"[FILTERING] ⚠️ Proposal filtering failed: {proposal_response.status_code}")
+                
+                # Filter approach field
+                print(f"[FILTERING] Filtering approach for contact information...")
+                approach_response = requests.post(f"{get_backend_url()}/api/intelligent-messages/send", json={
+                    "content": bid_data_local.approach,
+                    "sender_type": "contractor",
+                    "sender_id": bid_data_local.contractor_id,
+                    "bid_card_id": bid_data_local.bid_card_id,
+                    "message_type": "bid_submission_approach"
+                }, timeout=300)  # Give it 5 minutes for GPT-4o processing
+                
+                if approach_response.ok:
+                    approach_result = approach_response.json()
+                    if approach_result.get('approved'):
+                        filtered_approach = approach_result.get('filtered_content', bid_data_local.approach)
+                        print(f"[FILTERING] ✅ Approach filtered successfully")
+                    else:
+                        filtered_approach = "Approach contains restricted content - please contact through platform"
+                        print(f"[FILTERING] 🚫 Approach blocked due to contact info")
+                else:
+                    print(f"[FILTERING] ⚠️ Approach filtering failed: {approach_response.status_code}")
+                
+                # Filter warranty field if provided
+                if bid_data_local.warranty_details:
+                    print(f"[FILTERING] Filtering warranty for contact information...")
+                    warranty_response = requests.post(f"{get_backend_url()}/api/intelligent-messages/send", json={
+                        "content": bid_data_local.warranty_details,
+                        "sender_type": "contractor",
+                        "sender_id": bid_data_local.contractor_id,
+                        "bid_card_id": bid_data_local.bid_card_id,
+                        "message_type": "bid_submission_warranty"
+                    }, timeout=300)  # Give it 5 minutes for GPT-4o processing
+                    
+                    if warranty_response.ok:
+                        warranty_result = warranty_response.json()
+                        if warranty_result.get('approved'):
+                            filtered_warranty = warranty_result.get('filtered_content', bid_data_local.warranty_details)
+                            print(f"[FILTERING] ✅ Warranty filtered successfully")
+                        else:
+                            filtered_warranty = "Warranty contains restricted content - please contact through platform"
+                            print(f"[FILTERING] 🚫 Warranty blocked due to contact info")
+                    else:
+                        print(f"[FILTERING] ⚠️ Warranty filtering failed: {warranty_response.status_code}")
+                
+                # UPDATE THE BID WITH FILTERED CONTENT - THIS IS THE FIX!
+                print(f"[FILTERING] Updating bid {bid_id_local} with filtered content...")
+                update_response = supabase_client_local.table("contractor_bids").update({
+                    "proposal": filtered_proposal,
+                    "approach": filtered_approach,
+                    "warranty_details": filtered_warranty
+                }).eq("id", bid_id_local).execute()
+                
+                if update_response.data:
+                    print(f"[FILTERING] ✅✅✅ BID UPDATED WITH FILTERED CONTENT - ALL CONTACT INFO REMOVED ✅✅✅")
+                    print(f"[FILTERING] Database update successful for bid {bid_id_local}")
+                else:
+                    print(f"[FILTERING] ⚠️ WARNING: Failed to update bid with filtered content")
+                    
+            except Exception as e:
+                print(f"[FILTERING] ERROR: GPT-4o filtering failed: {e}")
+                # Don't fail - bid already saved, just not filtered
+        
+        # Start the filtering in a background thread
+        filter_thread = threading.Thread(target=filter_bid_content_async, args=(bid_id, bid_data, supabase_client))
+        filter_thread.daemon = True  # Don't block server shutdown
+        filter_thread.start()
+        print(f"[BID SUBMISSION] Bid {bid_id} saved - filtering started in background")
 
         # Update bid card counts
-        current_bid_count = bid_card.get("bids_received_count", 0)
+        current_bid_count = bid_card.get("bid_count", 0)
         new_bid_count = current_bid_count + 1
         contractor_count_needed = bid_card.get("contractor_count_needed", 1)
 
         update_data = {
-            "bids_received_count": new_bid_count,
-            "bids_target_met": new_bid_count >= contractor_count_needed
+            "bid_count": new_bid_count
         }
 
         # Update status if target met
@@ -485,38 +669,138 @@ async def submit_contractor_bid_with_files(
 
         # Handle file uploads if any
         uploaded_attachments = []
+        flagged_files = []
         if files:
             supabase_client = db.client
 
             for file in files:
                 if file.filename:
-                    # For now, simulate file storage - in production this would upload to Supabase Storage
-                    # This is placeholder logic - real implementation would upload to Supabase bucket
-                    file_url = f"https://placeholder-storage.com/bid-attachments/{bid_id}/{file.filename}"
+                    try:
+                        # Read file data
+                        file_data = await file.read()
+                        
+                        # 🚨 NEW: Analyze file for contact information
+                        file_analysis = await analyze_file_for_contact_info(file_data, file.filename, file.content_type)
+                        
+                        # Generate unique filename using unified system pattern
+                        from datetime import datetime
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        unique_name = f"bid_attachments/{bid_id}/{timestamp}_{file.filename}"
+                        
+                        if file_analysis.get("contact_info_detected"):
+                            # 🚨 FILE FLAGGED: Store in review queue instead of normal upload
+                            print(f"[FILE FLAGGED] {file.filename} contains contact info - sending to review queue")
+                            
+                            # Upload to separate quarantine bucket for review
+                            quarantine_path = f"quarantine/{bid_id}/{timestamp}_{file.filename}"
+                            supabase_client.storage.from_("project-images").upload(
+                                quarantine_path,
+                                file_data,
+                                {
+                                    "content-type": file.content_type or "application/octet-stream",
+                                    "cache-control": "3600",
+                                    "upsert": "false"
+                                }
+                            )
+                            
+                            # Add to file review queue
+                            review_record = {
+                                "bid_card_id": bid_request.bid_card_id,
+                                "contractor_id": bid_request.contractor_id,
+                                "file_name": file.filename,
+                                "file_path": quarantine_path,
+                                "file_type": file.content_type or "application/octet-stream",
+                                "file_size": len(file_data),
+                                "original_upload_data": {
+                                    "upload_timestamp": timestamp,
+                                    "bid_id": bid_id,
+                                    "original_filename": file.filename
+                                },
+                                "contact_analysis": file_analysis,
+                                "flagged_reason": file_analysis.get("explanation", "Contact information detected"),
+                                "confidence_score": file_analysis.get("confidence", 0.0),
+                                "detected_contact_types": get_detected_contact_types(file_analysis),
+                                "review_status": "pending"
+                            }
+                            
+                            review_result = supabase_client.table("file_review_queue").insert(review_record).execute()
+                            
+                            # 🚨 NEW: Send notification to contractor about flagged file
+                            if review_result.data:
+                                review_queue_id = review_result.data[0]["id"]
+                                try:
+                                    from services.file_flagged_notification_service import send_file_flagged_notification
+                                    notification_result = await send_file_flagged_notification(
+                                        contractor_id=bid_request.contractor_id,
+                                        bid_card_id=bid_request.bid_card_id,
+                                        file_name=file.filename,
+                                        flagged_reason=file_analysis.get("explanation", "Contact information detected"),
+                                        confidence_score=file_analysis.get("confidence", 0.0),
+                                        review_queue_id=review_queue_id
+                                    )
+                                    print(f"[NOTIFICATION] File flagged notification: {notification_result}")
+                                except Exception as e:
+                                    print(f"[WARNING] Failed to send flagged file notification: {e}")
+                            
+                            flagged_files.append({
+                                "filename": file.filename,
+                                "reason": file_analysis.get("explanation"),
+                                "confidence": file_analysis.get("confidence")
+                            })
+                            
+                        else:
+                            # ✅ FILE CLEAN: Normal upload process
+                            supabase_client.storage.from_("project-images").upload(
+                                unique_name,
+                                file_data,
+                                {
+                                    "content-type": file.content_type or "application/octet-stream",
+                                    "cache-control": "3600",
+                                    "upsert": "false"
+                                }
+                            )
+                            
+                            # Get public URL from Supabase Storage
+                            file_url = supabase_client.storage.from_("project-images").get_public_url(unique_name)
+                            
+                            print(f"[ATTACHMENT] Uploaded {file.filename} to {file_url}")
+                            
+                            # Store attachment metadata in database with real URL
+                            attachment_data = {
+                                "contractor_bid_id": bid_id,
+                                "name": file.filename,
+                                "type": file.content_type.split("/")[0] if file.content_type else "document",
+                                "url": file_url,
+                                "size": len(file_data),
+                                "mime_type": file.content_type
+                            }
 
-                    # Store attachment metadata in database
-                    attachment_data = {
-                        "contractor_bid_id": bid_id,
-                        "name": file.filename,
-                        "type": file.content_type.split("/")[0] if file.content_type else "document",
-                        "url": file_url,
-                        "size": file.size if file.size else 0,
-                        "mime_type": file.content_type
-                    }
+                            attachment_response = supabase_client.table("contractor_proposal_attachments").insert(attachment_data).execute()
+                            if attachment_response.data:
+                                uploaded_attachments.append({
+                                "id": attachment_response.data[0]["id"],
+                                "name": file.filename,
+                                "url": file_url,
+                                "type": attachment_data["type"]
+                                })
+                            
+                    except Exception as upload_error:
+                        print(f"[ERROR] Failed to upload {file.filename}: {upload_error}")
+                        # Continue with other files even if one fails
 
-                    attachment_response = supabase_client.table("contractor_proposal_attachments").insert(attachment_data).execute()
-                    if attachment_response.data:
-                        uploaded_attachments.append({
-                            "id": attachment_response.data[0]["id"],
-                            "name": file.filename,
-                            "url": file_url,
-                            "type": attachment_data["type"]
-                        })
-
-        # Return success with attachment info
+        # Return success with attachment info and flagged files
         result = bid_result.copy()
         result["attachments"] = uploaded_attachments
-        result["message"] = f"Bid submitted successfully with {len(uploaded_attachments)} attachments"
+        result["flagged_files"] = flagged_files
+        
+        # Create appropriate message based on file processing results
+        total_files = len(uploaded_attachments) + len(flagged_files)
+        if flagged_files:
+            result["message"] = f"Bid submitted successfully. {len(uploaded_attachments)} files uploaded, {len(flagged_files)} files sent for admin review due to potential contact information."
+            result["review_required"] = True
+        else:
+            result["message"] = f"Bid submitted successfully with {len(uploaded_attachments)} attachments"
+            result["review_required"] = False
 
         return result
 
@@ -675,7 +959,12 @@ async def get_bid_card_contractor_view(
             "distance_miles": 10.5,  # Would calculate actual distance
             "match_score": 0.85,     # Would calculate based on contractor profile
             "homeowner_verified": True,
-            "response_time_hours": 24
+            "response_time_hours": 24,
+            # Service complexity classification fields
+            "service_complexity": card.get("service_complexity", "single-trade"),
+            "trade_count": card.get("trade_count", 1),
+            "primary_trade": card.get("primary_trade", "general"),
+            "secondary_trades": card.get("secondary_trades", [])
         }
 
         return contractor_view

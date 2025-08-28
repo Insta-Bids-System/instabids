@@ -3,7 +3,9 @@ import { Clock, Shield, Star, Users } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import CIAChat from "@/components/chat/CIAChat";
+import UltimateCIAChat from "@/components/chat/UltimateCIAChat";
+import GlassmorphismChatDemo from "@/components/testing/GlassmorphismChatDemo";
+import UITestingShowcase from "@/components/testing/UITestingShowcase";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiService } from "@/services/api";
 
@@ -13,6 +15,7 @@ const HomePage: React.FC = () => {
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [_conversationComplete, setConversationComplete] = useState(false);
   const [_projectData, setProjectData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'chat' | 'ui-testing'>('chat');
   const [sessionId] = useState(() => {
     // Try to get existing session ID from localStorage, or create new one
     const existingSessionId = localStorage.getItem("cia_session_id");
@@ -128,28 +131,79 @@ const HomePage: React.FC = () => {
       {/* Hero Section with Chat */}
       <section className="pt-24 pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Hero Text */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-8"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Save 20% on Home Projects
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              No sales meetings. No hassle. Just chat with our AI to describe your project and get
-              matched with pre-qualified contractors instantly.
-            </p>
-          </motion.div>
+          {/* Tab Navigation */}
+          <div className="flex justify-center mb-6">
+            <div className="bg-white rounded-lg shadow-sm p-1 flex gap-2">
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`px-6 py-2 rounded-md font-medium transition-all ${
+                  activeTab === 'chat'
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                💬 Chat Interface
+              </button>
+              <button
+                onClick={() => setActiveTab('ui-testing')}
+                className={`px-6 py-2 rounded-md font-medium transition-all ${
+                  activeTab === 'ui-testing'
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🧪 UI Testing Lab
+              </button>
+            </div>
+          </div>
 
-          {/* Trust Indicators */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="flex flex-wrap justify-center gap-6 mb-8"
+          {/* Conditional Content Based on Tab */}
+          {activeTab === 'chat' ? (
+            <>
+              {/* Hero Text for Chat Tab */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="text-center mb-8"
+              >
+                <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+                  ⚡ SECOND HOT RELOAD TEST - WATCH MODE WORKING! ⚡
+                </h2>
+                <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+                  No sales meetings. No hassle. Just chat with our AI to describe your project and get
+                  matched with pre-qualified contractors instantly.
+                </p>
+              </motion.div>
+            </>
+          ) : (
+            <>
+              {/* Hero Text for UI Testing Tab */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="text-center mb-8"
+              >
+                <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-amber-600 to-pink-600 bg-clip-text text-transparent">
+                  UI Testing Laboratory
+                </h2>
+                <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+                  Explore different design concepts and interface styles for the InstaBids platform.
+                </p>
+              </motion.div>
+            </>
+          )}
+
+          {/* Conditional Content Based on Active Tab */}
+          {activeTab === 'chat' ? (
+            <>
+              {/* Trust Indicators */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+                className="flex flex-wrap justify-center gap-6 mb-8"
           >
             <div className="flex items-center gap-2 text-gray-600">
               <Shield className="w-5 h-5 text-green-600" />
@@ -169,21 +223,28 @@ const HomePage: React.FC = () => {
             </div>
           </motion.div>
 
-          {/* Chat Interface */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.5, duration: 0.5 }}
-            className="max-w-4xl mx-auto"
-          >
-            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-              <CIAChat
-                onSendMessage={handleSendMessage}
-                onAccountCreated={handleAccountCreated}
-                sessionId={sessionId}
-              />
-            </div>
-          </motion.div>
+              {/* Chat Interface */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5, duration: 0.5 }}
+                className="max-w-4xl mx-auto"
+              >
+                <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                  <UltimateCIAChat
+                    onSendMessage={handleSendMessage}
+                    onAccountCreated={handleAccountCreated}
+                    sessionId={sessionId}
+                  />
+                </div>
+              </motion.div>
+            </>
+          ) : (
+            <>
+              {/* UI Testing Lab Content - Comprehensive Component Showcase */}
+              <UITestingShowcase />
+            </>
+          )}
 
           {/* Signup Prompt Modal */}
           {showSignupPrompt && (

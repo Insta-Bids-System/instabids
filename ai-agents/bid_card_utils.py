@@ -85,11 +85,11 @@ def create_bid_card_with_defaults(project_data: dict[str, Any]) -> dict[str, Any
                         "project_type": project_data.get("project_type"),
                         "urgency_level": project_data.get("urgency_level", "standard"),
                         "contractor_count_needed": project_data.get("contractor_count_needed", 4),
-                        "homeowner_id": project_data.get("homeowner_id"),
+                        "user_id": project_data.get("user_id"),
                         "status": "generated"
                     },
-                    created_by=project_data.get("homeowner_id"),
-                    created_by_type="homeowner" if project_data.get("homeowner_id") else "system"
+                    created_by=project_data.get("user_id"),
+                    created_by_type="homeowner" if project_data.get("user_id") else "system"
                 ))
             except Exception as e:
                 print(f"Warning: Could not track bid card creation event: {e}")

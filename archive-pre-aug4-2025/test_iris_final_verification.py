@@ -10,7 +10,7 @@ print("=" * 60)
 url = "http://localhost:8008/api/iris/chat"
 payload = {
     "message": "Generate a vision of my kitchen with modern white cabinets and marble countertops",
-    "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",
     "board_id": "26cf972b-83e4-484c-98b6-a5d1a4affee3"
 }
 

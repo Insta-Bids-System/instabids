@@ -114,7 +114,7 @@ send_msg_url = f"{BASE_URL}/api/messages/send"
 msg_data = {
     "bid_card_id": BID_CARD_ID,
     "contractor_id": CONTRACTOR_ID,
-    "homeowner_id": HOMEOWNER_ID,
+    "user_id": HOMEOWNER_ID,
     "sender_type": "homeowner",
     "sender_id": HOMEOWNER_ID,
     "content": "This is a test message after the image upload"

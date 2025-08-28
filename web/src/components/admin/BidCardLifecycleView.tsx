@@ -1,5 +1,6 @@
 import type React from "react";
 import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabase";
 import type {
   BidCard,
   BidCardView,
@@ -49,6 +50,24 @@ interface TimelineEvent {
   details?: Record<string, unknown>;
 }
 
+interface ConnectionFeeData {
+  winner_selected: boolean;
+  winner_contractor_id: string | null;
+  winner_selected_at: string | null;
+  winning_bid_amount: number | null;
+  connection_fee_calculated: boolean;
+  connection_fee_data: {
+    fee_id: string | null;
+    base_fee_amount: number | null;
+    final_fee_amount: number | null;
+    category_adjustment: number | null;
+    fee_status: string;
+    payment_processed_at: string | null;
+    payment_method: string | null;
+    payment_transaction_id: string | null;
+  } | null;
+}
+
 interface LifecycleMetrics {
   completion: {
     bids_received: number;
@@ -86,6 +105,42 @@ interface LifecycleMetrics {
   };
 }
 
+interface ChangeLog {
+  id: string;
+  bid_card_id: string;
+  bid_card_number: string;
+  change_type: string;
+  changed_fields: string[];
+  before_state: Record<string, any>;
+  after_state: Record<string, any>;
+  change_summary: string;
+  significance_level: string;
+  source_agent: string;
+  source_context: Record<string, any>;
+  conversation_snippet: string;
+  detected_change_hints: string[];
+  approval_status: string;
+  contractors_notified: number;
+  notification_sent_at: string | null;
+  created_at: string;
+  created_by: string;
+  time_ago: string;
+  change_impact: string;
+  change_category: string;
+  approval_required: boolean;
+}
+
+interface ChangeHistoryData {
+  change_logs: ChangeLog[];
+  summary: {
+    total_changes: number;
+    pending_approval: number;
+    major_changes: number;
+    agent_breakdown: Record<string, number>;
+    most_active_agent: string | null;
+  };
+}
+
 interface LifecycleData {
   bid_card: BidCard;
   discovery: {
@@ -110,6 +165,7 @@ interface LifecycleData {
   bids: EnhancedSubmittedBid[];
   timeline: TimelineEvent[];
   metrics: LifecycleMetrics;
+  connection_fee: ConnectionFeeData;
 }
 
 interface EnhancedSubmittedBid extends SubmittedBid {
@@ -129,6 +185,7 @@ interface BidCardLifecycleViewProps {
 
 const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, onClose }) => {
   const [lifecycleData, setLifecycleData] = useState<LifecycleData | null>(null);
+  const [changeHistoryData, setChangeHistoryData] = useState<ChangeHistoryData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +195,7 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
       try {
         setIsLoading(true);
         console.log("Loading lifecycle for bid card ID:", bidCardId);
-        const response = await fetch(`http://localhost:8008/api/bid-cards/${bidCardId}/lifecycle`, {
+        const response = await fetch(`/api/bid-cards/${bidCardId}/lifecycle`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("admin_session_id")}`,
           },
@@ -161,6 +218,26 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
             errorData.detail || `Failed to load bid card lifecycle data (${response.status})`
           );
         }
+
+        // Load change history data
+        try {
+          const changeHistoryResponse = await fetch(`/api/bid-cards/${bidCardId}/change-history`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("admin_session_id")}`,
+            },
+          });
+
+          if (changeHistoryResponse.ok) {
+            const changeHistoryData = await changeHistoryResponse.json();
+            setChangeHistoryData(changeHistoryData);
+          } else {
+            console.warn('Failed to load change history:', changeHistoryResponse.status);
+            setChangeHistoryData({ change_logs: [], summary: { total_changes: 0, pending_approval: 0, major_changes: 0, agent_breakdown: {}, most_active_agent: null } });
+          }
+        } catch (changeHistoryError) {
+          console.warn('Error loading change history:', changeHistoryError);
+          setChangeHistoryData({ change_logs: [], summary: { total_changes: 0, pending_approval: 0, major_changes: 0, agent_breakdown: {}, most_active_agent: null } });
+        }
       } catch (err) {
         setError("Error loading lifecycle data");
         console.error("Error:", err);
@@ -170,6 +247,68 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
     };
 
     loadLifecycleData();
+
+    // Set up WebSocket subscriptions for real-time updates
+    const bidCardSubscription = supabase
+      .channel(`bid_card_changes:${bidCardId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "bid_cards",
+          filter: `id=eq.${bidCardId}`,
+        },
+        (payload) => {
+          console.log("Bid card updated:", payload);
+          // Reload lifecycle data when bid card is updated
+          loadLifecycleData();
+        }
+      )
+      .subscribe();
+
+    const changeLogSubscription = supabase
+      .channel(`change_logs:${bidCardId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "bid_card_change_logs",
+          filter: `bid_card_id=eq.${bidCardId}`,
+        },
+        async (payload) => {
+          console.log("New change log:", payload);
+          // Reload change history when new change is logged
+          try {
+            const changeHistoryResponse = await fetch(`/api/bid-cards/${bidCardId}/change-history`, {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("admin_session_id")}`,
+              },
+            });
+
+            if (changeHistoryResponse.ok) {
+              const changeHistoryData = await changeHistoryResponse.json();
+              setChangeHistoryData(changeHistoryData);
+              
+              // Show notification for new change
+              if (payload.new) {
+                const change = payload.new as any;
+                console.log(`New change detected: ${change.change_summary} from ${change.source_agent}`);
+              }
+            }
+          } catch (error) {
+            console.error('Error reloading change history:', error);
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      bidCardSubscription.unsubscribe();
+      changeLogSubscription.unsubscribe();
+    };
   }, [bidCardId]);
 
   const getStatusColor = (status: string) => {
@@ -218,6 +357,254 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
     if (diffInHours < 1) return "Just now";
     if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
     return `${Math.floor(diffInHours / 24)}d ago`;
+  };
+
+  const renderChangeHistoryTab = () => {
+    if (!changeHistoryData) {
+      return (
+        <div className="bg-white rounded-lg p-8 text-center">
+          <div className="text-gray-400 text-6xl mb-4">📝</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Change History</h3>
+          <p className="text-gray-600">
+            Change tracking data is not available for this bid card.
+          </p>
+        </div>
+      );
+    }
+
+    const { change_logs, summary } = changeHistoryData;
+
+    if (change_logs.length === 0) {
+      return (
+        <div className="bg-white rounded-lg p-8 text-center">
+          <div className="text-gray-400 text-6xl mb-4">📝</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Changes Yet</h3>
+          <p className="text-gray-600">
+            This bid card has not been modified by homeowner interactions with other agents.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Summary Statistics */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Change Summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{summary.total_changes}</div>
+              <div className="text-sm text-gray-500">Total Changes</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-600">{summary.major_changes}</div>
+              <div className="text-sm text-gray-500">Major Changes</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600">{summary.pending_approval}</div>
+              <div className="text-sm text-gray-500">Pending Approval</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {summary.most_active_agent || "None"}
+              </div>
+              <div className="text-sm text-gray-500">Most Active Agent</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Agent Breakdown */}
+        {Object.keys(summary.agent_breakdown).length > 0 && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Changes by Agent</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {Object.entries(summary.agent_breakdown).map(([agent, count]) => (
+                <div key={agent} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <div className="font-medium text-gray-900 capitalize">{agent}</div>
+                    <div className="text-sm text-gray-600">{agent === 'cia' ? 'Contractor Interface' : agent === 'messaging' ? 'Messaging System' : agent}</div>
+                  </div>
+                  <div className="text-xl font-bold text-blue-600">{count}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Change History Timeline */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Change History Timeline</h3>
+          <div className="space-y-4">
+            {change_logs.map((change, index) => (
+              <div key={change.id || index} className="border border-gray-200 rounded-lg p-4">
+                {/* Change Header */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-2xl">{change.change_category}</span>
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900">{change.change_summary}</h4>
+                      <div className="flex items-center space-x-3 mt-1">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          change.significance_level === 'major' 
+                            ? 'bg-red-100 text-red-800' 
+                            : change.significance_level === 'moderate' 
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {change.significance_level} impact
+                        </span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          change.change_impact === 'high' 
+                            ? 'bg-red-100 text-red-800' 
+                            : change.change_impact === 'medium' 
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {change.change_impact} change impact
+                        </span>
+                        <span className="text-sm text-gray-600">by {change.source_agent}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-500">{change.time_ago}</div>
+                </div>
+
+                {/* Changed Fields */}
+                {change.changed_fields && change.changed_fields.length > 0 && (
+                  <div className="mb-3">
+                    <h5 className="text-sm font-medium text-gray-700 mb-2">Fields Changed:</h5>
+                    <div className="flex flex-wrap gap-2">
+                      {change.changed_fields.map((field, fieldIndex) => (
+                        <span key={fieldIndex} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700">
+                          {field.replace('_', ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Before/After States */}
+                {change.before_state && change.after_state && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <h6 className="text-sm font-medium text-red-800 mb-2">Before:</h6>
+                      <div className="text-sm text-red-700">
+                        {Object.entries(change.before_state).map(([key, value]) => (
+                          <div key={key} className="flex justify-between">
+                            <span className="font-medium">{key.replace('_', ' ')}:</span>
+                            <span>{String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <h6 className="text-sm font-medium text-green-800 mb-2">After:</h6>
+                      <div className="text-sm text-green-700">
+                        {Object.entries(change.after_state).map(([key, value]) => (
+                          <div key={key} className="flex justify-between">
+                            <span className="font-medium">{key.replace('_', ' ')}:</span>
+                            <span>{String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Conversation Snippet */}
+                {change.conversation_snippet && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3">
+                    <h6 className="text-sm font-medium text-gray-700 mb-2">Conversation Context:</h6>
+                    <p className="text-sm text-gray-600 italic">"{change.conversation_snippet}"</p>
+                  </div>
+                )}
+
+                {/* Contractor Notification Info */}
+                {change.contractors_notified > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-600">Contractors notified:</span>
+                      <span className="font-medium text-gray-900">{change.contractors_notified}</span>
+                    </div>
+                    {change.notification_sent_at && (
+                      <span className="text-gray-500">
+                        Notified {formatTimeAgo(change.notification_sent_at)}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Approval Status */}
+                {change.approval_required && (
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      change.approval_status === 'approved' 
+                        ? 'bg-green-100 text-green-800'
+                        : change.approval_status === 'rejected'
+                        ? 'bg-red-100 text-red-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {change.approval_status === 'auto_applied' ? 'Auto Applied' : change.approval_status}
+                    </span>
+                    {change.approval_status === 'pending' && (
+                      <div className="space-x-2">
+                        <button 
+                          onClick={() => handleApproveChange(change.id, 'approved')}
+                          className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+                        >
+                          Approve
+                        </button>
+                        <button 
+                          onClick={() => handleApproveChange(change.id, 'rejected')}
+                          className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const handleApproveChange = async (changeLogId: string, status: 'approved' | 'rejected') => {
+    try {
+      const response = await fetch(`/api/bid-cards/${bidCardId}/approve-change/${changeLogId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem("admin_session_id")}`,
+        },
+        body: JSON.stringify({
+          status: status,
+          approved_by: 'admin_user', // Could be dynamic based on logged-in user
+          rejection_reason: status === 'rejected' ? 'Rejected via admin panel' : undefined
+        })
+      });
+
+      if (response.ok) {
+        // Refresh change history data
+        const changeHistoryResponse = await fetch(`/api/bid-cards/${bidCardId}/change-history`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("admin_session_id")}`,
+          },
+        });
+
+        if (changeHistoryResponse.ok) {
+          const changeHistoryData = await changeHistoryResponse.json();
+          setChangeHistoryData(changeHistoryData);
+        }
+      } else {
+        console.error('Failed to update change approval status');
+      }
+    } catch (error) {
+      console.error('Error updating change approval:', error);
+    }
   };
 
   const renderOverviewTab = () => {
@@ -1350,6 +1737,203 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
     );
   }
 
+  const renderConnectionFeeTab = () => {
+    if (!lifecycleData) return null;
+    
+    const { connection_fee } = lifecycleData;
+    
+    return (
+      <div className="bg-white rounded-lg p-6 shadow-sm">
+        <div className="space-y-6">
+          {/* Winner Selection Status */}
+          <div className="border-b pb-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Winner Selection Status</h3>
+            
+            {connection_fee.winner_selected ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-3">
+                  <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                  <span className="font-medium text-green-800">Contractor Selected</span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Selected At:</span>
+                    <span className="ml-2 font-medium text-gray-900">
+                      {connection_fee.winner_selected_at ? new Date(connection_fee.winner_selected_at).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Winning Bid:</span>
+                    <span className="ml-2 font-medium text-green-600">
+                      ${connection_fee.winning_bid_amount?.toLocaleString() || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                  <span className="font-medium text-yellow-800">No Winner Selected</span>
+                </div>
+                <p className="text-sm text-yellow-700">
+                  Homeowner has not yet selected a winning contractor for this project.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Connection Fee Details */}
+          {connection_fee.winner_selected && connection_fee.connection_fee_data && (
+            <div className="border-b pb-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Connection Fee Details</h3>
+              
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600 block">Base Fee:</span>
+                    <span className="font-medium text-gray-900">
+                      ${connection_fee.connection_fee_data.base_fee_amount?.toLocaleString() || 'N/A'}
+                    </span>
+                  </div>
+                  
+                  <div>
+                    <span className="text-gray-600 block">Category Adjustment:</span>
+                    <span className={`font-medium ${
+                      (connection_fee.connection_fee_data.category_adjustment || 0) >= 0 
+                        ? 'text-red-600' 
+                        : 'text-green-600'
+                    }`}>
+                      {connection_fee.connection_fee_data.category_adjustment ? 
+                        `${connection_fee.connection_fee_data.category_adjustment > 0 ? '+' : ''}${(connection_fee.connection_fee_data.category_adjustment * 100).toFixed(0)}%` : 
+                        '0%'
+                      }
+                    </span>
+                  </div>
+                  
+                  <div>
+                    <span className="text-gray-600 block">Final Amount:</span>
+                    <span className="font-bold text-lg text-blue-600">
+                      ${connection_fee.connection_fee_data.final_fee_amount?.toLocaleString() || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Payment Status */}
+          {connection_fee.winner_selected && connection_fee.connection_fee_data && (
+            <div className="border-b pb-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Status</h3>
+              
+              <div className={`rounded-lg p-4 ${
+                connection_fee.connection_fee_data.fee_status === 'paid' 
+                  ? 'bg-green-50 border border-green-200'
+                  : connection_fee.connection_fee_data.fee_status === 'calculated'
+                  ? 'bg-yellow-50 border border-yellow-200'
+                  : 'bg-gray-50 border border-gray-200'
+              }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${
+                      connection_fee.connection_fee_data.fee_status === 'paid' 
+                        ? 'bg-green-400'
+                        : connection_fee.connection_fee_data.fee_status === 'calculated'
+                        ? 'bg-yellow-400'
+                        : 'bg-gray-400'
+                    }`}></div>
+                    <span className={`font-medium ${
+                      connection_fee.connection_fee_data.fee_status === 'paid' 
+                        ? 'text-green-800'
+                        : connection_fee.connection_fee_data.fee_status === 'calculated'
+                        ? 'text-yellow-800'
+                        : 'text-gray-800'
+                    }`}>
+                      {connection_fee.connection_fee_data.fee_status === 'paid' 
+                        ? 'Payment Completed'
+                        : connection_fee.connection_fee_data.fee_status === 'calculated'
+                        ? 'Payment Pending'
+                        : 'Fee Not Calculated'
+                      }
+                    </span>
+                  </div>
+
+                  {/* Admin Actions */}
+                  {connection_fee.connection_fee_data.fee_status === 'calculated' && (
+                    <button
+                      onClick={() => {
+                        // TODO: Implement payment reminder functionality
+                        console.log('Send payment reminder for fee:', connection_fee.connection_fee_data.fee_id);
+                      }}
+                      className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                    >
+                      Send Payment Reminder
+                    </button>
+                  )}
+                </div>
+
+                {/* Payment Details */}
+                <div className="text-sm space-y-2">
+                  {connection_fee.connection_fee_data.payment_processed_at && (
+                    <div>
+                      <span className="text-gray-600">Payment Date:</span>
+                      <span className="ml-2 font-medium text-gray-900">
+                        {new Date(connection_fee.connection_fee_data.payment_processed_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {connection_fee.connection_fee_data.payment_method && (
+                    <div>
+                      <span className="text-gray-600">Payment Method:</span>
+                      <span className="ml-2 font-medium text-gray-900">
+                        {connection_fee.connection_fee_data.payment_method}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {connection_fee.connection_fee_data.payment_transaction_id && (
+                    <div>
+                      <span className="text-gray-600">Transaction ID:</span>
+                      <span className="ml-2 font-mono text-sm text-gray-700">
+                        {connection_fee.connection_fee_data.payment_transaction_id}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Fee Calculation Guide */}
+          {!connection_fee.winner_selected && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Connection Fee System</h3>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-3">How Connection Fees Work</h4>
+                <div className="text-sm text-blue-800 space-y-2">
+                  <p>• Contractors pay a connection fee when selected by homeowners</p>
+                  <p>• Fee amount is based on the winning bid amount:</p>
+                  <ul className="ml-4 space-y-1">
+                    <li>• $20 for bids under $500</li>
+                    <li>• $35 for bids $500-$1,500</li>
+                    <li>• $50 for bids $1,500-$5,000</li>
+                    <li>• $100 for bids $5,000-$15,000</li>
+                    <li>• $250 for bids over $15,000</li>
+                  </ul>
+                  <p>• Additional adjustments may apply based on project category</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Always render the modal structure, even while loading
   // This prevents the modal from disappearing
 
@@ -1357,6 +1941,8 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
     { id: "overview", name: "Overview", icon: "📊" },
     { id: "campaign-outreach", name: "Campaign & Outreach", icon: "🎯" },
     { id: "bids", name: "Submitted Bids", icon: "💰" },
+    { id: "connection-fee", name: "Connection Fee", icon: "💳" },
+    { id: "change-history", name: "Change History", icon: "📝" },
     { id: "timeline", name: "Timeline", icon: "📅" },
   ];
 
@@ -1424,6 +2010,8 @@ const BidCardLifecycleView: React.FC<BidCardLifecycleViewProps> = ({ bidCardId, 
               {activeTab === "overview" && renderOverviewTab()}
               {activeTab === "campaign-outreach" && renderCampaignOutreachTab()}
               {activeTab === "bids" && renderBidsTab()}
+              {activeTab === "connection-fee" && renderConnectionFeeTab()}
+              {activeTab === "change-history" && renderChangeHistoryTab()}
               {activeTab === "timeline" && renderTimelineTab()}
             </>
           ) : null}

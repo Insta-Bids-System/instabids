@@ -24,7 +24,7 @@ def demonstrate_iris_success():
     
     iris_request = {
         "message": "I want a modern bathroom with subway tiles and a walk-in shower. Can you show me what it would look like?",
-        "homeowner_id": USER_ID,
+        "user_id": USER_ID,
         "board_id": BOARD_ID,
         "conversation_context": []
     }

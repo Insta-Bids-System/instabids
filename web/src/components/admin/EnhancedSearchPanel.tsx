@@ -6,7 +6,7 @@ interface SearchResult {
   bid_cards: Array<{
     id: string;
     bid_card_number: string;
-    homeowner_id?: string;
+    user_id?: string;
     homeowner_name?: string;
     project_type: string;
     status: string;
@@ -17,7 +17,7 @@ interface SearchResult {
     location_state?: string;
   }>;
   homeowners: Array<{
-    homeowner_id: string;
+    user_id: string;
     homeowner_name: string;
     bid_card_count: number;
     email?: string;
@@ -42,7 +42,7 @@ interface SearchResult {
 }
 
 interface HomeownerSummary {
-  homeowner_id: string;
+  user_id: string;
   homeowner_name: string;
   profile?: {
     email?: string;
@@ -126,7 +126,7 @@ const EnhancedSearchPanel: React.FC = () => {
           break;
       }
 
-      const response = await fetch(`http://localhost:8008${endpoint}?${params}`, {
+      const response = await fetch(`${endpoint}?${params}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("admin_session_id")}`,
         },
@@ -190,7 +190,7 @@ const EnhancedSearchPanel: React.FC = () => {
       const field = searchType === "bid_cards" ? "homeowner_name" : 
                     searchType === "contractors" ? "contractor_name" : "homeowner_name";
       const response = await fetch(
-        `http://localhost:8008/api/admin/search/autocomplete?field=${field}&term=${encodeURIComponent(searchQuery)}`,
+        `/api/admin/search/autocomplete?field=${field}&term=${encodeURIComponent(searchQuery)}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("admin_session_id")}`,
@@ -212,7 +212,7 @@ const EnhancedSearchPanel: React.FC = () => {
     setIsLoadingDetails(true);
     try {
       const response = await fetch(
-        `http://localhost:8008/api/admin/search/homeowner/${homeownerId}/summary`,
+        `/api/admin/search/homeowner/${homeownerId}/summary`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("admin_session_id")}`,
@@ -364,9 +364,9 @@ const EnhancedSearchPanel: React.FC = () => {
                             Budget: {formatBudget(card.budget_min, card.budget_max)} • Created: {new Date(card.created_at).toLocaleDateString()}
                           </div>
                         </div>
-                        {card.homeowner_id && (
+                        {card.user_id && (
                           <button
-                            onClick={() => loadHomeownerDetails(card.homeowner_id!)}
+                            onClick={() => loadHomeownerDetails(card.user_id!)}
                             className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                           >
                             View Homeowner
@@ -385,7 +385,7 @@ const EnhancedSearchPanel: React.FC = () => {
                 <h4 className="font-medium text-gray-900 mb-3">👤 Homeowners ({searchResults.total_homeowners})</h4>
                 <div className="space-y-3">
                   {searchResults.homeowners.map((homeowner) => (
-                    <div key={homeowner.homeowner_id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300">
+                    <div key={homeowner.user_id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300">
                       <div className="flex items-center justify-between">
                         <div>
                           <h5 className="font-medium text-gray-900">{homeowner.homeowner_name}</h5>
@@ -396,7 +396,7 @@ const EnhancedSearchPanel: React.FC = () => {
                           </div>
                         </div>
                         <button
-                          onClick={() => loadHomeownerDetails(homeowner.homeowner_id)}
+                          onClick={() => loadHomeownerDetails(homeowner.user_id)}
                           className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
                         >
                           View Details

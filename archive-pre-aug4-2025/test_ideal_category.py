@@ -24,7 +24,7 @@ supabase: Client = create_client(supabase_url, supabase_key)
 test_timestamp = datetime.now().isoformat()
 vision_image_record = {
     "board_id": "26cf972b-83e4-484c-98b6-a5d1a4affee3",
-    "homeowner_id": "550e8400-e29b-41d4-a716-446655440001",
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",
     "image_url": "https://example.com/test_ideal_image.jpg",
     "thumbnail_url": "https://example.com/test_ideal_image.jpg",
     "source": "ai_generated",

@@ -29,7 +29,7 @@ async def test_messaging_system():
     
     # Test bid card ID (use one from the database)
     test_bid_card_id = "550e8400-e29b-41d4-a716-446655440001"
-    test_homeowner_id = "test-homeowner-123"
+    test_user_id = "test-homeowner-123"
     test_contractor_id = "test-contractor-456"
     
     # Test 1: Send contractor message with contact info
@@ -56,7 +56,7 @@ async def test_messaging_system():
     result2 = await process_message(
         content=homeowner_message,
         sender_type="homeowner", 
-        sender_id=test_homeowner_id,
+        sender_id=test_user_id,
         bid_card_id=test_bid_card_id,
         conversation_id=result.get('conversation_id')
     )
@@ -72,7 +72,7 @@ async def test_messaging_system():
     broadcast_result = await process_broadcast(
         content=broadcast_message,
         sender_type="homeowner",
-        sender_id=test_homeowner_id,
+        sender_id=test_user_id,
         bid_card_id=test_bid_card_id,
         recipient_type="all_contractors"
     )

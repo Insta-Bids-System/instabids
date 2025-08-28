@@ -94,7 +94,7 @@ class AdminAuthService:
 
             # Try to insert default admin (will fail if already exists, which is fine)
             try:
-                self.db.query("admin_users").insert(default_admin).execute()
+                self.db.table("admin_users").insert(default_admin).execute()
                 logger.info("Default admin user created")
             except Exception:
                 logger.info("Admin users table already exists")
@@ -129,7 +129,7 @@ class AdminAuthService:
         """Authenticate admin user and create session"""
         try:
             # Get admin user from database
-            admin_result = self.db.query("admin_users").select("*").eq("email", login_request.email).execute()
+            admin_result = self.db.table("admin_users").select("*").eq("email", login_request.email).execute()
 
             if not admin_result.data:
                 raise HTTPException(
@@ -181,10 +181,10 @@ class AdminAuthService:
                 "is_active": True
             }
 
-            self.db.query("admin_sessions").insert(session_data).execute()
+            self.db.table("admin_sessions").insert(session_data).execute()
 
             # Update last login time
-            self.db.query("admin_users").update({
+            self.db.table("admin_users").update({
                 "last_login": datetime.now().isoformat()
             }).eq("id", admin_data["id"]).execute()
 
@@ -213,8 +213,8 @@ class AdminAuthService:
         try:
             # TEMPORARY: Mock session validation for development
             # In production, this would query the actual admin_sessions table
-            if session_id and session_id.startswith("admin-"):
-                # Return mock admin user for any valid-looking session
+            if session_id and (session_id.startswith("admin-") or session_id.startswith("mock-")):
+                # Return mock admin user for any valid-looking session (admin-* or mock-*)
                 return AdminUser(
                     id="admin-user",
                     email="admin@instabids.com",
@@ -227,7 +227,7 @@ class AdminAuthService:
             
             # Original database check (will fail if tables don't exist)
             try:
-                session_result = self.db.query("admin_sessions").select("*").eq("session_id", session_id).eq("is_active", True).execute()
+                session_result = self.db.table("admin_sessions").select("*").eq("session_id", session_id).eq("is_active", True).execute()
                 if not session_result.data:
                     return None
             except Exception:
@@ -243,12 +243,12 @@ class AdminAuthService:
                 return None
 
             # Update last activity
-            self.db.query("admin_sessions").update({
+            self.db.table("admin_sessions").update({
                 "last_activity": datetime.now().isoformat()
             }).eq("session_id", session_id).execute()
 
             # Get current admin user data
-            admin_result = self.db.query("admin_users").select("*").eq("id", session_data["admin_user_id"]).execute()
+            admin_result = self.db.table("admin_users").select("*").eq("id", session_data["admin_user_id"]).execute()
 
             if not admin_result.data:
                 await self.invalidate_session(session_id)
@@ -280,13 +280,13 @@ class AdminAuthService:
         """Invalidate admin session"""
         try:
             # Get session from database
-            session_result = self.db.query("admin_sessions").select("*").eq("session_id", session_id).execute()
+            session_result = self.db.table("admin_sessions").select("*").eq("session_id", session_id).execute()
 
             if session_result.data:
                 session_data = session_result.data[0]
 
                 # Mark session as inactive in database
-                self.db.query("admin_sessions").update({
+                self.db.table("admin_sessions").update({
                     "is_active": False
                 }).eq("session_id", session_id).execute()
 
@@ -321,7 +321,7 @@ class AdminAuthService:
         """Get all active admin sessions"""
         try:
             # Query active sessions from database
-            session_results = self.db.query("admin_sessions").select("*").eq("is_active", True).execute()
+            session_results = self.db.table("admin_sessions").select("*").eq("is_active", True).execute()
 
             if not session_results.data:
                 return []
@@ -358,7 +358,7 @@ class AdminAuthService:
             current_time = datetime.now().isoformat()
 
             # Find and deactivate expired sessions
-            expired_result = self.db.query("admin_sessions").update({
+            expired_result = self.db.table("admin_sessions").update({
                 "is_active": False
             }).lt("expires_at", current_time).eq("is_active", True).execute()
 
@@ -386,7 +386,7 @@ class AdminAuthService:
             }
 
             # Store in admin_activity_log table
-            self.db.query("admin_activity_log").insert(activity_log).execute()
+            self.db.table("admin_activity_log").insert(activity_log).execute()
             logger.info(f"Admin activity: {admin_user_id} - {action}")
 
         except Exception as e:
@@ -400,11 +400,11 @@ class AdminAuthService:
             active_sessions_count = len(active_sessions)
 
             # Get total sessions from database
-            total_sessions_result = self.db.query("admin_sessions").select("count").execute()
+            total_sessions_result = self.db.table("admin_sessions").select("count").execute()
             total_sessions = total_sessions_result.data[0]["count"] if total_sessions_result.data else 0
 
             # Get admin users count
-            admin_users = self.db.query("admin_users").select("id,email,last_login,is_active").execute()
+            admin_users = self.db.table("admin_users").select("id,email,last_login,is_active").execute()
             total_admins = len(admin_users.data) if admin_users.data else 0
             active_admins = len([u for u in admin_users.data if u.get("is_active", True)]) if admin_users.data else 0
 
@@ -426,7 +426,7 @@ class AdminAuthService:
         """Create new admin user (for setup/management)"""
         try:
             # Check if user already exists
-            existing = self.db.query("admin_users").select("id").eq("email", email).execute()
+            existing = self.db.table("admin_users").select("id").eq("email", email).execute()
             if existing.data:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -445,7 +445,7 @@ class AdminAuthService:
                 "is_active": True
             }
 
-            result = self.db.query("admin_users").insert(admin_data).execute()
+            result = self.db.table("admin_users").insert(admin_data).execute()
 
             if result.data:
                 logger.info(f"Created admin user: {email}")

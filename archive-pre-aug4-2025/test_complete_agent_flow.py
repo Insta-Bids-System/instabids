@@ -24,7 +24,7 @@ def test_complete_agent_conversation():
     
     initial_request = {
         "message": "I want to generate my dream kitchen combining my current space with the industrial inspiration",
-        "homeowner_id": DEMO_HOMEOWNER_ID,
+        "user_id": DEMO_HOMEOWNER_ID,
         "board_id": DEMO_BOARD_ID,
         "conversation_context": []
     }
@@ -54,7 +54,7 @@ def test_complete_agent_conversation():
                 
                 confirmation_request = {
                     "message": "Yes, please generate my dream kitchen with exposed brick and pendant lighting",
-                    "homeowner_id": DEMO_HOMEOWNER_ID,
+                    "user_id": DEMO_HOMEOWNER_ID,
                     "board_id": DEMO_BOARD_ID,
                     "conversation_context": [
                         {"role": "user", "content": initial_request["message"]},

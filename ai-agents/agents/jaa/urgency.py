@@ -12,9 +12,14 @@ class UrgencyAssessor:
     def __init__(self):
         # Keywords that indicate different urgency levels
         self.emergency_keywords = [
-            "emergency", "urgent", "asap", "immediately", "right away",
+            "emergency", "asap", "immediately", "right away",
             "leak", "flooding", "no heat", "no hot water", "electrical issue",
             "dangerous", "safety", "broken", "not working"
+        ]
+        
+        self.urgent_keywords = [
+            "urgent", "need quickly", "time sensitive", "can't wait",
+            "priority", "high priority", "important", "pressing"
         ]
 
         self.week_keywords = [
@@ -35,12 +40,12 @@ class UrgencyAssessor:
     def assess_urgency(self, project_info: dict[str, Any]) -> str:
         """
         Assess project urgency based on extracted information
-        Returns: 'emergency', 'week', 'month', or 'flexible'
+        Returns: 'emergency', 'urgent', 'week', 'month', or 'flexible'
         """
 
         # Check for explicit urgency in collected info
         explicit_urgency = project_info.get("urgency")
-        if explicit_urgency and explicit_urgency in ["emergency", "week", "month", "flexible"]:
+        if explicit_urgency and explicit_urgency in ["emergency", "urgent", "week", "month", "flexible"]:
             return explicit_urgency
 
         # Analyze conversation content for urgency signals
@@ -81,6 +86,7 @@ class UrgencyAssessor:
         # Count urgency keywords
         urgency_scores = {
             "emergency": 0,
+            "urgent": 0,
             "week": 0,
             "month": 0,
             "flexible": 0
@@ -88,6 +94,9 @@ class UrgencyAssessor:
 
         for keyword in self.emergency_keywords:
             urgency_scores["emergency"] += full_text.count(keyword.lower())
+
+        for keyword in self.urgent_keywords:
+            urgency_scores["urgent"] += full_text.count(keyword.lower())
 
         for keyword in self.week_keywords:
             urgency_scores["week"] += full_text.count(keyword.lower())
@@ -124,13 +133,13 @@ class UrgencyAssessor:
         if any(concern in concerns for concern in emergency_concerns):
             return "emergency"
 
-        # Week-urgent project types
-        week_urgent_types = [
-            "repair", "fix", "broken", "not working"
+        # Urgent project types (need attention but not emergency)
+        urgent_types = [
+            "repair", "fix", "broken", "not working", "important repair"
         ]
 
-        if any(urgent_type in project_type for urgent_type in week_urgent_types):
-            return "week"
+        if any(urgent_type in project_type for urgent_type in urgent_types):
+            return "urgent"
 
         # Month-timeline projects (renovations, improvements)
         month_timeline_types = [
@@ -230,7 +239,8 @@ class UrgencyAssessor:
 
         # Create urgency priority map
         urgency_priority = {
-            "emergency": 4,
+            "emergency": 5,
+            "urgent": 4,
             "week": 3,
             "month": 2,
             "flexible": 1
@@ -247,8 +257,12 @@ class UrgencyAssessor:
         if signal_scores.get("emergency", 0) > 0:
             return "emergency"
 
+        # Override: if urgent signals are present, use urgent
+        if signal_scores.get("urgent", 0) > 0:
+            return "urgent"
+
         # Override: if explicit week timing mentioned with urgent project
-        if signal_scores.get("week", 0) > 0 and type_urgency in ["emergency", "week"]:
+        if signal_scores.get("week", 0) > 0 and type_urgency in ["emergency", "urgent", "week"]:
             return "week"
 
         return final_urgency
@@ -258,7 +272,8 @@ class UrgencyAssessor:
 
         descriptions = {
             "emergency": "Emergency - Immediate attention required (same day)",
-            "week": "Urgent - Start within 1 week",
+            "urgent": "Urgent - High priority, start within 2-3 days",
+            "week": "Week - Start within 1 week",
             "month": "Standard - Start within 1 month",
             "flexible": "Flexible - No specific timeline pressure"
         }
