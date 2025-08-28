@@ -43,8 +43,13 @@ try:
     
     result_text = response.choices[0].message.content
     print(f"\nOpenAI Vision Response:\n{result_text}")
-    print("\n✅ OpenAI Vision API is working!")
+    print("\n[SUCCESS] OpenAI Vision API is working!")
     
 except Exception as e:
-    print(f"\n❌ OpenAI Vision API Error: {e}")
+    print(f"\n[ERROR] OpenAI Vision API Error: {e}")
     print(f"Error type: {type(e).__name__}")
+    
+    if "401" in str(e) or "invalid_api_key" in str(e):
+        print("\n[CRITICAL] The OpenAI API key is invalid or expired!")
+        print("Please update the OPENAI_API_KEY environment variable with a valid key.")
+        print("You can get a key from: https://platform.openai.com/account/api-keys")
