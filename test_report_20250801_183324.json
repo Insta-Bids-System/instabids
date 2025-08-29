@@ -1,0 +1,210 @@
+{
+  "test_run": "20250801_183324",
+  "summary": {
+    "total": 22,
+    "passed": 12,
+    "failed": 6,
+    "partial": 2,
+    "pass_rate": "54.5%"
+  },
+  "categories": {
+    "Homepage": 3,
+    "Navigate": 1,
+    "Form": 1,
+    "Demo": 1,
+    "Project": 1,
+    "Chat": 1,
+    "Contractor": 1,
+    "API": 4,
+    "Responsive": 3,
+    "Accessibility": 1,
+    "Performance": 1,
+    "404": 1,
+    "Network": 1,
+    "Security": 1,
+    "XSS": 1
+  },
+  "results": [
+    {
+      "test": "Homepage Loading",
+      "status": "FAIL",
+      "timestamp": "2025-08-01T18:33:03.216571",
+      "error": "Page.goto: Navigation to \"http://localhost:5174/\" is interrupted by another navigation to \"about:blank\"\nCall log:\n  - navigating to \"http://localhost:5174/\", waiting until \"networkidle\"\n"
+    },
+    {
+      "test": "Homepage Elements",
+      "status": "PARTIAL",
+      "timestamp": "2025-08-01T18:33:03.390821",
+      "details": {
+        "found": [
+          "cta_buttons"
+        ]
+      }
+    },
+    {
+      "test": "Homepage Interactivity",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:03.926295"
+    },
+    {
+      "test": "Navigate to Signup",
+      "status": "FAIL",
+      "timestamp": "2025-08-01T18:33:04.056854"
+    },
+    {
+      "test": "Form Validation",
+      "status": "FAIL",
+      "timestamp": "2025-08-01T18:33:04.072885",
+      "details": {
+        "fields_found": []
+      }
+    },
+    {
+      "test": "Demo Account",
+      "status": "INFO",
+      "timestamp": "2025-08-01T18:33:04.079067"
+    },
+    {
+      "test": "Project Creation Access",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:07.088234"
+    },
+    {
+      "test": "Chat Interface",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:07.146169"
+    },
+    {
+      "test": "Contractor Portal",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:09.317962"
+    },
+    {
+      "test": "API: Root",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:09.342130",
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "test": "API: API Documentation",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:09.346318",
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "test": "API: CIA Chat Endpoint",
+      "status": "FAIL",
+      "timestamp": "2025-08-01T18:33:09.352277",
+      "details": {
+        "status": 404
+      }
+    },
+    {
+      "test": "API: Agents Status",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:09.355636",
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "test": "Responsive: Mobile",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:10.987652",
+      "details": {
+        "overflow": false,
+        "viewport": {
+          "name": "Mobile",
+          "width": 375,
+          "height": 812
+        }
+      }
+    },
+    {
+      "test": "Responsive: Tablet",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:12.640333",
+      "details": {
+        "overflow": false,
+        "viewport": {
+          "name": "Tablet",
+          "width": 768,
+          "height": 1024
+        }
+      }
+    },
+    {
+      "test": "Responsive: Desktop",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:14.316882",
+      "details": {
+        "overflow": false,
+        "viewport": {
+          "name": "Desktop",
+          "width": 1920,
+          "height": 1080
+        }
+      }
+    },
+    {
+      "test": "Accessibility",
+      "status": "PARTIAL",
+      "timestamp": "2025-08-01T18:33:14.400122",
+      "details": {
+        "images_without_alt": 0,
+        "buttons_without_text": 5,
+        "heading_issues": 0,
+        "low_contrast": 2
+      }
+    },
+    {
+      "test": "Performance",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:17.062755",
+      "details": {
+        "load_time": "0.57s",
+        "resources": {
+          "jsCount": 0,
+          "jsSize": 0,
+          "cssCount": 1,
+          "cssSize": 300,
+          "imageCount": 0,
+          "imageSize": 0
+        },
+        "console_errors": 0
+      }
+    },
+    {
+      "test": "404 Error Handling",
+      "status": "FAIL",
+      "timestamp": "2025-08-01T18:33:19.251041"
+    },
+    {
+      "test": "Network Error Handling",
+      "status": "INFO",
+      "timestamp": "2025-08-01T18:33:19.358949"
+    },
+    {
+      "test": "Security Headers",
+      "status": "FAIL",
+      "timestamp": "2025-08-01T18:33:19.374275",
+      "details": {
+        "headers": {
+          "x-frame-options": null,
+          "x-content-type-options": null,
+          "strict-transport-security": null,
+          "content-security-policy": null
+        }
+      }
+    },
+    {
+      "test": "XSS Protection",
+      "status": "PASS",
+      "timestamp": "2025-08-01T18:33:24.023320"
+    }
+  ]
+}

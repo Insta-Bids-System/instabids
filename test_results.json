@@ -1,0 +1,30 @@
+[
+  {
+    "test": "Homepage Load",
+    "status": "PASS",
+    "details": "Title: Instabids - AI-Powered Contractor Marketplace"
+  },
+  {
+    "test": "UI Elements",
+    "status": "PARTIAL",
+    "found": [
+      "InstaBids branding",
+      "Contractor section"
+    ]
+  },
+  {
+    "test": "API Connectivity",
+    "status": "PASS",
+    "api_status": "online",
+    "active_agents": [
+      "cia",
+      "jaa_legacy",
+      "cda",
+      "eaa"
+    ]
+  },
+  {
+    "test": "Responsive Design",
+    "status": "PASS"
+  }
+]

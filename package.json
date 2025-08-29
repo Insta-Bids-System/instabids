@@ -64,5 +64,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.53.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-darwin-arm64": "^4.46.2"
   }
 }
